@@ -462,6 +462,7 @@ public final class RugbyHubActivity extends Activity {
                 StringBuilder extracted=new StringBuilder();
                 String lineupColumns=null;
                 String disciplinaryColumns=null;
+                String scoreboardColumns=null;
                 try(com.tom_roush.pdfbox.pdmodel.PDDocument pdf=
                     com.tom_roush.pdfbox.pdmodel.PDDocument.load(data)){
                     com.tom_roush.pdfbox.text.PDFTextStripper stripper=
@@ -469,6 +470,7 @@ public final class RugbyHubActivity extends Activity {
                     stripper.setSortByPosition(true);
                     if(pdf.getNumberOfPages()>0)lineupColumns=extractLineupColumns(pdf);
                     disciplinaryColumns=extractDisciplinaryColumns(pdf);
+                    scoreboardColumns=extractScoreboardColumns(pdf);
                     for(int page=1;page<=pdf.getNumberOfPages();page++){
                         stripper.setStartPage(page);stripper.setEndPage(page);
                         extracted.append("PÁGINA ").append(page).append("\n\n")
@@ -478,6 +480,7 @@ public final class RugbyHubActivity extends Activity {
                 String content=extracted.toString().trim();
                 final String safeLineups=lineupColumns;
                 final String safeDiscipline=disciplinaryColumns;
+                final String safeScoreboard=scoreboardColumns;
                 runOnUiThread(()->{
                     if(!dialog.isShowing())return;
                     if(content.isEmpty()){
@@ -488,6 +491,7 @@ public final class RugbyHubActivity extends Activity {
                         java.util.LinkedHashMap<String,String> parsed=structuredActSections(content);
                         if(safeLineups!=null)parsed.put("Alineaciones",safeLineups);
                         if(safeDiscipline!=null)parsed.put("Expulsiones",safeDiscipline);
+                        if(safeScoreboard!=null)parsed.put("Marcador",safeScoreboard);
                         sections.removeAllViews();
                         
                         LinearLayout tabStack=new LinearLayout(this);
@@ -553,6 +557,27 @@ public final class RugbyHubActivity extends Activity {
                     "No se pudo leer el acta. Puedes abrir el PDF original.");});
             }finally{if(conn!=null)conn.disconnect();}
         }).start();
+    }
+    // Extract scoring rows from the score-table region, separately from page text.
+    private String extractScoreboardColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
+        for(int p=0;p<pdf.getNumberOfPages();p++){
+            try{
+                com.tom_roush.pdfbox.pdmodel.PDPage page=pdf.getPage(p);
+                float w=page.getCropBox().getWidth(),h=page.getCropBox().getHeight();
+                com.tom_roush.pdfbox.text.PDFTextStripperByArea area=
+                    new com.tom_roush.pdfbox.text.PDFTextStripperByArea();
+                area.setSortByPosition(true);
+                area.addRegion("score",new android.graphics.RectF(0,h*.16f,w,h*.21f));
+                area.extractRegions(page);
+                String score=area.getTextForRegion("score");
+                if(score==null||!score.toLowerCase(java.util.Locale.ROOT).contains("equipo local")||
+                   !score.toLowerCase(java.util.Locale.ROOT).contains("equipo visitante"))continue;
+                String parsed=parseActEventSection(score,"Marcador");
+                if(parsed.contains("Equipo local:")&&parsed.contains("Equipo visitante:")&&
+                   parsed.contains("puntos"))return parsed;
+            }catch(Exception ignored){}
+        }
+        return null;
     }
     private String extractDisciplinaryColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
         StringBuilder out=new StringBuilder();
