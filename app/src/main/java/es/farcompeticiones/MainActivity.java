@@ -102,6 +102,7 @@ public class MainActivity extends Activity {
         }
         String official=officialCalendar();
         if(!official.isEmpty()){
+            if(selectedCompetition.startsWith("Segunda División"))body.addView(txt("M14 · "+selectedCompetition+" · "+season,12,accent));
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
             Button refresh=new Button(this);refresh.setText("↻ Actualizar");refresh.setTextSize(12);refresh.setAllCaps(false);
             actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));refresh.setOnClickListener(v->refreshNative(official));
@@ -119,7 +120,7 @@ public class MainActivity extends Activity {
     String cacheKey(){return "native_"+season+"_"+category+"_"+selectedCompetition;}
     void showCachedNative(){
         String raw=getPreferences(0).getString(cacheKey(),"");
-        if(raw.isEmpty()){body.addView(txt("Pulsa Actualizar datos de MatchReady para cargar las tablas oficiales.",13,Color.LTGRAY));return;}
+        if(raw.isEmpty()){body.addView(txt("Esta competición aún no tiene datos descargados. Pulsa «Actualizar» para importar su calendario, resultados y clasificación desde MatchReady.",13,Color.LTGRAY));return;}
         try{org.json.JSONObject cached=new org.json.JSONObject(raw);if(cached.optInt("format",0)!=2){body.addView(txt("Actualiza para convertir los datos al nuevo formato.",13,Color.LTGRAY));return;}renderNative(cached);}catch(Exception ex){body.addView(txt("Los datos guardados no se pueden leer. Actualiza de nuevo.",13,Color.LTGRAY));}
     }
     String clean(String text,String marker){
@@ -321,8 +322,11 @@ public class MainActivity extends Activity {
                             org.json.JSONArray tables=obj.optJSONArray("tables");
                             if(obj.has("error")){Toast.makeText(MainActivity.this,"Error de lectura: "+obj.optString("error"),Toast.LENGTH_LONG).show();return;}
                             if(tables==null||tables.length()==0){Toast.makeText(MainActivity.this,"No se encontraron tablas. Abre la fuente oficial.",Toast.LENGTH_LONG).show();return;}
+                            int matchTables=0,standingTables=0;
+                            for(int z=0;z<tables.length();z++){org.json.JSONObject t=tables.optJSONObject(z);if(t!=null){if("matches".equals(t.optString("kind")))matchTables++;if("standing".equals(t.optString("kind")))standingTables++;}}
+                            if(matchTables==0&&standingTables==0){Toast.makeText(MainActivity.this,"No se han identificado tablas de partidos ni clasificación.",Toast.LENGTH_LONG).show();return;}
                             getPreferences(0).edit().putString(key,obj.toString()).apply();
-                            Toast.makeText(MainActivity.this,"Tablas descargadas: "+tables.length(),Toast.LENGTH_LONG).show();
+                            Toast.makeText(MainActivity.this,"Importación: "+matchTables+" jornadas y "+standingTables+" clasificaciones",Toast.LENGTH_LONG).show();
                             showCompetitionTab(selectedTab);
                         }catch(Exception ex){android.util.Log.e("FAR_IMPORT","Respuesta: "+result,ex);new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Error del lector").setMessage("Detalle: "+ex.getMessage()+"\nRespuesta: "+String.valueOf(result).substring(0,Math.min(250,String.valueOf(result).length()))).setPositiveButton("Cerrar",null).show();}
                     });
