@@ -144,7 +144,7 @@ public class MainActivity extends Activity {
             ImageView logo=new ImageView(this);
             logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(px,px);
-            lp.setMargins(2,0,4,0);
+            lp.setMargins(2,0,(int)(8*getResources().getDisplayMetrics().density),0);
             fixed.addView(logo,lp);
             new Thread(()->{
                 try{
@@ -158,7 +158,7 @@ public class MainActivity extends Activity {
             }).start();
         }
         TextView name=txt(team,11,Color.WHITE);
-        name.setPadding(1,4,1,4);
+        name.setPadding(2,4,3,4);
         name.setGravity(android.view.Gravity.CENTER_VERTICAL);
         name.setMaxLines(2);
         name.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -300,6 +300,7 @@ public class MainActivity extends Activity {
                 addStandingFixed(heading,"Equipo",(int)(getResources().getDisplayMetrics().density*168),accent);
                 android.widget.HorizontalScrollView headerScroll=new android.widget.HorizontalScrollView(this);
                 headerScroll.setHorizontalScrollBarEnabled(false);
+                headerScroll.setClipToPadding(true);
                 LinearLayout headerStats=new LinearLayout(this);
                 for(int k=2;k<labels.length;k++)addStandingFixed(headerStats,labels[k],unit,accent);
                 headerScroll.addView(headerStats);heading.addView(headerScroll,new LinearLayout.LayoutParams(0,-2,1));
@@ -325,6 +326,7 @@ public class MainActivity extends Activity {
                     addStandingTeam(line,vals[1],row.optString("crest",""),(int)(getResources().getDisplayMetrics().density*168));
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
                     scroller.setHorizontalScrollBarEnabled(false);
+                    scroller.setClipToPadding(true);
                     LinearLayout statsLine=new LinearLayout(this);
                     for(int k=2;k<vals.length-1;k++)addStandingFixed(statsLine,vals[k],unit,Color.WHITE);
                     scroller.addView(statsLine);line.addView(scroller,new LinearLayout.LayoutParams(0,-2,1));
