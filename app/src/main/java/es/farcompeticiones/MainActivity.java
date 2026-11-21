@@ -24,6 +24,7 @@ public class MainActivity extends Activity {
     String lastInspectedStructure="";
     String lastBrowserUrl="";
     int selectedMatchGroup=-1;
+    boolean showStandingDetails=false;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
@@ -85,6 +86,7 @@ public class MainActivity extends Activity {
     String farUrl(){return "https://farugby.com/";}
     void details(String competition){
         selectedCompetition=competition;
+        selectedMatchGroup=-1;
         showCompetitionTab("Calendario");
     }
     void showCompetitionTab(String tab){
@@ -182,22 +184,21 @@ public class MainActivity extends Activity {
                         if(next!=selectedMatchGroup){selectedMatchGroup=next;showCompetitionTab(selectedTab);}
                     }
                 });
-                if(selectedMatchGroup>=0){
-                    int selectedTable=groupIds.get(selectedMatchGroup);
-                    for(int i=0;i<tables.length();i++)if(i!=selectedTable){
-                        org.json.JSONObject other=tables.optJSONObject(i);
-                        if(other!=null&&other.optString("kind").equals("matches"))other.put("_hidden",true);
-                    }
-                }
+
             }
         }
         for(int i=0;i<tables.length();i++){
             org.json.JSONObject table=tables.optJSONObject(i);if(table==null)continue;
             String kind=table.optString("kind","");
-            if(table.optBoolean("_hidden",false))continue;
+            if(!selectedTab.equals("Clasificación")&&selectedMatchGroup>=0&&kind.equals("matches")){
+                int groupIndex=0;for(int k=0;k<i;k++){org.json.JSONObject prev=tables.optJSONObject(k);if(prev!=null&&prev.optString("kind").equals("matches")&&prev.optJSONArray("rows")!=null&&prev.optJSONArray("rows").length()>0)groupIndex++;}
+                if(groupIndex!=selectedMatchGroup)continue;
+            }
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
             if(selectedTab.equals("Clasificación")){
                 if(!kind.equals("standing"))continue;
+                Button expand=new Button(this);expand.setAllCaps(false);expand.setText(showStandingDetails?"Ocultar estadísticas":"Ver estadísticas completas");body.addView(expand);
+                expand.setOnClickListener(v->{showStandingDetails=!showStandingDetails;showCompetitionTab(selectedTab);});
                 LinearLayout heading=new LinearLayout(this);heading.setBackgroundColor(panel);body.addView(heading);
                 for(String h:new String[]{"#","Equipo","J","Pts"}){TextView v=txt(h,12,accent);heading.addView(v,new LinearLayout.LayoutParams(0,-2,h.equals("Equipo")?4:1));}
                 for(int j=0;j<rows.length();j++){
@@ -205,12 +206,27 @@ public class MainActivity extends Activity {
                     LinearLayout line=new LinearLayout(this);line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
                     String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),row.optString("points","—")};
                     for(int k=0;k<vals.length;k++){TextView v=txt(vals[k],k==1?12:13,Color.WHITE);line.addView(v,new LinearLayout.LayoutParams(0,-2,k==1?4:1));}
+                    if(showStandingDetails){
+                        org.json.JSONObject stats=row.optJSONObject("stats");
+                        if(stats!=null){
+                            StringBuilder detail=new StringBuilder();
+                            java.util.Iterator<String> keys=stats.keys();
+                            while(keys.hasNext()){String key=keys.next();if(detail.length()>0)detail.append("   ·   ");detail.append(key).append(": ").append(stats.optString(key));}
+                            TextView extra=txt(detail.toString(),11,Color.LTGRAY);extra.setBackgroundColor(j%2==0?panel:bg);body.addView(extra);
+                        }
+                    }
                     count++;
                 }
             }else{
                 if(!kind.equals("matches"))continue;
                 if(rows.length()==0)continue;
-                TextView head=txt(table.optString("heading","Jornada"),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
+                String full=table.optString("heading","Jornada");
+                java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?i)Jornada\\s+([0-9]+(?:\\.[0-9]+)?)").matcher(full);
+                String number=m.find()?m.group(1):"";
+                String phase=full.toLowerCase(java.util.Locale.ROOT).contains("2ª fase")?"2.ª fase":full.toLowerCase(java.util.Locale.ROOT).contains("1ª fase")?"1.ª fase":"";
+                int organizer=full.toLowerCase(java.util.Locale.ROOT).indexOf("organizador:");
+                TextView head=txt(number.isEmpty()?full:"Jornada "+number+(phase.isEmpty()?"":" · "+phase),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
+                if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+11).trim(),12,Color.LTGRAY));
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
                     String score=row.optString("score","");
@@ -246,7 +262,8 @@ public class MainActivity extends Activity {
                 if(!loaded.startsWith("https://farugby.matchready.es/"))return;
                 view.postDelayed(()->{
                     if(dataBrowser!=view||!page.equals("detail")||!key.equals(cacheKey()))return;
-                    String js="(function(){try{\nvar norm=function(s){return (s||'').trim().replace(/\\s+/g,' ')};\nvar tables=Array.from(document.querySelectorAll('table')).map(function(t){\n var tr=Array.from(t.querySelectorAll('tr'));\n var first=tr.find(function(r){return r.querySelector('th')});\n if(!first)return null;\n var h=Array.from(first.children).map(function(c){return norm(c.innerText).toLowerCase()});\n var find=function(names){return h.findIndex(function(v){return names.some(function(n){return v===n||v.indexOf(n)>=0})})};\n var home=find(['equipo local']),away=find(['equipo visitante']),score=find(['resultado']),date=find(['fecha/hora']);\n var team=find(['equipo']),played=find(['j']),points=find(['puntos','ptos','pts','punt']),position=0;\n var kind=home>=0&&away>=0&&score>=0&&date>=0?'matches':team>=0&&played>=0&&points>=0?'standing':'other';\n if(kind==='other')return null;\n var node=t,heading='';\n for(var n=0;n<8&&node;n++){node=node.previousElementSibling||node.parentElement;if(!node||node===document.body)break;if(node.matches&&node.matches('h1,h2,h3,h4,h5')){heading=norm(node.innerText);break}var x=node.querySelector&&node.querySelector('h1,h2,h3,h4,h5');if(x){heading=norm(x.innerText);break}}\n var rows=tr.slice(tr.indexOf(first)+1).map(function(r){\n var cells=Array.from(r.children).filter(function(c){return c.matches('td,th')}).map(function(c){return norm(c.innerText)});\n if(kind==='matches'){if(cells.length<=Math.max(home,away,score,date))return null;var a=cells[home],b=cells[away];if(!a||!b||a.toLowerCase()==='equipo local'||b.toLowerCase()==='equipo visitante')return null;return {when:cells[date],home:a.replace(/Árbitro:.*$/i,'').trim(),score:cells[score],away:b.replace(/Campo:.*$/i,'').trim(),extra:((a.match(/Árbitro:.*$/i)||[])[0]||'')+' '+((b.match(/Campo:.*$/i)||[])[0]||'')}}\n if(cells.length<=Math.max(team,played,points))return null;\n return {position:cells[position],team:cells[team],played:cells[played],points:cells[points]};\n }).filter(Boolean);\n return {kind:kind,heading:heading|| (kind==='matches'?'Jornada':'Clasificación'),rows:rows};\n}).filter(Boolean);\nreturn JSON.stringify({url:location.href,title:document.title,format:2,tables:tables});\n}catch(e){return JSON.stringify({error:String(e)})}})()";
+                    String js="(function(){try{\nvar norm=function(s){return (s||'').trim().replace(/\\s+/g,' ')};\nvar tables=Array.from(document.querySelectorAll('table')).map(function(t){\n var tr=Array.from(t.querySelectorAll('tr'));\n var first=tr.find(function(r){return r.querySelector('th')});\n if(!first)return null;\n var h=Array.from(first.children).map(function(c){return norm(c.innerText).toLowerCase()});\n var find=function(names){return h.findIndex(function(v){return names.some(function(n){return v===n||v.indexOf(n)>=0})})};\n var home=find(['equipo local']),away=find(['equipo visitante']),score=find(['resultado']),date=find(['fecha/hora']);\n var team=find(['equipo']),played=find(['j']),points=find(['puntos','ptos','pts','punt']),position=0;\n var kind=home>=0&&away>=0&&score>=0&&date>=0?'matches':team>=0&&played>=0&&points>=0?'standing':'other';\n if(kind==='other')return null;\n var node=t,heading='';\n for(var n=0;n<8&&node;n++){node=node.previousElementSibling||node.parentElement;if(!node||node===document.body)break;if(node.matches&&node.matches('h1,h2,h3,h4,h5')){heading=norm(node.innerText);break}var x=node.querySelector&&node.querySelector('h1,h2,h3,h4,h5');if(x){heading=norm(x.innerText);break}}\n var rows=tr.slice(tr.indexOf(first)+1).map(function(r){\n var cells=Array.from(r.children).filter(function(c){return c.matches('td,th')}).map(function(c){return norm(c.innerText)});\n if(kind==='matches'){if(cells.length<=Math.max(home,away,score,date))return null;var a=cells[home],b=cells[away];if(!a||!b||a.toLowerCase()==='equipo local'||b.toLowerCase()==='equipo visitante')return null;return {when:cells[date],home:a.replace(/Árbitro:.*$/i,'').trim(),score:cells[score],away:b.replace(/Campo:.*$/i,'').trim(),extra:((a.match(/Árbitro:.*$/i)||[])[0]||'')+' '+((b.match(/Campo:.*$/i)||[])[0]||'')}}\n if(cells.length<=Math.max(team,played,points))return null;\n var stats={};h.forEach(function(label,index){if(index!==position&&index!==team&&index!==played&&index!==points&&label)stats[label]=cells[index]||''});
+ return {position:cells[position],team:cells[team],played:cells[played],points:cells[points],stats:stats};\n }).filter(Boolean);\n return {kind:kind,heading:heading|| (kind==='matches'?'Jornada':'Clasificación'),rows:rows};\n}).filter(Boolean);\nreturn JSON.stringify({url:location.href,title:document.title,format:2,tables:tables});\n}catch(e){return JSON.stringify({error:String(e)})}})()";
                     view.evaluateJavascript(js,result->{
                         try{
                             String decoded=new org.json.JSONTokener(result).nextValue().toString();
