@@ -1261,8 +1261,22 @@ return "TITULARES ("+starterCount+")\n"+starters+
             int n=minutes==null?0:minutes.size();
             if(types!=null)n=Math.max(n,types.size());
             if(n==0){out.append("Sin incidencias registradas.\n\n");any=true;continue;}
-            boolean valid=true;
-            for(java.util.List<String> values:columns.values())if(values.size()!=n)valid=false;
+            boolean valid=types!=null&&minutes!=null&&types.size()==n&&minutes.size()==n;
+            java.util.List<String> dorsals=columns.get("dorsal");
+            // MatchReady omits the dorsal for penalty tries (EC).
+            if(valid&&dorsals!=null&&dorsals.size()!=n){
+                int expected=0;
+                for(String type:types)if(!"EC".equalsIgnoreCase(type))expected++;
+                if(dorsals.size()==expected){
+                    java.util.ArrayList<String> aligned=new java.util.ArrayList<>();
+                    int dorsalIndex=0;
+                    for(String type:types)
+                        aligned.add("EC".equalsIgnoreCase(type)?"":dorsals.get(dorsalIndex++));
+                    columns.put("dorsal",aligned);
+                }else valid=false;
+            }
+            for(java.util.Map.Entry<String,java.util.List<String>> column:columns.entrySet())
+                if(!"dorsal".equals(column.getKey())&&column.getValue().size()!=n)valid=false;
             if(!valid){
                 out.append("La tabla no se ha podido reconstruir con seguridad. Comprueba el PDF.\n");
                 out.append(normalized).append("\n\n");any=true;continue;
@@ -1271,7 +1285,7 @@ return "TITULARES ("+starterCount+")\n"+starters+
                 out.append(i+1).append(". ");
                 if(minutes!=null)out.append("Min ").append(minutes.get(i)).append(" · ");
                 if(types!=null)out.append(eventDescription(types.get(i),kind)).append(" · ");
-                if(columns.containsKey("dorsal"))out.append("Dorsal ").append(columns.get("dorsal").get(i));
+                if(columns.containsKey("dorsal")&&!columns.get("dorsal").get(i).isEmpty())out.append("Dorsal ").append(columns.get("dorsal").get(i));
                 if(columns.containsKey("dorsal entra"))out.append("Entra nº ").append(columns.get("dorsal entra").get(i));
                 if(columns.containsKey("dorsal sale"))out.append(" · Sale nº ").append(columns.get("dorsal sale").get(i));
                 out.append("\n");
