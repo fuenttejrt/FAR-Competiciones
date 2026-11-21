@@ -365,7 +365,7 @@ public class MainActivity extends Activity {
         actView.setWebViewClient(new WebViewClient(){
             @Override public void onPageFinished(WebView view,String loaded){
                 if(!loaded.startsWith("https://farugby.matchready.es/"))return;
-                String js="(function(){try{var norm=function(x){return (x||'').replace(/\\\\s+/g,' ').trim()};"+
+                String js="(function(){try{var norm=function(x){return (x||'').replace(/\\s+/g,' ').trim()};"+
                     "var sections=Array.from(document.querySelectorAll('table')).map(function(t){"+
                     "var prev=t.previousElementSibling,heading='';for(var i=0;i<5&&prev;i++,prev=prev.previousElementSibling){"+
                     "if(/H[1-6]/.test(prev.tagName)){heading=norm(prev.innerText);break;}"+
