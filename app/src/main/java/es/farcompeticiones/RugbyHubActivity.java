@@ -757,7 +757,7 @@ public final class RugbyHubActivity extends Activity {
             motiveView.setTextColor(0xffffb1a1);
             card.addView(motiveView);
             String playerName=names[team].get(item[3]);
-            TextView player=text(teamName+"  ·  Nº "+item[3]+
+            TextView player=text(teamName+"  ·  "+(item[3].isEmpty()?"Dorsal no indicado":"Nº "+item[3])+
                 (playerName==null?"":"  ·  "+playerName),12,false);
             player.setTextColor(0xffb8c9d9);card.addView(player);
         }
