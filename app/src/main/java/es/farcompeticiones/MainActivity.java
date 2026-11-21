@@ -62,11 +62,21 @@ public class MainActivity extends Activity {
     void list(){
         while(body.getChildCount()>5)body.removeViewAt(5);
         body.addView(txt("Competiciones · "+category+" · "+season,19,accent));
-        String[] entries=category.equals("M14")?new String[]{"Primera División","Segunda División · Grupos","Segunda fase","Promoción","Copa FAR"}:category.equals("M16")?new String[]{"Primera División","Segunda División · Grupos","Otras fases"}:category.equals("M18")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:new String[]{"Consultar competiciones oficiales"};
+        String[] entries;
+        if(category.equals("M14")&&season.equals("2026/27"))entries=new String[]{"Primera División","Segunda División · Grupo 1","Segunda División · Grupo 2","Copa FAR"};
+        else entries=category.equals("M14")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M16")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M18")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:new String[]{"Consultar competiciones oficiales"};
         for(String entry:entries){TextView card=txt(entry+"  ›",17,Color.WHITE);card.setBackgroundColor(panel);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,5,0,5);body.addView(card,lp);card.setOnClickListener(v->details(entry));}
-        body.addView(txt("Estructura orientativa: las divisiones y grupos deben verificarse para cada temporada.",12,Color.LTGRAY));
+        body.addView(txt(category.equals("M14")&&season.equals("2026/27")?"Competiciones contrastadas con la web oficial FAR.":"Estructura orientativa: verificar divisiones y grupos para esta temporada.",12,Color.LTGRAY));
     }
-    String farUrl(){return category.equals("M14")?"https://farugby.com/categoria-m14/":category.equals("M16")?"https://farugby.com/categoria-m16/":category.equals("M18")?"https://farugby.com/categoria-m18/":"https://farugby.com/";}
+    String officialCalendar(){
+        if(!season.equals("2026/27")||!category.equals("M14"))return "";
+        if(selectedCompetition.equals("Primera División"))return "https://farugby.matchready.es/es/public/calendar/35/11/combined/";
+        if(selectedCompetition.equals("Segunda División · Grupo 1"))return "https://farugby.matchready.es/es/public/calendar/35/12/combined/";
+        if(selectedCompetition.equals("Segunda División · Grupo 2"))return "https://farugby.matchready.es/es/public/calendar/35/15/combined/";
+        if(selectedCompetition.equals("Copa FAR"))return "https://farugby.matchready.es/es/public/calendar/35/83/combined/";
+        return "";
+    }
+    String farUrl(){return "https://farugby.com/";}
     void details(String competition){
         selectedCompetition=competition;
         showCompetitionTab("Calendario");
@@ -80,10 +90,14 @@ public class MainActivity extends Activity {
             tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->showCompetitionTab(item));
         }
         body.addView(txt(tab.toUpperCase(),18,accent));
-        body.addView(txt("Sin datos sincronizados todavía. Estamos preparando la lectura de los datos públicos de MatchReady. No se muestran marcadores ni clasificaciones sin verificar.",14,Color.LTGRAY));
+        String official=officialCalendar();
+        if(!official.isEmpty()){
+            body.addView(txt("Fuente: calendario público oficial FAR / MatchReady · "+season,13,accent));
+            button("Ver "+tab.toLowerCase()+" oficial",()->openBrowser(official));
+        }else body.addView(txt("Sin datos sincronizados. No se muestran resultados ni clasificaciones sin verificar.",14,Color.LTGRAY));
         String saved=getPreferences(0).getString("url_"+season+"_"+category+"_"+selectedCompetition,"");
-        if(saved.startsWith("https://farugby.matchready.es/"))button("Consultar "+tab.toLowerCase()+" en MatchReady",()->openBrowser(saved));
-        else button("Buscar "+tab.toLowerCase()+" en MatchReady",()->openBrowser("https://farugby.matchready.es/"));
+        if(official.isEmpty()&&saved.startsWith("https://farugby.matchready.es/"))button("Consultar "+tab.toLowerCase()+" en MatchReady",()->openBrowser(saved));
+        else if(official.isEmpty())button("Buscar "+tab.toLowerCase()+" en MatchReady",()->openBrowser("https://farugby.matchready.es/"));
         body.addView(txt("FUENTES OFICIALES",17,accent));
         button("Consultar categoría en FAR",()->openBrowser(farUrl()));
         button("Consultar MatchReady",()->openBrowser("https://farugby.matchready.es/"));
