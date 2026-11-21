@@ -27,9 +27,26 @@ jobs:
             echo "Falta configurar el secreto FAR_SIGNING_PASSWORD"
             exit 1
           fi
-          base64 --decode app/signing/release.jks.enc.b64 > "$RUNNER_TEMP/release.jks.enc"
-          printf '%s' "$FAR_SIGNING_PASSWORD" | openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$RUNNER_TEMP/release.jks.enc" -out "$RUNNER_TEMP/far-release.jks" -pass stdin
+          if [ "${#FAR_SIGNING_PASSWORD}" -lt 6 ]; then
+            echo "La contraseña de firma debe tener al menos 6 caracteres"
+            exit 1
+          fi
+          if [ -f app/signing/release.jks.enc.b64 ]; then
+            base64 --decode app/signing/release.jks.enc.b64 > "$RUNNER_TEMP/release.jks.enc"
+            printf '%s' "$FAR_SIGNING_PASSWORD" | openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$RUNNER_TEMP/release.jks.enc" -out "$RUNNER_TEMP/far-release.jks" -pass stdin
+          else
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/far-release.jks" -storetype PKCS12 -alias "$FAR_KEY_ALIAS" -keyalg RSA -keysize 3072 -validity 10000 -dname "CN=FAR Competiciones, O=FAR Competiciones, C=ES" -storepass "$FAR_SIGNING_PASSWORD" -keypass "$FAR_SIGNING_PASSWORD"
+            mkdir -p app/signing
+            printf '%s' "$FAR_SIGNING_PASSWORD" | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$RUNNER_TEMP/far-release.jks" -out "$RUNNER_TEMP/release.jks.enc" -pass stdin
+            base64 -w 0 "$RUNNER_TEMP/release.jks.enc" > app/signing/release.jks.enc.b64
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/signing/release.jks.enc.b64
+            git commit -m "Guardar clave de firma cifrada para actualizaciones"
+            git push origin HEAD:main
+          fi
           echo "FAR_KEYSTORE_PATH=$RUNNER_TEMP/far-release.jks" >> "$GITHUB_ENV"
+          echo "FAR_KEYSTORE_PASSWORD=$FAR_SIGNING_PASSWORD" >> "$GITHUB_ENV"
       - name: Compilar APK firmada
         run: gradle --no-daemon :app:assembleRelease
       - uses: actions/upload-artifact@v4
