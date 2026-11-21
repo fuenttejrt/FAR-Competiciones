@@ -884,7 +884,7 @@ public final class RugbyHubActivity extends Activity {
         int[] score={0,0};
         int side=-1;
         java.util.regex.Pattern row=java.util.regex.Pattern.compile(
-            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*(.*?)\\s*·\\s*Dorsal\\s+(\\d+)\\s*$");
+            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*(.*?)(?:\\s*·\\s*Dorsal\\s+(\\d+)|\\s*·\\s*Dorsal no indicado)?\\s*$");
         for(String line:(events==null?"":events).split("\\r?\\n")){
             String t=line.trim();
             if(t.toLowerCase(java.util.Locale.ROOT).startsWith("equipo local:"))side=0;
@@ -898,8 +898,8 @@ public final class RugbyHubActivity extends Activity {
                 if(!points.find())continue;
                 int value=Integer.parseInt(points.group(1));
                 score[side]+=value;
-                String dorsal=m.group(3);
-                String playerName=players[side].get(dorsal);
+                String dorsal=m.group(3)==null?"":m.group(3);
+                String playerName=dorsal.isEmpty()?"":players[side].get(dorsal);
                 items.add(new String[]{m.group(1),type.replaceAll("\\s*\\(\\d+\\s+puntos?\\)",""),
                     dorsal,playerName==null?"":playerName,String.valueOf(value),String.valueOf(side)});
             }
