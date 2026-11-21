@@ -885,6 +885,12 @@ public final class RugbyHubActivity extends Activity {
             warning.setPadding(dp(4),dp(8),dp(4),0);
             header.addView(warning);
         }
+        if(!hasOfficial){
+            TextView warning=text("No se ha podido verificar el resultado oficial. El total extraído del PDF puede ser incompleto.",11,false);
+            warning.setTextColor(0xffffcf85);
+            warning.setPadding(dp(4),dp(8),dp(4),0);
+            header.addView(warning);
+        }
         if(items.isEmpty()){
             TextView empty=text("No se han identificado anotaciones suficientes. Consulta el PDF original.",13,false);
             empty.setPadding(dp(6),dp(16),dp(6),dp(8));host.addView(empty);
@@ -908,7 +914,7 @@ public final class RugbyHubActivity extends Activity {
                 item[3]+"  ·  Nº "+item[2];
             TextView detail=text(names[Integer.parseInt(item[5])]+"  ·  "+who,11,false);
             detail.setTextColor(0xffb8c9d9);card.addView(detail);
-            TextView partial=text("Marcador acumulado: "+accumulated,11,true);
+            TextView partial=text((mismatch||!hasOfficial?"Anotaciones identificadas hasta aquí: ":"Marcador acumulado: ")+accumulated,11,true);
             partial.setTextColor(0xff82c7ff);card.addView(partial);
         }
     }
