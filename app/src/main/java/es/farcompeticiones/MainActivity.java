@@ -136,6 +136,35 @@ public class MainActivity extends Activity {
         }
         return cells;
     }
+    void addStandingTeam(LinearLayout parent,String team,String crest,int width){
+        LinearLayout fixed=new LinearLayout(this);
+        fixed.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int px=(int)(getResources().getDisplayMetrics().density*30);
+        if(crest.startsWith("https://")){
+            ImageView logo=new ImageView(this);
+            logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(px,px);
+            lp.setMargins(2,0,4,0);
+            fixed.addView(logo,lp);
+            new Thread(()->{
+                try{
+                    java.net.HttpURLConnection connection=(java.net.HttpURLConnection)new java.net.URL(crest).openConnection();
+                    connection.setConnectTimeout(4500);connection.setReadTimeout(4500);
+                    try(java.io.InputStream input=connection.getInputStream()){
+                        android.graphics.Bitmap bitmap=android.graphics.BitmapFactory.decodeStream(input);
+                        if(bitmap!=null)runOnUiThread(()->logo.setImageBitmap(bitmap));
+                    }finally{connection.disconnect();}
+                }catch(Exception ignored){}
+            }).start();
+        }
+        TextView name=txt(team,11,Color.WHITE);
+        name.setPadding(1,4,1,4);
+        name.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        name.setMaxLines(2);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        fixed.addView(name,new LinearLayout.LayoutParams(0,-2,1));
+        parent.addView(fixed,new LinearLayout.LayoutParams(width,-2));
+    }
     void addStandingFixed(LinearLayout parent,String value,int width,int color){
         TextView cell=txt(value,11,color);
         cell.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.CENTER_HORIZONTAL);
@@ -262,8 +291,7 @@ public class MainActivity extends Activity {
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
             if(selectedTab.equals("Clasificación")){
                 if(!kind.equals("standing"))continue;
-                Button expand=new Button(this);expand.setAllCaps(false);expand.setText(showStandingDetails?"Ocultar estadísticas":"Ver estadísticas completas");body.addView(expand);
-                expand.setOnClickListener(v->{showStandingDetails=!showStandingDetails;showCompetitionTab(selectedTab);});
+                body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
                 String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
                 int unit=(int)(getResources().getDisplayMetrics().density*42);
                 java.util.ArrayList<android.widget.HorizontalScrollView> scrollRows=new java.util.ArrayList<>();
@@ -294,7 +322,7 @@ public class MainActivity extends Activity {
                         standingStat(stats,"bd","bonus defensivo"),
                         row.optString("points","—")};
                     addStandingFixed(line,vals[0],unit*3/5,Color.WHITE);
-                    addStandingFixed(line,vals[1],unit*4,Color.WHITE);
+                    addStandingTeam(line,vals[1],row.optString("crest",""),unit*4);
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
                     scroller.setHorizontalScrollBarEnabled(false);
                     LinearLayout statsLine=new LinearLayout(this);
@@ -302,7 +330,7 @@ public class MainActivity extends Activity {
                     scroller.addView(statsLine);line.addView(scroller,new LinearLayout.LayoutParams(0,-2,1));
                     addStandingFixed(line,vals[vals.length-1],unit,accent);
                     scrollRows.add(scroller);
-                    if(showStandingDetails){
+                    if(false){
                         if(stats!=null){
                             StringBuilder detail=new StringBuilder();
                             java.util.Iterator<String> keys=stats.keys();
@@ -365,7 +393,7 @@ public class MainActivity extends Activity {
                 if(!loaded.startsWith("https://farugby.matchready.es/"))return;
                 view.postDelayed(()->{
                     if(dataBrowser!=view||!page.equals("detail")||!key.equals(cacheKey()))return;
-                    String js="(function(){try{\nvar norm=function(s){return (s||'').trim().replace(/\\s+/g,' ')};\nvar tables=Array.from(document.querySelectorAll('table')).map(function(t){\n var tr=Array.from(t.querySelectorAll('tr'));\n var first=tr.find(function(r){return r.querySelector('th')});\n if(!first)return null;\n var h=Array.from(first.children).map(function(c){return norm(c.innerText).toLowerCase()});\n var find=function(names){return h.findIndex(function(v){return names.some(function(n){return v===n||v.indexOf(n)>=0})})};\n var home=find(['equipo local']),away=find(['equipo visitante']),score=find(['resultado']),date=find(['fecha/hora']);\n var team=find(['equipo']),played=find(['j']),points=find(['puntos','ptos','pts','punt']),position=0;\n var kind=home>=0&&away>=0&&score>=0&&date>=0?'matches':team>=0&&played>=0&&points>=0?'standing':'other';\n if(kind==='other')return null;\n var node=t,heading='';\n for(var n=0;n<8&&node;n++){node=node.previousElementSibling||node.parentElement;if(!node||node===document.body)break;if(node.matches&&node.matches('h1,h2,h3,h4,h5')){heading=norm(node.innerText);break}var x=node.querySelector&&node.querySelector('h1,h2,h3,h4,h5');if(x){heading=norm(x.innerText);break}}\n var rows=tr.slice(tr.indexOf(first)+1).map(function(r){\n var cells=Array.from(r.children).filter(function(c){return c.matches('td,th')}).map(function(c){return norm(c.innerText)});\n if(kind==='matches'){if(cells.length<=Math.max(home,away,score,date))return null;var a=cells[home],b=cells[away];if(!a||!b||a.toLowerCase()==='equipo local'||b.toLowerCase()==='equipo visitante')return null;return {when:cells[date],home:a.replace(/Árbitro:.*$/i,'').trim(),score:cells[score],away:b.replace(/Campo:.*$/i,'').trim(),extra:((a.match(/Árbitro:.*$/i)||[])[0]||'')+' '+((b.match(/Campo:.*$/i)||[])[0]||'')}}\n if(cells.length<=Math.max(team,played,points))return null;\n var stats={};h.forEach(function(label,index){if(index!==position&&index!==team&&index!==played&&index!==points&&label)stats[label]=cells[index]||''});\n return {position:cells[position],team:cells[team],played:cells[played],points:cells[points],stats:stats};\n }).filter(Boolean);\n return {kind:kind,heading:heading|| (kind==='matches'?'Jornada':'Clasificación'),rows:rows};\n}).filter(Boolean);\nreturn JSON.stringify({url:location.href,title:document.title,format:2,tables:tables});\n}catch(e){return JSON.stringify({error:String(e)})}})()";
+                    String js="(function(){try{\nvar norm=function(s){return (s||'').trim().replace(/\\s+/g,' ')};\nvar tables=Array.from(document.querySelectorAll('table')).map(function(t){\n var tr=Array.from(t.querySelectorAll('tr'));\n var first=tr.find(function(r){return r.querySelector('th')});\n if(!first)return null;\n var h=Array.from(first.children).map(function(c){return norm(c.innerText).toLowerCase()});\n var find=function(names){return h.findIndex(function(v){return names.some(function(n){return v===n||v.indexOf(n)>=0})})};\n var home=find(['equipo local']),away=find(['equipo visitante']),score=find(['resultado']),date=find(['fecha/hora']);\n var team=find(['equipo']),played=find(['j']),points=find(['puntos','ptos','pts','punt']),position=0;\n var kind=home>=0&&away>=0&&score>=0&&date>=0?'matches':team>=0&&played>=0&&points>=0?'standing':'other';\n if(kind==='other')return null;\n var node=t,heading='';\n for(var n=0;n<8&&node;n++){node=node.previousElementSibling||node.parentElement;if(!node||node===document.body)break;if(node.matches&&node.matches('h1,h2,h3,h4,h5')){heading=norm(node.innerText);break}var x=node.querySelector&&node.querySelector('h1,h2,h3,h4,h5');if(x){heading=norm(x.innerText);break}}\n var rows=tr.slice(tr.indexOf(first)+1).map(function(r){\n var cells=Array.from(r.children).filter(function(c){return c.matches('td,th')}).map(function(c){return norm(c.innerText)});\n if(kind==='matches'){if(cells.length<=Math.max(home,away,score,date))return null;var a=cells[home],b=cells[away];if(!a||!b||a.toLowerCase()==='equipo local'||b.toLowerCase()==='equipo visitante')return null;return {when:cells[date],home:a.replace(/Árbitro:.*$/i,'').trim(),score:cells[score],away:b.replace(/Campo:.*$/i,'').trim(),extra:((a.match(/Árbitro:.*$/i)||[])[0]||'')+' '+((b.match(/Campo:.*$/i)||[])[0]||'')}}\n if(cells.length<=Math.max(team,played,points))return null;\n var stats={};h.forEach(function(label,index){if(index!==position&&index!==team&&index!==played&&index!==points&&label)stats[label]=cells[index]||''});\n var teamCell=Array.from(r.children).filter(function(c){return c.matches('td,th')})[team];var crestImg=teamCell&&teamCell.querySelector('img');var crest=crestImg?(crestImg.currentSrc||crestImg.src||''):'';return {position:cells[position],team:cells[team],played:cells[played],points:cells[points],stats:stats,crest:crest};\n }).filter(Boolean);\n return {kind:kind,heading:heading|| (kind==='matches'?'Jornada':'Clasificación'),rows:rows};\n}).filter(Boolean);\nreturn JSON.stringify({url:location.href,title:document.title,format:2,tables:tables});\n}catch(e){return JSON.stringify({error:String(e)})}})()";
                     view.evaluateJavascript(js,result->{
                         try{
                             String decoded=new org.json.JSONTokener(result).nextValue().toString();
