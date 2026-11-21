@@ -159,6 +159,20 @@ public class MainActivity extends Activity {
         String extra=(referee+" "+field).trim();
         if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
     }
+    boolean isPlayedMatch(org.json.JSONObject row){
+        String score=row.optString("score","").trim();
+        if(!isScore(score))return false;
+        String when=row.optString("when","");
+        java.util.regex.Matcher date=java.util.regex.Pattern.compile("(\\\\d{2})/(\\\\d{2})/(\\\\d{4})").matcher(when);
+        if(date.find()){
+            try{
+                java.util.Calendar match=java.util.Calendar.getInstance();
+                match.set(java.lang.Integer.parseInt(date.group(3)),java.lang.Integer.parseInt(date.group(2))-1,java.lang.Integer.parseInt(date.group(1)),23,59,59);
+                if(match.getTimeInMillis()>System.currentTimeMillis())return false;
+            }catch(Exception ignored){}
+        }
+        return true;
+    }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
@@ -225,12 +239,15 @@ public class MainActivity extends Activity {
                 String number=m.find()?m.group(1):"";
                 String phase=full.toLowerCase(java.util.Locale.ROOT).contains("2ª fase")?"2.ª fase":full.toLowerCase(java.util.Locale.ROOT).contains("1ª fase")?"1.ª fase":"";
                 int organizer=full.toLowerCase(java.util.Locale.ROOT).indexOf("organizador:");
+                int visibleRows=0;
+                for(int n=0;n<rows.length();n++){org.json.JSONObject candidate=rows.optJSONObject(n);if(candidate!=null&&(!selectedTab.equals("Resultados")||isPlayedMatch(candidate)))visibleRows++;}
+                if(visibleRows==0)continue;
                 TextView head=txt(number.isEmpty()?full:"Jornada "+number+(phase.isEmpty()?"":" · "+phase),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
-                if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+11).trim(),12,Color.LTGRAY));
+                if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\\\s*[:\\\\-]\\\\s*","").trim(),12,Color.LTGRAY));
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
                     String score=row.optString("score","");
-                    if(selectedTab.equals("Resultados")&&!isScore(score))continue;
+                    if(selectedTab.equals("Resultados")&&!isPlayedMatch(row))continue;
                     LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(10,8,10,8);card.setBackgroundColor(panel);
                     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,3,0,3);body.addView(card,cp);
                     card.addView(txt(row.optString("when",""),12,accent));
@@ -246,7 +263,7 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        if(count==0)body.addView(txt("No hay datos estructurados para esta pestaña. Pulsa Actualizar para volver a importar desde MatchReady.",13,Color.LTGRAY));
+        if(count==0)body.addView(txt(selectedTab.equals("Resultados")?"No hay resultados finalizados disponibles en los datos importados.":"No hay datos estructurados para esta pestaña. Pulsa Actualizar para volver a importar desde MatchReady.",13,Color.LTGRAY));
         else body.addView(txt("MatchReady · Datos guardados en el móvil",11,Color.LTGRAY));
     }
     void refreshNative(String url){
