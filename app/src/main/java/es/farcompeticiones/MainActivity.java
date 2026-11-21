@@ -474,16 +474,20 @@ public class MainActivity extends Activity {
                     }
                     LinearLayout right=matchTeam(row.optString("away",""),matchCrest(tables,row.optString("away",""),row.optString("awayCrest","")),true);
                     line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
-                    line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
-                    line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
+                    LinearLayout center=new LinearLayout(this);
+                    center.setOrientation(LinearLayout.VERTICAL);
+                    center.setGravity(android.view.Gravity.CENTER);
+                    center.addView(mid,new LinearLayout.LayoutParams(-2,-2));
                     if(selectedTab.equals("Resultados")){
                         String hour=matchHour(row.optString("when",""));
                         if(!hour.isEmpty()){
                             TextView time=txt(hour+" h",10,Color.LTGRAY);
                             time.setGravity(android.view.Gravity.CENTER);
-                            card.addView(time);
+                            center.addView(time);
                         }
                     }
+                    line.addView(center,new LinearLayout.LayoutParams(-2,-2));
+                    line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
                     String extra=row.optString("extra","");if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
                     count++;
                 }
