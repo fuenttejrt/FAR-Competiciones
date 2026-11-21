@@ -77,7 +77,6 @@ public class MainActivity extends Activity {
         if(saved.startsWith("https://farugby.matchready.es/"))button("Consultar "+tab.toLowerCase()+" en MatchReady",()->openBrowser(saved));
         else button("Buscar "+tab.toLowerCase()+" en MatchReady",()->openBrowser("https://farugby.matchready.es/"));
         body.addView(txt("FUENTES OFICIALES",17,accent));
-        body.addView(txt("FUENTES OFICIALES",17,accent));
         button("Consultar categoría en FAR",()->openBrowser(farUrl()));
         button("Consultar MatchReady",()->openBrowser("https://farugby.matchready.es/"));
         if(category.equals("M14")){
