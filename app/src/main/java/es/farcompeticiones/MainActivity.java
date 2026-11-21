@@ -26,6 +26,7 @@ public class MainActivity extends Activity {
     int selectedMatchGroup=-1;
     boolean showStandingDetails=false;
     boolean calendarUpcomingOnly=true;
+    boolean latestResultsOnOpen=true;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
@@ -88,6 +89,7 @@ public class MainActivity extends Activity {
     void details(String competition){
         selectedCompetition=competition;
         selectedMatchGroup=-1;
+        latestResultsOnOpen=true;
         calendarUpcomingOnly=true;
         showCompetitionTab("Calendario");
     }
@@ -98,14 +100,14 @@ public class MainActivity extends Activity {
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             Button b=new Button(this);b.setText(item);b.setTextSize(11);b.setAllCaps(false);
             b.setTextColor(item.equals(tab)?accent:Color.WHITE);
-            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->{if(!item.equals(selectedTab)){selectedMatchGroup=item.equals("Resultados")?0:-1;}showCompetitionTab(item);});
+            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->{if(!item.equals(selectedTab)){selectedMatchGroup=item.equals("Resultados")?0:-1;latestResultsOnOpen=item.equals("Resultados");}showCompetitionTab(item);});
         }
         String official=officialCalendar();
         if(!official.isEmpty()){
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
-            Button refresh=new Button(this);refresh.setText("↻ Actualizar");refresh.setAllCaps(false);
+            Button refresh=new Button(this);refresh.setText("↻ Actualizar");refresh.setTextSize(12);refresh.setAllCaps(false);
             actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));refresh.setOnClickListener(v->refreshNative(official));
-            Button source=new Button(this);source.setText("Fuente oficial");source.setAllCaps(false);
+            Button source=new Button(this);source.setText("Web oficial");source.setTextSize(12);source.setAllCaps(false);
             actions.addView(source,new LinearLayout.LayoutParams(0,-2,1));source.setOnClickListener(v->openBrowser(official));
             showCachedNative();
         }else{
@@ -196,7 +198,7 @@ public class MainActivity extends Activity {
         int count=0;
         if(selectedTab.equals("Calendario")){
             Button mode=new Button(this);mode.setAllCaps(false);
-            mode.setText(calendarUpcomingOnly?"Ver todas las jornadas":"Ver próximos partidos");
+            mode.setText(calendarUpcomingOnly?"Ver calendario completo":"Ver próximos partidos");mode.setTextSize(12);
             body.addView(mode);
             mode.setOnClickListener(v->{calendarUpcomingOnly=!calendarUpcomingOnly;selectedMatchGroup=-1;showCompetitionTab("Calendario");});
         }
@@ -215,14 +217,16 @@ public class MainActivity extends Activity {
             if(!groupIds.isEmpty()){
                 if(selectedMatchGroup>=groupIds.size())selectedMatchGroup=-1;
                 Spinner picker=new Spinner(this);
-                java.util.ArrayList<String> options=new java.util.ArrayList<>();options.add("Todas las jornadas");options.addAll(groupNames);
+                java.util.ArrayList<String> options=new java.util.ArrayList<>();
+                options.add(selectedTab.equals("Calendario")&&calendarUpcomingOnly?"Próximas jornadas":selectedTab.equals("Resultados")?"Todos los resultados":"Todas las jornadas");
+                options.addAll(groupNames);
                 ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options);
                 picker.setAdapter(adapter);picker.setSelection(selectedMatchGroup+1);body.addView(picker);
                 picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
                     public void onNothingSelected(AdapterView<?> p){}
                     public void onItemSelected(AdapterView<?> p,View v,int position,long id){
                         int next=position-1;
-                        if(next!=selectedMatchGroup){selectedMatchGroup=next;showCompetitionTab(selectedTab);}
+                        if(next!=selectedMatchGroup){selectedMatchGroup=next;latestResultsOnOpen=false;showCompetitionTab(selectedTab);}
                     }
                 });
 
