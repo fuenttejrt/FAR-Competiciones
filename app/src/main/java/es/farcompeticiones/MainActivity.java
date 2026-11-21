@@ -165,6 +165,14 @@ public class MainActivity extends Activity {
         fixed.addView(name,new LinearLayout.LayoutParams(0,-2,1));
         parent.addView(fixed,new LinearLayout.LayoutParams(width,-2));
     }
+    void addStandingPoints(LinearLayout parent,String value,int width,int color,int background){
+        TextView cell=txt(value,11,color);
+        cell.setGravity(android.view.Gravity.CENTER);
+        cell.setPadding(5,8,2,8);
+        cell.setBackgroundColor(background);
+        cell.setElevation(4*getResources().getDisplayMetrics().density);
+        parent.addView(cell,new LinearLayout.LayoutParams(width,-2));
+    }
     void addStandingFixed(LinearLayout parent,String value,int width,int color){
         TextView cell=txt(value,11,color);
         cell.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.CENTER_HORIZONTAL);
@@ -304,7 +312,7 @@ public class MainActivity extends Activity {
                 LinearLayout headerStats=new LinearLayout(this);
                 for(int k=2;k<labels.length;k++)addStandingFixed(headerStats,labels[k],unit,accent);
                 headerScroll.addView(headerStats);heading.addView(headerScroll,new LinearLayout.LayoutParams(0,-2,1));
-                addStandingFixed(heading,"Pts",unit,accent);
+                addStandingPoints(heading,"Pts",unit,accent,panel);
                 scrollRows.add(headerScroll);
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
@@ -330,7 +338,7 @@ public class MainActivity extends Activity {
                     LinearLayout statsLine=new LinearLayout(this);
                     for(int k=2;k<vals.length-1;k++)addStandingFixed(statsLine,vals[k],unit,Color.WHITE);
                     scroller.addView(statsLine);line.addView(scroller,new LinearLayout.LayoutParams(0,-2,1));
-                    addStandingFixed(line,vals[vals.length-1],unit,accent);
+                    addStandingPoints(line,vals[vals.length-1],unit,accent,j%2==0?panel:bg);
                     scrollRows.add(scroller);
                     if(false){
                         if(stats!=null){
