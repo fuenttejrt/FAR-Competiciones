@@ -136,6 +136,16 @@ public class MainActivity extends Activity {
         }
         return cells;
     }
+    String standingStat(org.json.JSONObject stats,String... names){
+        if(stats==null)return "–";
+        java.util.Iterator<String> keys=stats.keys();
+        while(keys.hasNext()){
+            String key=keys.next();
+            String normalized=java.text.Normalizer.normalize(key.toLowerCase(java.util.Locale.ROOT),java.text.Normalizer.Form.NFD).replaceAll("[\\u0300-\\u036f]","").trim();
+            for(String name:names)if(normalized.equals(name))return stats.optString(key,"–");
+        }
+        return "–";
+    }
     boolean isScore(String value){return value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");}
     void addMatchCard(org.json.JSONArray raw){
         org.json.JSONArray cells=normalizedCells(raw);
@@ -248,13 +258,24 @@ public class MainActivity extends Activity {
                 if(!kind.equals("standing"))continue;
                 Button expand=new Button(this);expand.setAllCaps(false);expand.setText(showStandingDetails?"Ocultar estadísticas":"Ver estadísticas completas");body.addView(expand);
                 expand.setOnClickListener(v->{showStandingDetails=!showStandingDetails;showCompetitionTab(selectedTab);});
-                LinearLayout heading=new LinearLayout(this);heading.setBackgroundColor(panel);body.addView(heading);
-                for(String h:new String[]{"#","Equipo","J","Pts"}){TextView v=txt(h,12,accent);heading.addView(v,new LinearLayout.LayoutParams(0,-2,h.equals("Equipo")?4:1));}
+                String[] labels={"#","Equipo","J","G","E","P","Pts"};
+                float[] widths={0.55f,4.2f,0.65f,0.65f,0.65f,0.65f,0.85f};
+                LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);heading.setBackgroundColor(panel);body.addView(heading);
+                for(int k=0;k<labels.length;k++){
+                    TextView cell=txt(labels[k],k==1?11:10,accent);
+                    cell.setGravity(k==1?android.view.Gravity.START:android.view.Gravity.CENTER);
+                    heading.addView(cell,new LinearLayout.LayoutParams(0,-2,widths[k]));
+                }
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
-                    LinearLayout line=new LinearLayout(this);line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
-                    String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),row.optString("points","—")};
-                    for(int k=0;k<vals.length;k++){TextView v=txt(vals[k],k==1?12:13,Color.WHITE);line.addView(v,new LinearLayout.LayoutParams(0,-2,k==1?4:1));}
+                    LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);line.setMinimumHeight(dp(30));line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
+                    org.json.JSONObject stats=row.optJSONObject("stats");
+                    String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),standingStat(stats,"g","ganados","ganados/as","victorias","pg"),standingStat(stats,"e","empatados","empates","pe"),standingStat(stats,"p","perdidos","derrotas","pp"),row.optString("points","—")};
+                    for(int k=0;k<vals.length;k++){
+                        TextView cell=txt(vals[k],k==1?11:12,Color.WHITE);
+                        cell.setGravity(k==1?android.view.Gravity.START:android.view.Gravity.CENTER);
+                        line.addView(cell,new LinearLayout.LayoutParams(0,-2,widths[k]));
+                    }
                     if(showStandingDetails){
                         org.json.JSONObject stats=row.optJSONObject("stats");
                         if(stats!=null){
