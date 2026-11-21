@@ -175,17 +175,18 @@ public class MainActivity extends Activity {
                 if(!loaded.startsWith("https://farugby.matchready.es/"))return;
                 view.postDelayed(()->{
                     if(dataBrowser!=view||!page.equals("detail")||!key.equals(cacheKey()))return;
-                    String js="(function(){var ts=[].slice.call(document.querySelectorAll('table'));return JSON.stringify({url:location.href,title:document.title,tables:ts.map(function(t){var h=[].slice.call(t.querySelectorAll('th')).map(function(c){return c.innerText.trim().toLowerCase()});var standing=h.some(function(x){return x==='puntos'||x==='ptos'||x==='pts'})||h.some(function(x){return x==='pj'||x==='j'})&&h.some(function(x){return x==='g'});var n=t.previousElementSibling;var heading='';for(var i=0;n&&i<5;i++,n=n.previousElementSibling){if(n.innerText&&n.innerText.trim()){heading=n.innerText.trim().slice(0,100);break}}return {heading:heading,standing:standing,rows:[].slice.call(t.querySelectorAll('tr')).map(function(r){return [].slice.call(r.querySelectorAll('th,td')).map(function(c){return c.innerText.trim().replace(/\\s+/g,' ')})}).filter(function(r){return r.length>1})}})})})})()";
+                    String js="(function(){try{var tables=Array.from(document.querySelectorAll('table')).map(function(t){var headers=Array.from(t.querySelectorAll('th')).map(function(c){return (c.innerText||'').trim().toLowerCase()});var standing=headers.some(function(x){return x==='puntos'||x==='ptos'||x==='pts'||x==='punt os'})||(headers.indexOf('j')>=0&&headers.indexOf('g')>=0);var rows=Array.from(t.querySelectorAll('tr')).map(function(r){return Array.from(r.querySelectorAll('th,td')).map(function(c){return (c.innerText||'').trim().replace(/\\\\s+/g,' ')})}).filter(function(r){return r.length>1});return {heading:'',standing:standing,rows:rows}});return JSON.stringify({url:location.href,title:document.title,tables:tables})}catch(e){return JSON.stringify({error:String(e)})}})()";
                     view.evaluateJavascript(js,result->{
                         try{
                             String decoded=new org.json.JSONTokener(result).nextValue().toString();
                             org.json.JSONObject obj=new org.json.JSONObject(decoded);
                             org.json.JSONArray tables=obj.optJSONArray("tables");
+                            if(obj.has("error")){Toast.makeText(MainActivity.this,"Error de lectura: "+obj.optString("error"),Toast.LENGTH_LONG).show();return;}
                             if(tables==null||tables.length()==0){Toast.makeText(MainActivity.this,"No se encontraron tablas. Abre la fuente oficial.",Toast.LENGTH_LONG).show();return;}
                             getPreferences(0).edit().putString(key,obj.toString()).apply();
                             Toast.makeText(MainActivity.this,"Tablas descargadas: "+tables.length(),Toast.LENGTH_LONG).show();
                             showCompetitionTab(selectedTab);
-                        }catch(Exception ex){Toast.makeText(MainActivity.this,"No se pudieron interpretar los datos.",Toast.LENGTH_LONG).show();}
+                        }catch(Exception ex){android.util.Log.e("FAR_IMPORT","Respuesta: "+result,ex);new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Error del lector").setMessage("Detalle: "+ex.getMessage()+"\nRespuesta: "+String.valueOf(result).substring(0,Math.min(250,String.valueOf(result).length()))).setPositiveButton("Cerrar",null).show();}
                     });
                 },2500);
             }
