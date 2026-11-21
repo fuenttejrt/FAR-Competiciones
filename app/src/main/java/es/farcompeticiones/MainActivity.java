@@ -163,7 +163,7 @@ public class MainActivity extends Activity {
         String score=row.optString("score","").trim();
         if(!isScore(score))return false;
         String when=row.optString("when","");
-        java.util.regex.Matcher date=java.util.regex.Pattern.compile("(\\\\d{2})/(\\\\d{2})/(\\\\d{4})").matcher(when);
+        java.util.regex.Matcher date=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})").matcher(when);
         if(date.find()){
             try{
                 java.util.Calendar match=java.util.Calendar.getInstance();
@@ -243,7 +243,7 @@ public class MainActivity extends Activity {
                 for(int n=0;n<rows.length();n++){org.json.JSONObject candidate=rows.optJSONObject(n);if(candidate!=null&&(!selectedTab.equals("Resultados")||isPlayedMatch(candidate)))visibleRows++;}
                 if(visibleRows==0)continue;
                 TextView head=txt(number.isEmpty()?full:"Jornada "+number+(phase.isEmpty()?"":" · "+phase),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
-                if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\\\s*[:\\\\-]\\\\s*","").trim(),12,Color.LTGRAY));
+                if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY));
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
                     String score=row.optString("score","");
