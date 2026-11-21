@@ -277,7 +277,6 @@ public class MainActivity extends Activity {
                         line.addView(cell,new LinearLayout.LayoutParams(0,-2,widths[k]));
                     }
                     if(showStandingDetails){
-                        org.json.JSONObject stats=row.optJSONObject("stats");
                         if(stats!=null){
                             StringBuilder detail=new StringBuilder();
                             java.util.Iterator<String> keys=stats.keys();
