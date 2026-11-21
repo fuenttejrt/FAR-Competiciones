@@ -333,6 +333,13 @@ public class MainActivity extends Activity {
         if(!organizer.isEmpty())details.addView(txt("Organiza: "+organizer,14,Color.LTGRAY));
         String extra=row.optString("extra","").trim();
         if(!extra.isEmpty())details.addView(txt(extra,13,Color.LTGRAY));
+        String statisticsUrl=row.optString("statsUrl","");
+        if(statisticsUrl.startsWith("https://farugby.matchready.es/")){
+            Button loadActa=new Button(this);
+            loadActa.setText("Consultar acta y estadísticas");
+            details.addView(loadActa);
+            loadActa.setOnClickListener(v->loadOfficialActa(statisticsUrl,details,loadActa));
+        }
         org.json.JSONObject act=row.optJSONObject("acta");
         if(act!=null){
             addActaSection(details,"Titulares · Local",act.optJSONArray("titularesLocal"));
@@ -349,6 +356,45 @@ public class MainActivity extends Activity {
         }
         ScrollView scroll=new ScrollView(this);scroll.addView(details);
         new android.app.AlertDialog.Builder(this).setTitle("Ficha del partido").setView(scroll).setPositiveButton("Cerrar",null).show();
+    }
+    void loadOfficialActa(String url,LinearLayout parent,Button button){
+        button.setEnabled(false);button.setText("Cargando datos oficiales…");
+        WebView actView=new WebView(this);
+        actView.getSettings().setJavaScriptEnabled(true);
+        actView.getSettings().setDomStorageEnabled(true);
+        actView.setWebViewClient(new WebViewClient(){
+            @Override public void onPageFinished(WebView view,String loaded){
+                if(!loaded.startsWith("https://farugby.matchready.es/"))return;
+                String js="(function(){try{var norm=function(x){return (x||'').replace(/\\\\s+/g,' ').trim()};"+
+                    "var sections=Array.from(document.querySelectorAll('table')).map(function(t){"+
+                    "var prev=t.previousElementSibling,heading='';for(var i=0;i<5&&prev;i++,prev=prev.previousElementSibling){"+
+                    "if(/H[1-6]/.test(prev.tagName)){heading=norm(prev.innerText);break;}"+
+                    "if(prev.querySelector){var h=prev.querySelector('h1,h2,h3,h4,h5,h6');if(h){heading=norm(h.innerText);break;}}}"+
+                    "var rows=Array.from(t.querySelectorAll('tr')).map(function(r){return norm(r.innerText)}).filter(Boolean);"+
+                    "return {heading:heading||'Datos oficiales',rows:rows};}).filter(function(x){return x.rows.length>0});"+
+                    "return JSON.stringify({sections:sections});}catch(e){return JSON.stringify({error:String(e)})}})()";
+                view.evaluateJavascript(js,result->{
+                    try{
+                        String decoded=new org.json.JSONTokener(result).nextValue().toString();
+                        org.json.JSONObject data=new org.json.JSONObject(decoded);
+                        org.json.JSONArray sections=data.optJSONArray("sections");
+                        if(sections==null||sections.length()==0){
+                            button.setText("No se encontraron datos del acta");return;
+                        }
+                        button.setVisibility(View.GONE);
+                        for(int i=0;i<sections.length();i++){
+                            org.json.JSONObject section=sections.optJSONObject(i);if(section==null)continue;
+                            addActaSection(parent,section.optString("heading","Datos oficiales"),section.optJSONArray("rows"));
+                        }
+                    }catch(Exception ex){button.setText("No se pudo interpretar el acta");}
+                    finally{view.destroy();}
+                });
+            }
+            @Override public void onReceivedError(WebView view,WebResourceRequest request,android.webkit.WebResourceError error){
+                if(request.isForMainFrame()){button.setText("No se pudo cargar el acta");button.setEnabled(true);}
+            }
+        });
+        actView.loadUrl(url);
     }
     void addActaSection(LinearLayout parent,String heading,org.json.JSONArray items){
         if(items==null||items.length()==0)return;
