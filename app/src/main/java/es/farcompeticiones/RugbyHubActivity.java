@@ -689,7 +689,7 @@ public final class RugbyHubActivity extends Activity {
         }
         java.util.ArrayList<String[]> incidents=new java.util.ArrayList<>();
         java.util.regex.Pattern record=java.util.regex.Pattern.compile(
-            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*Tipo\\s+([A-Za-z]{1,3})\\s*·\\s*Dorsal\\s+(\\d+)\\s*$",
+            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*Tipo\\s+([A-Za-z]{1,3})(?:\\s*·\\s*Dorsal\\s+(\\d+)|\\s*·\\s*Dorsal no indicado)?\\s*$",
             java.util.regex.Pattern.CASE_INSENSITIVE);
         String raw=expulsions==null?"":expulsions;
         int category=-1,side=-1;
@@ -701,7 +701,7 @@ public final class RugbyHubActivity extends Activity {
             else if(t.startsWith("equipo visitante:"))side=1;
             else if(category>=0&&side>=0){
                 java.util.regex.Matcher m=record.matcher(line.trim());
-                if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3),String.valueOf(category)});
+                if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3)==null?"":m.group(3),String.valueOf(category)});
             }
         }
         // If the PDF's two-column table could not be isolated, retain the
@@ -714,7 +714,7 @@ public final class RugbyHubActivity extends Activity {
                 else if(t.startsWith("equipo visitante:"))side=1;
                 else if(side>=0){
                     java.util.regex.Matcher m=record.matcher(line.trim());
-                    if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3),"-1"});
+                    if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3)==null?"":m.group(3),"-1"});
                 }
             }
         }
@@ -794,7 +794,7 @@ public final class RugbyHubActivity extends Activity {
         };
         int side=-1;
         java.util.regex.Pattern change=java.util.regex.Pattern.compile(
-            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*Cambio\\s*·\\s*Entra\\s*n[º°o]?\\s*(\\d+)\\s*·\\s*Sale\\s*n[º°o]?\\s*(\\d+)\\s*$",
+            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*Cambio\\s*·\\s*Entra\\s*(?:n[º°o]?\\s*(\\d+)|sin dorsal)\\s*·\\s*Sale\\s*(?:n[º°o]?\\s*(\\d+)|sin dorsal)\\s*$",
             java.util.regex.Pattern.CASE_INSENSITIVE);
         for(String line:(events==null?"":events).split("\\r?\\n")){
             String value=line.trim();
@@ -802,7 +802,7 @@ public final class RugbyHubActivity extends Activity {
             else if(value.toLowerCase(java.util.Locale.ROOT).startsWith("equipo visitante:"))side=1;
             else if(side>=0){
                 java.util.regex.Matcher m=change.matcher(value);
-                if(m.matches())changes[side].add(new String[]{m.group(1),m.group(2),m.group(3)});
+                if(m.matches())changes[side].add(new String[]{m.group(1),m.group(2)==null?"":m.group(2),m.group(3)==null?"":m.group(3)});
             }
         }
         for(java.util.ArrayList<String[]> list:changes)
@@ -842,12 +842,12 @@ public final class RugbyHubActivity extends Activity {
                     lp.setMargins(0,dp(5),0,dp(3));cards.addView(card,lp);
                     card.addView(text("MINUTO "+changeRow[0]+"'",12,true));
                     String outName=players[team].get(changeRow[2]);
-                    TextView outgoing=text("↓  SALE · Nº "+changeRow[2]+"  "+
+                    TextView outgoing=text("↓  SALE · "+(changeRow[2].isEmpty()?"Dorsal no indicado":"Nº "+changeRow[2])+"  "+
                         (outName==null?"Nombre no identificado":outName),13,true);
                     outgoing.setTextColor(0xffffa0a0);
                     outgoing.setPadding(0,dp(6),0,dp(3));card.addView(outgoing);
                     String inName=players[team].get(changeRow[1]);
-                    TextView incoming=text("↑  ENTRA · Nº "+changeRow[1]+"  "+
+                    TextView incoming=text("↑  ENTRA · "+(changeRow[1].isEmpty()?"Dorsal no indicado":"Nº "+changeRow[1])+"  "+
                         (inName==null?"Nombre no identificado":inName),13,true);
                     incoming.setTextColor(0xff93e0b2);card.addView(incoming);
                 }
