@@ -255,6 +255,18 @@ public class MainActivity extends Activity {
             return Character.toUpperCase(formatted.charAt(0))+formatted.substring(1)+(m.group(4)==null?"":" · "+m.group(4)+" h");
         }catch(Exception ignored){return value;}
     }
+    String matchDayLabel(String value){
+        String formatted=formatMatchDate(value);
+        return formatted.replaceFirst(" · \\d{1,2}:\\d{2} h$","");
+    }
+    String matchHour(String value){
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("\\b(\\d{1,2}:\\d{2})\\b").matcher(value);
+        return m.find()?m.group(1):"";
+    }
+    String shortRoundLabel(String heading){
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?i)Jornada\\s+([0-9]+(?:\\.[0-9]+)?)").matcher(heading);
+        return m.find()?"Jornada "+m.group(1):heading;
+    }
     long matchTimestamp(org.json.JSONObject row,boolean endOfDay){
         String when=row.optString("when","");
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})(?:\\s+(\\d{1,2}):(\\d{2}))?").matcher(when);
@@ -325,7 +337,7 @@ public class MainActivity extends Activity {
                     boolean any=false;
                     for(int n=0;n<group.optJSONArray("rows").length();n++){org.json.JSONObject row=group.optJSONArray("rows").optJSONObject(n);if(row!=null&&matchVisible(row)){any=true;break;}}
                     if(!any)continue;
-                    if(selectedTab.equals("Resultados")){groupIds.add(0,t);groupNames.add(0,group.optString("heading","Jornada "+(t+1)));}else{groupIds.add(t);groupNames.add(group.optString("heading","Jornada "+(t+1)));}
+                    if(selectedTab.equals("Resultados")){groupIds.add(0,t);groupNames.add(0,shortRoundLabel(group.optString("heading","Jornada "+(t+1))));}else{groupIds.add(t);groupNames.add(shortRoundLabel(group.optString("heading","Jornada "+(t+1))));}
                 }
             }
             if(!groupIds.isEmpty()){
@@ -437,7 +449,7 @@ public class MainActivity extends Activity {
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
                     String score=row.optString("score","");
                     if(!matchVisible(row))continue;
-                    String dateLabel=formatMatchDate(row.optString("when",""));
+                    String dateLabel=matchDayLabel(row.optString("when",""));
                     if(!dateLabel.equals(lastDate)){
                         TextView dateView=txt(dateLabel,12,accent);
                         dateView.setTypeface(null,Typeface.BOLD);
@@ -464,6 +476,14 @@ public class MainActivity extends Activity {
                     line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
                     line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
                     line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
+                    if(selectedTab.equals("Resultados")){
+                        String hour=matchHour(row.optString("when",""));
+                        if(!hour.isEmpty()){
+                            TextView time=txt(hour+" h",10,Color.LTGRAY);
+                            time.setGravity(android.view.Gravity.CENTER);
+                            card.addView(time);
+                        }
+                    }
                     String extra=row.optString("extra","");if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
                     count++;
                 }
