@@ -21,6 +21,7 @@ public class MainActivity extends Activity {
     LinearLayout root,body;
     String category="M14", page="home", selectedCompetition="", selectedTab="Calendario", season="2026/27";
     WebView browser;
+    String lastInspectedStructure="";
     String lastBrowserUrl="";
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
@@ -123,6 +124,8 @@ public class MainActivity extends Activity {
         button("Volver",()->home());
         button("Abrir en navegador externo",()->openExternal(browser!=null?browser.getUrl():url));
         button("Actualizar página",()->{if(browser!=null)browser.reload();});
+        button("Inspeccionar estructura pública",()->inspectPage());
+        button("Ver informe de estructura",()->new android.app.AlertDialog.Builder(this).setTitle("Diagnóstico de MatchReady").setMessage(lastInspectedStructure.isEmpty()?"Abre un calendario y pulsa Inspeccionar estructura pública.":lastInspectedStructure).setPositiveButton("Cerrar",null).show());
         ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);body.addView(progress);
         browser=new WebView(this);browser.getSettings().setJavaScriptEnabled(true);browser.getSettings().setDomStorageEnabled(true);
         browser.setWebViewClient(new WebViewClient(){
@@ -135,6 +138,25 @@ public class MainActivity extends Activity {
         browser.setWebChromeClient(new WebChromeClient(){@Override public void onProgressChanged(WebView view,int newProgress){progress.setProgress(newProgress);}});
         body.addView(browser,new LinearLayout.LayoutParams(-1,(int)(getResources().getDisplayMetrics().heightPixels*0.72)));
         browser.loadUrl(url);
+    }
+    void inspectPage(){
+        if(browser==null){Toast.makeText(this,"Abre primero un calendario",Toast.LENGTH_SHORT).show();return;}
+        String script="(function(){try{var tables=[].slice.call(document.querySelectorAll('table'));var headings=[].slice.call(document.querySelectorAll('h1,h2,h3,h4')).map(function(x){return x.innerText.trim()}).filter(Boolean).slice(0,20);var rows=tables.map(function(t){return {filas:t.querySelectorAll('tr').length,cabeceras:[].slice.call(t.querySelectorAll('th')).map(function(x){return x.innerText.trim()}).slice(0,25)}});return JSON.stringify({titulo:document.title,url:location.href,tablas:rows,encabezados:headings,iframes:[].slice.call(document.querySelectorAll('iframe')).map(function(x){return x.src}).slice(0,12)});}catch(e){return JSON.stringify({error:String(e)})}})()";
+        browser.evaluateJavascript(script,result->{
+            try{
+                String decoded=new org.json.JSONTokener(result).nextValue().toString();
+                org.json.JSONObject info=new org.json.JSONObject(decoded);
+                StringBuilder out=new StringBuilder();
+                out.append("Página: ").append(info.optString("titulo")).append("\\n");
+                out.append("URL: ").append(info.optString("url")).append("\\n");
+                out.append("Tablas: ").append(info.optJSONArray("tablas")!=null?info.optJSONArray("tablas").length():0).append("\\n");
+                out.append("Encabezados: ").append(info.optJSONArray("encabezados")).append("\\n");
+                out.append("Columnas y filas: ").append(info.optJSONArray("tablas")).append("\\n");
+                out.append("Marcos: ").append(info.optJSONArray("iframes"));
+                lastInspectedStructure=out.toString();
+                new android.app.AlertDialog.Builder(this).setTitle("Estructura detectada").setMessage(lastInspectedStructure).setPositiveButton("Cerrar",null).show();
+            }catch(Exception ex){lastInspectedStructure="No se ha podido analizar la página: "+ex.getMessage();Toast.makeText(this,lastInspectedStructure,Toast.LENGTH_LONG).show();}
+        });
     }
     @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else if(page.equals("browser")&&!selectedCompetition.isEmpty())showCompetitionTab(selectedTab);else home();}
     @Override protected void onDestroy(){if(browser!=null)browser.destroy();super.onDestroy();}
