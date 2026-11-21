@@ -25,6 +25,7 @@ public class MainActivity extends Activity {
     String lastBrowserUrl="";
     int selectedMatchGroup=-1;
     boolean showStandingDetails=false;
+    boolean calendarUpcomingOnly=false;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
@@ -173,15 +174,40 @@ public class MainActivity extends Activity {
         }
         return true;
     }
+    boolean isUpcomingMatch(org.json.JSONObject row){
+        String when=row.optString("when","");
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})").matcher(when);
+        if(!m.find())return !isScore(row.optString("score",""));
+        try{
+            java.util.Calendar day=java.util.Calendar.getInstance();
+            day.setLenient(false);
+            day.set(Integer.parseInt(m.group(3)),Integer.parseInt(m.group(2))-1,Integer.parseInt(m.group(1)),23,59,59);
+            return day.getTimeInMillis()>=System.currentTimeMillis();
+        }catch(Exception ex){return false;}
+    }
+    boolean matchVisible(org.json.JSONObject row){
+        if(selectedTab.equals("Resultados"))return isPlayedMatch(row);
+        if(selectedTab.equals("Calendario")&&calendarUpcomingOnly)return isUpcomingMatch(row);
+        return true;
+    }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
+        if(selectedTab.equals("Calendario")){
+            Button mode=new Button(this);mode.setAllCaps(false);
+            mode.setText(calendarUpcomingOnly?"Mostrar calendario completo":"Ver solo próximos partidos");
+            body.addView(mode);
+            mode.setOnClickListener(v->{calendarUpcomingOnly=!calendarUpcomingOnly;selectedMatchGroup=-1;showCompetitionTab("Calendario");});
+        }
         if(!selectedTab.equals("Clasificación")){
             java.util.ArrayList<Integer> groupIds=new java.util.ArrayList<>();
             java.util.ArrayList<String> groupNames=new java.util.ArrayList<>();
             for(int t=0;t<tables.length();t++){
                 org.json.JSONObject group=tables.optJSONObject(t);
                 if(group!=null&&group.optString("kind").equals("matches")&&group.optJSONArray("rows")!=null&&group.optJSONArray("rows").length()>0){
+                    boolean any=false;
+                    for(int n=0;n<group.optJSONArray("rows").length();n++){org.json.JSONObject row=group.optJSONArray("rows").optJSONObject(n);if(row!=null&&matchVisible(row)){any=true;break;}}
+                    if(!any)continue;
                     groupIds.add(t);groupNames.add(group.optString("heading","Jornada "+(t+1)));
                 }
             }
@@ -201,11 +227,16 @@ public class MainActivity extends Activity {
 
             }
         }
-        for(int i=0;i<tables.length();i++){
+        for(int iteration=0;iteration<tables.length();iteration++){
+            int i=selectedTab.equals("Resultados")?tables.length()-1-iteration:iteration;
             org.json.JSONObject table=tables.optJSONObject(i);if(table==null)continue;
             String kind=table.optString("kind","");
             if(!selectedTab.equals("Clasificación")&&selectedMatchGroup>=0&&kind.equals("matches")){
-                int groupIndex=0;for(int k=0;k<i;k++){org.json.JSONObject prev=tables.optJSONObject(k);if(prev!=null&&prev.optString("kind").equals("matches")&&prev.optJSONArray("rows")!=null&&prev.optJSONArray("rows").length()>0)groupIndex++;}
+                int groupIndex=0;for(int k=0;k<i;k++){org.json.JSONObject prev=tables.optJSONObject(k);if(prev!=null&&prev.optString("kind").equals("matches")&&prev.optJSONArray("rows")!=null&&prev.optJSONArray("rows").length()>0){
+                    boolean any=false;
+                    for(int n=0;n<prev.optJSONArray("rows").length();n++){org.json.JSONObject item=prev.optJSONArray("rows").optJSONObject(n);if(item!=null&&matchVisible(item)){any=true;break;}}
+                    if(any)groupIndex++;
+                }}
                 if(groupIndex!=selectedMatchGroup)continue;
             }
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
@@ -240,20 +271,20 @@ public class MainActivity extends Activity {
                 String phase=full.toLowerCase(java.util.Locale.ROOT).contains("2ª fase")?"2.ª fase":full.toLowerCase(java.util.Locale.ROOT).contains("1ª fase")?"1.ª fase":"";
                 int organizer=full.toLowerCase(java.util.Locale.ROOT).indexOf("organizador:");
                 int visibleRows=0;
-                for(int n=0;n<rows.length();n++){org.json.JSONObject candidate=rows.optJSONObject(n);if(candidate!=null&&(!selectedTab.equals("Resultados")||isPlayedMatch(candidate)))visibleRows++;}
+                for(int n=0;n<rows.length();n++){org.json.JSONObject candidate=rows.optJSONObject(n);if(candidate!=null&&matchVisible(candidate))visibleRows++;}
                 if(visibleRows==0)continue;
                 TextView head=txt(number.isEmpty()?full:"Jornada "+number+(phase.isEmpty()?"":" · "+phase),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
                 if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY));
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
                     String score=row.optString("score","");
-                    if(selectedTab.equals("Resultados")&&!isPlayedMatch(row))continue;
+                    if(!matchVisible(row))continue;
                     LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(10,8,10,8);card.setBackgroundColor(panel);
                     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,3,0,3);body.addView(card,cp);
-                    card.addView(txt(row.optString("when",""),12,accent));
+                    card.addView(txt(row.optString("when",""),12,selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent));
                     LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
                     TextView left=txt(row.optString("home",""),13,Color.WHITE);
-                    TextView mid=txt(isScore(score)?score:"VS",19,accent);mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
+                    TextView mid=txt(selectedTab.equals("Calendario")&&isUpcomingMatch(row)?"VS":isScore(score)?score:"VS",19,selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent);mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
                     TextView right=txt(row.optString("away",""),13,Color.WHITE);right.setGravity(android.view.Gravity.RIGHT);
                     line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
                     line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
