@@ -127,7 +127,7 @@ public class MainActivity extends Activity {
         }
         return cells;
     }
-    boolean isScore(String value){return value.matches("(?s).*\\\\d+\\\\s*[-–:]\\\\s*\\\\d+.*");}
+    boolean isScore(String value){return value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");}
     void addMatchCard(org.json.JSONArray raw){
         org.json.JSONArray cells=normalizedCells(raw);
         if(cells.length()<4)return;
