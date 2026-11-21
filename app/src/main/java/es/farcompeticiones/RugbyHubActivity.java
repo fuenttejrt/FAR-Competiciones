@@ -1189,11 +1189,11 @@ return "TITULARES ("+starterCount+")\n"+starters+
     private String parseActEventSection(String raw,String kind){
         if(raw==null||raw.trim().isEmpty())return "Sin información en el acta.";
         StringBuilder out=new StringBuilder();
-        String[] blocks=raw.split("(?i)(?=Equipo (?:local|visitante):)");
+        String[] blocks=raw.split("(?im)(?=^\\s*Equipo\\s+(?:local|visitante):)");
         boolean any=false;
         for(String block:blocks){
             String normalized=block.trim();
-            if(!normalized.matches("(?s)(?i)^Equipo (local|visitante):.*"))continue;
+            if(!normalized.matches("(?s)(?i)^Equipo\\s+(local|visitante):.*"))continue;
             String[] lines=normalized.split("\\r?\n");
             String team=lines[0].trim();
             java.util.LinkedHashMap<String,java.util.List<String>> columns=new java.util.LinkedHashMap<>();
