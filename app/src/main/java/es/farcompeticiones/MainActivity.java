@@ -322,31 +322,42 @@ public class MainActivity extends Activity {
     void showMatchDetail(org.json.JSONObject row,String round,String organizer,String homeLogo,String awayLogo){
         LinearLayout details=new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
-        details.setPadding(12,8,12,8);
+        details.setPadding(14,10,14,14);
         details.setBackgroundColor(bg);
         TextView teams=txt(row.optString("home","")+"  —  "+row.optString("away",""),18,Color.WHITE);
-        teams.setTypeface(null,Typeface.BOLD);
-        details.addView(teams);
+        teams.setTypeface(null,Typeface.BOLD);details.addView(teams);
         String score=row.optString("score","");
-        if(isScore(score))details.addView(txt("Resultado: "+score,17,accent));
+        if(isScore(score))details.addView(txt("Resultado: "+score,20,accent));
         details.addView(txt("Fecha y hora: "+formatMatchDate(row.optString("when","")),14,Color.WHITE));
         details.addView(txt("Jornada: "+shortRoundLabel(round),14,Color.WHITE));
         if(!organizer.isEmpty())details.addView(txt("Organiza: "+organizer,14,Color.LTGRAY));
         String extra=row.optString("extra","").trim();
         if(!extra.isEmpty())details.addView(txt(extra,13,Color.LTGRAY));
-        String act=row.optString("actUrl","");
-        String statistics=row.optString("statsUrl","");
-        if(act.startsWith("https://")){
-            Button actButton=new Button(this);actButton.setText("Ver acta oficial (PDF)");
-            details.addView(actButton);actButton.setOnClickListener(v->openExternal(act));
+        org.json.JSONObject act=row.optJSONObject("acta");
+        if(act!=null){
+            addActaSection(details,"Titulares · Local",act.optJSONArray("titularesLocal"));
+            addActaSection(details,"Suplentes · Local",act.optJSONArray("suplentesLocal"));
+            addActaSection(details,"Titulares · Visitante",act.optJSONArray("titularesVisitante"));
+            addActaSection(details,"Suplentes · Visitante",act.optJSONArray("suplentesVisitante"));
+            addActaSection(details,"Ensayos",act.optJSONArray("ensayos"));
+            addActaSection(details,"Transformaciones",act.optJSONArray("transformaciones"));
+            addActaSection(details,"Golpes de castigo",act.optJSONArray("golpes"));
+            addActaSection(details,"Tarjetas",act.optJSONArray("tarjetas"));
+            addActaSection(details,"Sustituciones e incidencias",act.optJSONArray("incidencias"));
+        }else{
+            details.addView(txt("Acta oficial pendiente de importar. Los datos de jugadores y anotaciones se mostrarán aquí cuando se puedan leer de MatchReady.",13,Color.LTGRAY));
         }
-        if(statistics.startsWith("https://")){
-            Button statsButton=new Button(this);statsButton.setText("Estadísticas oficiales");
-            details.addView(statsButton);statsButton.setOnClickListener(v->openExternal(statistics));
-        }
-        if(act.isEmpty()&&statistics.isEmpty())details.addView(txt("Acta y estadísticas no disponibles en los datos oficiales importados.",12,Color.LTGRAY));
         ScrollView scroll=new ScrollView(this);scroll.addView(details);
         new android.app.AlertDialog.Builder(this).setTitle("Ficha del partido").setView(scroll).setPositiveButton("Cerrar",null).show();
+    }
+    void addActaSection(LinearLayout parent,String heading,org.json.JSONArray items){
+        if(items==null||items.length()==0)return;
+        TextView title=txt(heading,16,accent);title.setTypeface(null,Typeface.BOLD);parent.addView(title);
+        for(int i=0;i<items.length();i++){
+            Object item=items.opt(i);
+            String value=item instanceof org.json.JSONObject?((org.json.JSONObject)item).optString("texto",item.toString()):String.valueOf(item);
+            parent.addView(txt(value,14,Color.WHITE));
+        }
     }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
@@ -528,7 +539,7 @@ public class MainActivity extends Activity {
                     String homeLogo=matchCrest(tables,row.optString("home",""),row.optString("homeCrest",""));
                     String awayLogo=matchCrest(tables,row.optString("away",""),row.optString("awayCrest",""));
                     card.setOnClickListener(v->showMatchDetail(row,full,organizerText,homeLogo,awayLogo));
-                    String extra=row.optString("extra","");if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
+                    String extra=row.optString("extra","");if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);}
                     count++;
                 }
             }
