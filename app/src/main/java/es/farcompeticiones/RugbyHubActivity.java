@@ -1,0 +1,1874 @@
+package es.farcompeticiones;
+
+import android.app.*;
+import android.os.Bundle;
+import android.content.*;
+import android.graphics.Color;
+import android.view.*;
+import android.widget.*;
+import org.json.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+public final class RugbyHubActivity extends Activity {
+    private final String official="https://farugby.matchready.es/es/public/calendar/35/11/combined/";
+    private LinearLayout list;
+    private TextView screenTitle, screenSubtitle;
+    private int dp(int v){return Math.round(v*getResources().getDisplayMetrics().density);}
+    private TextView text(String value,int size,boolean bold){
+        TextView t=new TextView(this);t.setText(value);t.setTextSize(size);
+        t.setTextColor(Color.WHITE);if(bold)t.setTypeface(null,1);return t;
+    }
+    @Override public void onCreate(Bundle state){super.onCreate(state);
+        String embeddedAct=getIntent().getStringExtra("far_act_url");
+        if(embeddedAct!=null){
+            android.widget.FrameLayout background=new android.widget.FrameLayout(this);
+            background.setBackgroundColor(0xff101a24);
+            setContentView(background);
+            if(!embeddedAct.startsWith("https://farugby.matchready.es/")){finish();return;}
+            background.post(()->showReadableAct(embeddedAct,
+                getIntent().getStringExtra("far_home"),
+                getIntent().getStringExtra("far_away")));
+            return;
+        }
+
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
+        list=new LinearLayout(this);list.setOrientation(1);list.setPadding(dp(16),dp(20),dp(16),dp(28));
+        list.setBackgroundColor(0xff101a24);scroll.addView(list);setContentView(scroll);
+        screenTitle=text("Rugby M14",25,true);list.addView(screenTitle);
+        screenSubtitle=text("Todas las jornadas y organizadores sincronizados",13,false);
+        screenSubtitle.setTextColor(0xffaab9c9);list.addView(screenSubtitle);
+        LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);list.addView(actions);
+        Button matches=new Button(this);matches.setText("PARTIDOS");actions.addView(matches,new LinearLayout.LayoutParams(0,dp(55),1));
+        Button table=new Button(this);table.setText("CLASIFICACIÓN");actions.addView(table,new LinearLayout.LayoutParams(0,dp(55),1));
+        matches.setOnClickListener(v->showMatches());
+        table.setOnClickListener(v->showClassification());
+        showMatches();
+    }
+    private void clear(){while(list.getChildCount()>3)list.removeViewAt(3);}
+    private void showClassification(){
+        clear();
+        screenTitle.setText("Clasificación M14");
+        screenSubtitle.setText("2026/27 · Andaluz M14 XV · 1ª División");
+        Button refresh=new Button(this);refresh.setText("↻ ACTUALIZAR");
+        refresh.setTextSize(12);refresh.setAllCaps(false);
+        LinearLayout.LayoutParams refreshParams=new LinearLayout.LayoutParams(-2,dp(40));
+        list.addView(refresh,refreshParams);
+        TextView status=text("Cargando clasificación oficial de MatchReady…",13,false);
+        status.setTextColor(0xffaab9c9);status.setTextSize(11);status.setPadding(0,dp(2),0,dp(5));
+        list.addView(status);
+        LinearLayout results=new LinearLayout(this);results.setOrientation(1);list.addView(results);
+        Button webButton=new Button(this);webButton.setText("VER CLASIFICACIÓN EN MATCHREADY");
+        list.addView(webButton);webButton.setOnClickListener(v->openOfficial());
+        android.webkit.WebView web=new android.webkit.WebView(this);
+        web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);
+        web.setVisibility(View.GONE);list.addView(web,new LinearLayout.LayoutParams(1,1));
+        final Runnable[] load=new Runnable[1];
+        load[0]=()->{
+            status.setText("Actualizando desde MatchReady…");results.removeAllViews();
+            web.loadUrl(official);
+        };
+        web.setWebViewClient(new android.webkit.WebViewClient(){
+            @Override public void onPageFinished(android.webkit.WebView view,String url){
+                String script="(function(){try{"+
+                    "var tables=[...document.querySelectorAll('table')];"+
+                    "var table=tables.find(t=>{var head=(t.querySelector('thead')||t).innerText.toUpperCase();return /PUNTOS/.test(head)&&/BO/.test(head)&&/BD/.test(head);});"+
+                    "if(!table)return JSON.stringify({error:'No se ha encontrado la tabla de clasificación'});"+
+                    "var rows=[...table.querySelectorAll('tr')].map(tr=>{"+
+                    "var cells=[...tr.querySelectorAll('td')];if(cells.length<10)return null;"+
+                    "var img=tr.querySelector('img');"+
+                    "return {values:cells.map(c=>c.innerText.trim()),logo:img?img.src:''};"+
+                    "}).filter(Boolean);"+
+                    "return JSON.stringify({rows:rows});"+
+                    "}catch(e){return JSON.stringify({error:String(e)});}})()";
+                view.evaluateJavascript(script,raw->{
+                    try{
+                        JSONObject obj=new JSONObject(new JSONTokener(raw).nextValue().toString());
+                        if(obj.has("error"))throw new Exception(obj.optString("error"));
+                        JSONArray rows=obj.optJSONArray("rows");
+                        if(rows==null||rows.length()==0)throw new Exception("La tabla oficial no contiene equipos");
+                        results.removeAllViews();
+                        TextView hint=text("Desliza estadísticas · Pulsa un equipo para ampliar",11,false);
+                        hint.setTextColor(0xffaab9c9);hint.setPadding(0,dp(2),0,dp(5));
+                        results.addView(hint);
+                        LinearLayout tableLayout=new LinearLayout(RugbyHubActivity.this);
+                        tableLayout.setOrientation(LinearLayout.HORIZONTAL);
+                        results.addView(tableLayout,new LinearLayout.LayoutParams(-1,-2));
+                        LinearLayout fixedLeft=new LinearLayout(RugbyHubActivity.this);
+                        fixedLeft.setOrientation(1);
+                        tableLayout.addView(fixedLeft,new LinearLayout.LayoutParams(dp(158),-2));
+                        HorizontalScrollView horizontal=new HorizontalScrollView(RugbyHubActivity.this);
+                        horizontal.setHorizontalScrollBarEnabled(true);
+                        tableLayout.addView(horizontal,new LinearLayout.LayoutParams(0,-2,1));
+                        LinearLayout middle=new LinearLayout(RugbyHubActivity.this);
+                        middle.setOrientation(1);horizontal.addView(middle);
+                        LinearLayout fixedRight=new LinearLayout(RugbyHubActivity.this);
+                        fixedRight.setOrientation(1);
+                        tableLayout.addView(fixedRight,new LinearLayout.LayoutParams(dp(51),-2));
+                        final int rowHeight=50, headerHeight=36, statWidth=37;
+                        LinearLayout leftHeader=new LinearLayout(RugbyHubActivity.this);
+                        leftHeader.setGravity(Gravity.CENTER_VERTICAL);leftHeader.setBackgroundColor(0xff30475d);
+                        fixedLeft.addView(leftHeader,new LinearLayout.LayoutParams(-1,dp(headerHeight)));
+                        TextView positionHeader=text("#",12,true);positionHeader.setGravity(Gravity.CENTER);
+                        leftHeader.addView(positionHeader,new LinearLayout.LayoutParams(dp(30),-1));
+                        TextView teamHeader=text("EQUIPO",12,true);
+                        teamHeader.setGravity(Gravity.CENTER_VERTICAL);
+                        leftHeader.addView(teamHeader,new LinearLayout.LayoutParams(0,-1,1));
+                        LinearLayout midHeader=new LinearLayout(RugbyHubActivity.this);
+                        midHeader.setGravity(Gravity.CENTER_VERTICAL);midHeader.setBackgroundColor(0xff30475d);
+                        middle.addView(midHeader,new LinearLayout.LayoutParams(-2,dp(headerHeight)));
+                        String[] columns={"J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
+                        for(String label:columns){
+                            TextView h=text(label,11,true);h.setGravity(Gravity.CENTER);
+                            midHeader.addView(h,new LinearLayout.LayoutParams(dp(statWidth),-1));
+                        }
+                        TextView pointsHeader=text("PTS",12,true);
+                        pointsHeader.setGravity(Gravity.CENTER);pointsHeader.setBackgroundColor(0xff30475d);
+                        fixedRight.addView(pointsHeader,new LinearLayout.LayoutParams(-1,dp(headerHeight)));
+                        LinearLayout detailsArea=new LinearLayout(RugbyHubActivity.this);
+                        detailsArea.setOrientation(1);results.addView(detailsArea);
+                        int shown=0;
+                        for(int i=0;i<rows.length();i++){
+                            JSONObject row=rows.optJSONObject(i);if(row==null)continue;
+                            JSONArray cells=row.optJSONArray("values");
+                            if(cells==null||cells.length()<14)continue;
+                            String rank=cells.optString(0).trim();
+                            if(!rank.matches("[0-9]+"))continue;
+                            String team=cells.optString(1).trim();
+                            final String[] values=new String[14];
+                            for(int c=0;c<14;c++)values[c]=cells.optString(c);
+                            int bg=shown%2==0?0xff203447:0xff192b3b;
+                            LinearLayout leftRow=new LinearLayout(RugbyHubActivity.this);
+                            leftRow.setGravity(Gravity.CENTER_VERTICAL);leftRow.setBackgroundColor(bg);
+                            fixedLeft.addView(leftRow,new LinearLayout.LayoutParams(-1,dp(rowHeight)));
+                            TextView rankView=text(rank+"º",15,true);rankView.setTextColor(0xff87d8b9);
+                            rankView.setGravity(Gravity.CENTER);
+                            leftRow.addView(rankView,new LinearLayout.LayoutParams(dp(34),-1));
+                            ImageView crest=teamLogo(row.optString("logo"));
+                            leftRow.addView(crest,new LinearLayout.LayoutParams(dp(27),dp(27)));
+                            TextView name=text(team,11,true);
+                            name.setPadding(dp(5),0,dp(2),0);name.setMaxLines(2);
+                            leftRow.addView(name,new LinearLayout.LayoutParams(0,-2,1));
+                            LinearLayout midRow=new LinearLayout(RugbyHubActivity.this);
+                            midRow.setGravity(Gravity.CENTER_VERTICAL);midRow.setBackgroundColor(bg);
+                            middle.addView(midRow,new LinearLayout.LayoutParams(-2,dp(rowHeight)));
+                            for(int c=2;c<=12;c++){
+                                TextView cell=text(values[c],12,false);cell.setGravity(Gravity.CENTER);
+                                midRow.addView(cell,new LinearLayout.LayoutParams(dp(statWidth),-1));
+                            }
+                            TextView points=text(values[13],16,true);
+                            points.setGravity(Gravity.CENTER);points.setTextColor(0xff87d8b9);
+                            points.setBackgroundColor(bg);
+                            fixedRight.addView(points,new LinearLayout.LayoutParams(-1,dp(rowHeight)));
+                            final String selectedTeam=team;
+                            View.OnClickListener expand=v->{
+                                detailsArea.removeAllViews();
+                                LinearLayout detail=new LinearLayout(RugbyHubActivity.this);
+                                detail.setOrientation(1);
+                                detail.setPadding(dp(13),dp(12),dp(13),dp(13));
+                                detail.setBackgroundColor(0xff293f52);
+                                LinearLayout.LayoutParams detailParams=new LinearLayout.LayoutParams(-1,-2);
+                                detailParams.topMargin=dp(10);detailsArea.addView(detail,detailParams);
+                                TextView detailTitle=text(selectedTeam+" · "+values[13]+" puntos",16,true);
+                                detail.addView(detailTitle);
+                                String[] labels={"Partidos jugados","Victorias","Empates","Derrotas",
+                                    "Tantos a favor","Tantos en contra","Diferencia",
+                                    "Ensayos a favor","Ensayos en contra",
+                                    "Bonus ofensivo","Bonus defensivo"};
+                                for(int c=2;c<=12;c++){
+                                    TextView detailLine=text(labels[c-2]+": "+values[c],14,false);
+                                    detailLine.setPadding(0,dp(5),0,0);detail.addView(detailLine);
+                                }
+                                TextView close=text("Cerrar detalles  ×",13,true);
+                                close.setTextColor(0xff87d8b9);close.setPadding(0,dp(12),0,0);
+                                detail.addView(close);close.setOnClickListener(w->detailsArea.removeAllViews());
+                            };
+                            leftRow.setOnClickListener(expand);
+                            midRow.setOnClickListener(expand);
+                            points.setOnClickListener(expand);
+                            shown++;
+                        }
+                        if(shown==0)throw new Exception("No se pudieron interpretar las posiciones");
+                        TextView legendTitle=text("LEYENDA DE LA CLASIFICACIÓN",14,true);
+                        legendTitle.setPadding(0,dp(16),0,dp(6));
+                        results.addView(legendTitle);
+                        LinearLayout legend=new LinearLayout(RugbyHubActivity.this);
+                        legend.setOrientation(1);
+                        legend.setPadding(dp(10),dp(9),dp(10),dp(9));
+                        legend.setBackgroundColor(0xff203447);
+                        results.addView(legend);
+                        String[][] meanings={
+                            {"J","Jugados"},{"G","Ganados"},{"E","Empatados"},{"P","Perdidos"},
+                            {"TF","Tantos a favor"},{"TC","Tantos en contra"},{"DT","Diferencia"},
+                            {"EF","Ensayos a favor"},{"EC","Ensayos en contra"},
+                            {"BO","Bonus ofensivo"},{"BD","Bonus defensivo"},{"PTS","Puntos"}
+                        };
+                        for(int k=0;k<meanings.length;k+=2){
+                            LinearLayout legendRow=new LinearLayout(RugbyHubActivity.this);
+                            legendRow.setOrientation(LinearLayout.HORIZONTAL);
+                            legend.addView(legendRow,new LinearLayout.LayoutParams(-1,-2));
+                            for(int n=k;n<Math.min(k+2,meanings.length);n++){
+                                TextView meaning=text(meanings[n][0]+" · "+meanings[n][1],12,false);
+                                meaning.setTextColor(0xffb8c9d9);
+                                meaning.setPadding(dp(3),dp(5),dp(3),dp(5));
+                                legendRow.addView(meaning,new LinearLayout.LayoutParams(0,-2,1));
+                            }
+                        }
+                        status.setText(shown+" equipos · Datos oficiales de MatchReady");
+                    }catch(Exception e){
+                        status.setText("No se ha podido leer la clasificación oficial. Puedes consultarla en MatchReady.");
+                    }
+                });
+            }
+        });
+        refresh.setOnClickListener(v->load[0].run());
+        load[0].run();
+    }
+    private void openOfficial(){startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(official)));}
+    private void inspectOfficial(){
+        clear();
+        list.addView(text("Diagnóstico de jornadas oficiales",21,true));
+        TextView status=text("Identificando cabeceras, filas, equipos, escudos y descargas…",14,false);
+        list.addView(status);
+        TextView report=text("",12,false);report.setTextIsSelectable(true);list.addView(report);
+        Button copy=new Button(this);copy.setText("Copiar informe");list.addView(copy);
+        copy.setOnClickListener(v->{
+            android.content.ClipboardManager cm=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("Diagnóstico Rugby",report.getText()));
+            Toast.makeText(this,"Informe copiado",Toast.LENGTH_SHORT).show();
+        });
+        Button back=new Button(this);back.setText("Volver a partidos");list.addView(back);
+        back.setOnClickListener(v->showMatches());
+        android.webkit.WebView web=new android.webkit.WebView(this);
+        web.getSettings().setJavaScriptEnabled(true);
+        web.getSettings().setDomStorageEnabled(true);
+        web.setVisibility(View.GONE);list.addView(web,new LinearLayout.LayoutParams(1,1));
+        final boolean[] finished={false};
+        web.setWebViewClient(new android.webkit.WebViewClient(){
+            @Override public void onPageFinished(android.webkit.WebView v,String url){
+                v.postDelayed(()->v.evaluateJavascript(
+                    "(function(){let o={url:location.href,title:document.title,sections:[],tables:[],links:[]};"+
+                    "let heads=[...document.querySelectorAll('h1,h2,h3,h4,.card-header,.panel-heading,.accordion-header,[data-bs-toggle=collapse]')];"+
+                    "o.sections=heads.slice(0,100).map(e=>({tag:e.tagName,text:(e.innerText||'').trim().slice(0,180)})).filter(x=>x.text);"+
+                    "o.tables=[...document.querySelectorAll('table')].slice(0,60).map((t,i)=>({index:i,rows:[...t.querySelectorAll('tr')].slice(0,80).map(r=>({cells:[...r.querySelectorAll('th,td')].map(c=>({text:(c.innerText||'').trim().slice(0,160),images:[...c.querySelectorAll('img')].map(im=>({src:im.src,alt:im.alt})),links:[...c.querySelectorAll('a[href]')].map(a=>({text:(a.innerText||'').trim(),href:a.href}))}))}))}));"+
+                    "o.links=[...document.querySelectorAll('a[href]')].filter(a=>/clasific|acta|descarga|pdf/i.test(a.innerText+' '+a.href)).slice(0,80).map(a=>({text:(a.innerText||'').trim(),href:a.href}));"+
+                    "return JSON.stringify(o)})()",value->{
+                        if(finished[0])return;
+                        try{
+                            String decoded=new JSONTokener(value).nextValue().toString();
+                            JSONObject obj=new JSONObject(decoded);
+                            JSONArray tables=obj.optJSONArray("tables");
+                            JSONArray sections=obj.optJSONArray("sections");
+                            report.setText(obj.toString(2));
+                            status.setText("Lectura completada: "+(sections==null?0:sections.length())+
+                                " cabeceras y "+(tables==null?0:tables.length())+
+                                " tablas. Copia el informe para revisar cada campo.");
+                            finished[0]=true;
+                        }catch(Exception ex){status.setText("No se pudo interpretar la estructura: "+ex.getMessage());}
+                        web.destroy();
+                    }),1800);
+            }
+            @Override public void onReceivedError(android.webkit.WebView v,
+                android.webkit.WebResourceRequest req,android.webkit.WebResourceError err){
+                if(req.isForMainFrame())status.setText("No se pudo abrir la página oficial.");
+            }
+        });
+        web.loadUrl(official);
+    }
+    private void updateOfficial(TextView status){
+        status.setText("Leyendo jornadas y partidos oficiales…");
+        android.webkit.WebView web=new android.webkit.WebView(this);
+        web.getSettings().setJavaScriptEnabled(true);
+        web.getSettings().setDomStorageEnabled(true);
+        web.setVisibility(View.GONE);
+        list.addView(web,new LinearLayout.LayoutParams(1,1));
+        final boolean[] received={false};
+        web.setWebViewClient(new android.webkit.WebViewClient(){
+            @Override public void onPageFinished(android.webkit.WebView v,String url){
+                v.postDelayed(()->v.evaluateJavascript(
+                    "(function(){"+
+                    "let hs=[...document.querySelectorAll('h4')].map(x=>(x.innerText||'').trim()).filter(x=>/^Jornada\\s+\\d|^JORNADA RECUPERACI/i.test(x));"+
+                    "let ts=[...document.querySelectorAll('table')].filter(t=>{let r=t.querySelector('tr');return r&&/Fecha\\s*\\/\\s*Hora/i.test(r.innerText||'')&&/Equipo local/i.test(r.innerText||'')});"+
+                    "let out=[];ts.forEach((t,i)=>{let round=hs[i]||('Jornada '+(i+1));"+
+                    "[...t.querySelectorAll('tr')].slice(1).forEach(r=>{let c=[...r.querySelectorAll('td')];if(c.length<7)return;"+
+                    "let first=x=>(x.innerText||'').trim().split('\\n')[0].trim();"+
+                    "let home=first(c[1]),away=first(c[5]);if(!home||!away||/descanso/i.test(home+' '+away))return;"+
+                    "let date=first(c[0]),time=((c[0].innerText||'').match(/\\b\\d{1,2}:\\d{2}\\b/)||[])[0]||'';"+
+                    "let score=first(c[3]);if(!/^\\d+\\s*[-–]\\s*\\d+$/.test(score))score='';"+
+                    "let hi=c[2].querySelector('img'),ai=c[4].querySelector('img');"+
+                    "let stats=c[3].querySelector('a[href]'),act=c[6].querySelector('a[href]');"+
+                    "out.push({jornada:round,date:date,time:time,home:home,away:away,score:score,"+
+                    "homeLogo:hi?hi.src:'',awayLogo:ai?ai.src:'',stats:stats?stats.href:'',act:act?act.href:''});"+
+                    "})});return JSON.stringify({rounds:hs,matches:out})})()",value->{
+                    if(received[0])return;
+                    try{
+                        JSONObject payload=new JSONObject(new JSONTokener(value).nextValue().toString());
+                        JSONArray rows=payload.getJSONArray("matches");
+                        JSONArray rounds=payload.getJSONArray("rounds");
+                        if(rows.length()<1||rounds.length()<1){
+                            status.setText("No se reconocieron las jornadas. Se mantienen los datos anteriores.");
+                        }else{
+                            received[0]=true;
+                            getSharedPreferences("rugby_official",MODE_PRIVATE).edit()
+                                .putString("matches",rows.toString())
+                                .putString("rounds",rounds.toString())
+                                .putLong("updated",System.currentTimeMillis()).apply();
+                            showMatches();
+                        }
+                    }catch(Exception ex){
+                        status.setText("Error interpretando las tablas oficiales. No se han borrado datos.");
+                    }
+                    web.destroy();
+                }),1800);
+            }
+            @Override public void onReceivedError(android.webkit.WebView v,
+                android.webkit.WebResourceRequest request,android.webkit.WebResourceError error){
+                if(request.isForMainFrame())status.setText("Sin conexión con Matchready. Se conservan los datos anteriores.");
+            }
+        });
+        web.loadUrl(official);
+    }
+    private JSONArray parseOfficial(String raw)throws Exception{
+        JSONArray out=new JSONArray();
+        String date="",organizer="";
+        java.util.regex.Pattern datePattern=java.util.regex.Pattern.compile(
+            "(?<![0-9])([0-3]?[0-9])[/.-]([01]?[0-9])[/.-](20[0-9]{2})(?![0-9])");
+        java.util.regex.Pattern hourPattern=java.util.regex.Pattern.compile(
+            "(?<![0-9])(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?![0-9])");
+        java.util.regex.Pattern scorePattern=java.util.regex.Pattern.compile(
+            "(?<![0-9])([0-9]{1,3})\\s*[-–]\\s*([0-9]{1,3})(?![0-9])");
+        java.util.ArrayList<String> pending=new java.util.ArrayList<>();
+        String[] lines=raw.split("\\n");
+        for(int i=0;i<=lines.length;i++){
+            String line=i<lines.length?lines[i].trim():"";
+            java.util.regex.Matcher dm=datePattern.matcher(line);
+            boolean isDate=dm.find();
+            boolean isOrganizer=line.toLowerCase(Locale.ROOT).startsWith("organizador:");
+            if((isDate||isOrganizer||i==lines.length)&&!pending.isEmpty()){
+                String block=android.text.TextUtils.join("\n",pending);
+                java.util.regex.Matcher tm=hourPattern.matcher(block);
+                java.util.regex.Matcher sm=scorePattern.matcher(block);
+                // Parse rows even without kickoff or final score. Matchready may
+                // render pending fixtures as "Local / vs / Visitante".
+                java.util.ArrayList<String> tokens=new java.util.ArrayList<>();
+                for(String part:block.split("\\n")){
+                    String t=part.trim();
+                    if(!t.isEmpty()&&!t.equalsIgnoreCase("vs")&&!t.equals("-")
+                        &&!t.equalsIgnoreCase("pendiente"))tokens.add(t);
+                }
+                String time="",home="",away="",score="";
+                if(tm.find()){
+                    time=tm.group();
+                    String after=block.substring(tm.end()).trim();
+                    int nl=after.indexOf('\n');
+                    home=(nl<0?after:after.substring(0,nl)).trim();
+                }
+                if(sm.find()){
+                    score=sm.group(1)+" - "+sm.group(2);
+                    String after=block.substring(sm.end()).trim();
+                    int nl=after.indexOf('\n');
+                    away=(nl<0?after:after.substring(0,nl)).trim();
+                }
+                if(home.isEmpty()||away.isEmpty()){
+                    java.util.ArrayList<String> teams=new java.util.ArrayList<>();
+                    for(String token:tokens){
+                        if(hourPattern.matcher(token).matches()||scorePattern.matcher(token).matches())continue;
+                        if(token.matches("(?i)(jornada|grupo|campo|árbitro|arbitro|hora|resultado).*"))continue;
+                        if(token.length()>90)continue;
+                        teams.add(token);
+                    }
+                    if(teams.size()>=2){
+                        if(home.isEmpty())home=teams.get(0);
+                        if(away.isEmpty())away=teams.get(teams.size()-1);
+                    }
+                }
+                if(!date.isEmpty()&&!home.isEmpty()&&!away.isEmpty()
+                    &&!home.equalsIgnoreCase(away)){
+                    JSONObject item=new JSONObject();
+                    item.put("date",date);item.put("organizer",organizer);
+                    item.put("home",home);item.put("away",away);
+                    item.put("time",time);item.put("score",score);
+                    out.put(item);
+                }
+                pending.clear();
+            }
+            if(isDate)date=String.format(Locale.ROOT,"%02d/%02d/%s",
+                Integer.parseInt(dm.group(1)),Integer.parseInt(dm.group(2)),dm.group(3));
+            if(isOrganizer)organizer=line.substring(line.indexOf(':')+1).trim();
+            if(i<lines.length&&!isDate&&!isOrganizer&&!line.isEmpty()
+                &&!line.toLowerCase(Locale.ROOT).startsWith("fecha/hora"))pending.add(line);
+        }
+        return out;
+    }
+    private void openMatchDetail(JSONObject match){
+        LinearLayout content=new LinearLayout(this);
+        content.setOrientation(1);content.setPadding(dp(18),dp(12),dp(18),dp(8));
+        content.setBackgroundColor(0xff223343);
+        String round=match.optString("jornada");
+        TextView title=text(round,17,true);content.addView(title);
+        TextView fixture=text(match.optString("home")+"  "+
+            (match.optString("score").isEmpty()?"VS":match.optString("score"))+
+            "  "+match.optString("away"),18,true);
+        fixture.setPadding(0,dp(14),0,dp(14));content.addView(fixture);
+        detailLine(content,"Fecha",match.optString("date"));
+        detailLine(content,"Hora",match.optString("time").isEmpty()?"Pendiente de confirmar":match.optString("time"));
+        detailLine(content,"Árbitro",match.optString("referee"));
+        detailLine(content,"Campo",match.optString("venue"));
+        String stats=match.optString("stats"),act=match.optString("act");
+        if(!stats.isEmpty()){
+            Button button=new Button(this);button.setText("Ver estadísticas oficiales");
+            content.addView(button);button.setOnClickListener(v->showStatistics(stats,match));
+        }
+        if(!act.isEmpty()){
+            Button readable=new Button(this);readable.setText("Acta adaptada al móvil");
+            content.addView(readable);readable.setOnClickListener(v->showReadableAct(act,match.optString("home"),match.optString("away")));
+            Button button=new Button(this);button.setText("Abrir acta oficial");
+            content.addView(button);button.setOnClickListener(v->showActPdf(act));
+        }
+        new AlertDialog.Builder(this).setView(content).setPositiveButton("Cerrar",null).show();
+    }
+    private void showReadableAct(String url,String homeName,String awayName){
+        android.app.Dialog dialog=new android.app.Dialog(this);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(1);
+        root.setPadding(dp(10),dp(7),dp(10),dp(7));root.setBackgroundColor(0xff101a24);
+        TextView heading=text("Acta oficial",17,true);root.addView(heading);
+        TextView status=text("Cargando acta…",11,false);status.setTextColor(0xffaab9c9);root.addView(status);
+        ScrollView scroll=new ScrollView(this);
+        TextView body=text("",13,false);body.setTextIsSelectable(true);body.setLineSpacing(dp(3),1.0f);
+        body.setPadding(dp(2),dp(12),dp(2),dp(12));scroll.addView(body);
+        LinearLayout sections=new LinearLayout(this);sections.setOrientation(1);
+        root.addView(sections);
+        scroll.setFillViewport(false);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        LinearLayout actions=new LinearLayout(this);root.addView(actions);
+        Button original=new Button(this);original.setText("PDF original");actions.addView(original);
+        original.setOnClickListener(v->showActPdf(url));
+        Button close=new Button(this);close.setText("Cerrar");actions.addView(close);
+        close.setOnClickListener(v->dialog.dismiss());
+        dialog.setContentView(root);dialog.show();dialog.getWindow().setLayout(-1,-1);
+        new Thread(()->{
+            java.net.HttpURLConnection conn=null;
+            try{
+                com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());
+                conn=(java.net.HttpURLConnection)new java.net.URL(url).openConnection();
+                conn.setConnectTimeout(10000);conn.setReadTimeout(20000);
+                byte[] data;
+                try(java.io.InputStream in=conn.getInputStream();
+                    java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){
+                    byte[] buffer=new byte[16384];int n;
+                    while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
+                    data=out.toByteArray();
+                }
+                StringBuilder extracted=new StringBuilder();
+                String lineupColumns=null;
+                String disciplinaryColumns=null;
+                try(com.tom_roush.pdfbox.pdmodel.PDDocument pdf=
+                    com.tom_roush.pdfbox.pdmodel.PDDocument.load(data)){
+                    com.tom_roush.pdfbox.text.PDFTextStripper stripper=
+                        new com.tom_roush.pdfbox.text.PDFTextStripper();
+                    stripper.setSortByPosition(true);
+                    if(pdf.getNumberOfPages()>0)lineupColumns=extractLineupColumns(pdf);
+                    disciplinaryColumns=extractDisciplinaryColumns(pdf);
+                    for(int page=1;page<=pdf.getNumberOfPages();page++){
+                        stripper.setStartPage(page);stripper.setEndPage(page);
+                        extracted.append("PÁGINA ").append(page).append("\n\n")
+                            .append(stripper.getText(pdf)).append("\n\n");
+                    }
+                }
+                String content=extracted.toString().trim();
+                final String safeLineups=lineupColumns;
+                final String safeDiscipline=disciplinaryColumns;
+                runOnUiThread(()->{
+                    if(!dialog.isShowing())return;
+                    if(content.isEmpty()){
+                        status.setText("El PDF no contiene texto extraíble.");
+                        body.setText("Consulta el documento original. No se han inventado datos.");
+                    }else{
+                        status.setText("Lectura adaptada al móvil");
+                        java.util.LinkedHashMap<String,String> parsed=structuredActSections(content);
+                        if(safeLineups!=null)parsed.put("Alineaciones",safeLineups);
+                        if(safeDiscipline!=null)parsed.put("Expulsiones",safeDiscipline);
+                        sections.removeAllViews();
+                        
+                        LinearLayout tabStack=new LinearLayout(this);
+                        tabStack.setOrientation(LinearLayout.VERTICAL);
+                        sections.addView(tabStack);
+                        java.util.ArrayList<Button> actTabs=new java.util.ArrayList<>();
+                        LinearLayout tabRow=null;
+                        int tabIndex=0;
+                        for(java.util.Map.Entry<String,String> entry:parsed.entrySet()){
+                            if(tabIndex==0||tabIndex==3){
+                                tabRow=new LinearLayout(this);
+                                tabRow.setOrientation(LinearLayout.HORIZONTAL);
+                                tabStack.addView(tabRow);
+                            }
+                            Button tab=new Button(this);
+                            tab.setText(entry.getKey());
+                            tab.setTextSize(12);
+                            tab.setAllCaps(false);
+                            tab.setSingleLine(true);
+                            tab.setMinWidth(0);
+                            tab.setMinimumWidth(0);
+                            tab.setMinHeight(0);
+                            tab.setMinimumHeight(0);
+                            tab.setPadding(dp(2),0,dp(2),0);
+                            tab.setTextColor(android.graphics.Color.WHITE);
+                            tab.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                                android.graphics.Color.parseColor(tabIndex==0?"#32638B":"#354554")));
+                            if(tabIndex==0)tab.setTypeface(null,android.graphics.Typeface.BOLD);
+                            LinearLayout.LayoutParams tabParams=new LinearLayout.LayoutParams(0,dp(44),1f);
+                            tabParams.setMargins(dp(2),0,dp(2),dp(2));
+                            tabRow.addView(tab,tabParams);
+                            actTabs.add(tab);
+                            tabIndex++;
+                            tab.setOnClickListener(v->{
+                                for(Button other:actTabs){
+                                    boolean selected=other==tab;
+                                    other.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+                                        android.graphics.Color.parseColor(selected?"#32638B":"#354554")));
+                                    other.setTextColor(android.graphics.Color.WHITE);
+                                    other.setTypeface(null,selected?android.graphics.Typeface.BOLD:android.graphics.Typeface.NORMAL);
+                                }
+                                if("Resumen".equals(entry.getKey()))
+                                    showActSummary(scroll,entry.getValue(),homeName,awayName);
+                                else if("Marcador".equals(entry.getKey()))
+                                    showActScoreboard(scroll,entry.getValue(),safeLineups,homeName,awayName);
+                                else if("Cambios".equals(entry.getKey()))
+                                    showActChanges(scroll,entry.getValue(),safeLineups,homeName,awayName);
+                                else if("Expulsiones".equals(entry.getKey()))
+                                    showActDiscipline(scroll,entry.getValue(),parsed.get("Cambios"),safeLineups,homeName,awayName);
+                                else if("Alineaciones".equals(entry.getKey()) && safeLineups!=null)
+                                    showLineupCards(scroll,safeLineups,homeName,awayName);
+                                else {scroll.removeAllViews();scroll.addView(body);body.setText(entry.getValue());}
+                                scroll.post(()->scroll.scrollTo(0,0));
+                            });
+                        }
+                        String first=parsed.containsKey("Resumen")?"Resumen":parsed.keySet().iterator().next();
+                        if("Resumen".equals(first))showActSummary(scroll,parsed.get(first),homeName,awayName);
+                        else body.setText(parsed.get(first));
+                    }
+                });
+            }catch(Exception ex){
+                runOnUiThread(()->{if(dialog.isShowing())status.setText(
+                    "No se pudo leer el acta. Puedes abrir el PDF original.");});
+            }finally{if(conn!=null)conn.disconnect();}
+        }).start();
+    }
+    private String extractDisciplinaryColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
+        StringBuilder out=new StringBuilder();
+        try{
+            for(int pageIndex=0;pageIndex<pdf.getNumberOfPages();pageIndex++){
+                com.tom_roush.pdfbox.pdmodel.PDPage page=pdf.getPage(pageIndex);
+                float w=page.getCropBox().getWidth(),h=page.getCropBox().getHeight();
+                com.tom_roush.pdfbox.text.PDFTextStripperByArea area=
+                    new com.tom_roush.pdfbox.text.PDFTextStripperByArea();
+                area.setSortByPosition(true);
+                area.addRegion("temporal",new android.graphics.RectF(0,0,w*.495f,h));
+                area.addRegion("definitiva",new android.graphics.RectF(w*.505f,0,w,h));
+                area.extractRegions(page);
+                String left=area.getTextForRegion("temporal");
+                String right=area.getTextForRegion("definitiva");
+                if(left==null||right==null)continue;
+                if(!left.toLowerCase(java.util.Locale.ROOT).contains("expulsiones temporales")||
+                   !right.toLowerCase(java.util.Locale.ROOT).contains("expulsiones definitivas"))continue;
+                String temporary=parseDisciplineTableOnly(left,"Expulsiones temporales");
+                String definitive=parseDisciplineTableOnly(right,"Expulsiones definitivas");
+                if(temporary.isEmpty()&&definitive.isEmpty())continue;
+                out.append("TEMPORALES\n").append(temporary).append("\nDEFINITIVAS\n")
+                    .append(definitive).append("\n");
+            }
+        }catch(Exception ignored){return null;}
+        return out.length()==0?null:out.toString();
+    }
+    private String parseDisciplineTableOnly(String column,String heading){
+        if(column==null)return "";
+        String lower=column.toLowerCase(java.util.Locale.ROOT);
+        int start=lower.indexOf(heading.toLowerCase(java.util.Locale.ROOT));
+        if(start<0)return "";
+        String section=column.substring(start+heading.length());
+        // Only the table immediately below this heading is eligible.
+        // Stop before its code legend, or the next section on the page.
+        java.util.regex.Matcher stop=java.util.regex.Pattern.compile(
+            "(?im)^\\s*(?:\\(\\*\\)|\\*\\)|leyenda|marcador|cambios|alineaciones|expulsiones\\s+(?:temporales|definitivas))\\b")
+            .matcher(section);
+        if(stop.find())section=section.substring(0,stop.start());
+        StringBuilder result=new StringBuilder();
+        java.util.regex.Matcher teams=java.util.regex.Pattern.compile(
+            "(?im)^\\s*Equipo\\s+(local|visitante):[^\\r\\n]*").matcher(section);
+        java.util.ArrayList<Integer> offsets=new java.util.ArrayList<>();
+        java.util.ArrayList<String> labels=new java.util.ArrayList<>();
+        while(teams.find()){offsets.add(teams.start());labels.add(teams.group().trim());}
+        for(int k=0;k<offsets.size();k++){
+            String block=section.substring(offsets.get(k),k+1<offsets.size()?offsets.get(k+1):section.length());
+            java.util.regex.Matcher type=java.util.regex.Pattern.compile("(?im)^\\s*Tipo\\s*\\*?\\s*(.*)$").matcher(block);
+            java.util.regex.Matcher dorsal=java.util.regex.Pattern.compile("(?im)^\\s*Dorsal\\s+(.*)$").matcher(block);
+            java.util.regex.Matcher minute=java.util.regex.Pattern.compile("(?im)^\\s*Minuto\\s+(.*)$").matcher(block);
+            if(!type.find()||!dorsal.find()||!minute.find())continue;
+            String[] types=type.group(1).trim().split("\\s+");
+            String[] dorsals=dorsal.group(1).trim().split("\\s+");
+            String[] minutes=minute.group(1).trim().split("\\s+");
+            result.append(labels.get(k)).append("\n");
+            int count=Math.min(types.length,Math.min(dorsals.length,minutes.length));
+            for(int i=0;i<count;i++){
+                if(!types[i].matches("(?i)[A-E]")||!dorsals[i].matches("\\d{1,2}")||
+                    !minutes[i].matches("\\d{1,3}"))continue;
+                result.append(i+1).append(". Min ").append(minutes[i]).append(" · Tipo ")
+                    .append(types[i]).append(" · Dorsal ").append(dorsals[i]).append("\n");
+            }
+            result.append("\n");
+        }
+        return result.toString();
+    }
+    private void showActDiscipline(ScrollView scroll,String expulsions,String changes,String lineups,String home,String away){
+        LinearLayout host=new LinearLayout(this);host.setOrientation(1);
+        host.setPadding(dp(4),dp(8),dp(4),dp(16));
+        scroll.removeAllViews();scroll.addView(host);
+        java.util.Map<String,String>[] names=new java.util.HashMap[]{
+            new java.util.HashMap<String,String>(),new java.util.HashMap<String,String>()
+        };
+        if(lineups!=null){
+            int side=-1;
+            java.util.regex.Pattern player=java.util.regex.Pattern.compile(
+                "^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*\\d{7}.*$");
+            for(String line:lineups.split("\\r?\\n")){
+                String t=line.trim();
+                if(t.equals("EQUIPO LOCAL"))side=0;
+                else if(t.equals("EQUIPO VISITANTE"))side=1;
+                else if(side>=0){
+                    java.util.regex.Matcher m=player.matcher(t);
+                    if(m.matches())names[side].put(m.group(1),m.group(2).trim());
+                }
+            }
+        }
+        java.util.ArrayList<String[]> incidents=new java.util.ArrayList<>();
+        java.util.regex.Pattern record=java.util.regex.Pattern.compile(
+            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*Tipo\\s+([A-Za-z]{1,3})\\s*·\\s*Dorsal\\s+(\\d+)\\s*$",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        String raw=expulsions==null?"":expulsions;
+        int category=-1,side=-1;
+        for(String line:raw.split("\\r?\\n")){
+            String t=line.trim().toLowerCase(java.util.Locale.ROOT);
+            if(t.equals("temporales")){category=0;side=-1;}
+            else if(t.equals("definitivas")){category=1;side=-1;}
+            else if(t.startsWith("equipo local:"))side=0;
+            else if(t.startsWith("equipo visitante:"))side=1;
+            else if(category>=0&&side>=0){
+                java.util.regex.Matcher m=record.matcher(line.trim());
+                if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3),String.valueOf(category)});
+            }
+        }
+        // If the PDF's two-column table could not be isolated, retain the
+        // raw records but never guess whether they were temporary or definitive.
+        if(incidents.isEmpty()){
+            side=-1;
+            for(String line:(changes==null?"":changes).split("\\r?\\n")){
+                String t=line.trim().toLowerCase(java.util.Locale.ROOT);
+                if(t.startsWith("equipo local:"))side=0;
+                else if(t.startsWith("equipo visitante:"))side=1;
+                else if(side>=0){
+                    java.util.regex.Matcher m=record.matcher(line.trim());
+                    if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3),"-1"});
+                }
+            }
+        }
+        TextView heading=text("EXPULSIONES",16,true);
+        host.addView(heading);
+        TextView note=text("Temporales y definitivas con los motivos indicados en la leyenda oficial del acta.",12,false);
+        note.setTextColor(0xffaab9c9);note.setPadding(0,dp(4),0,dp(12));host.addView(note);
+        if(incidents.isEmpty()){
+            TextView empty=text("No se han identificado registros disciplinarios verificables en el texto extraído. Consulta el PDF original.",13,false);
+            host.addView(empty);
+        }
+        java.util.Collections.sort(incidents,(a,b)->Integer.compare(Integer.parseInt(a[1]),Integer.parseInt(b[1])));
+        for(String[] item:incidents){
+            int team=Integer.parseInt(item[0]);
+            String teamName=team==0?home:away;
+            if(teamName==null||teamName.trim().isEmpty())teamName=team==0?"Equipo local":"Equipo visitante";
+            LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+            card.setPadding(dp(12),dp(9),dp(12),dp(9));
+            android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+            bg.setColor(0xff1b2a39);bg.setCornerRadius(dp(9));card.setBackground(bg);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+            lp.setMargins(0,dp(4),0,dp(3));host.addView(card,lp);
+            int sanctionCategory=Integer.parseInt(item[4]);
+            String sanction=sanctionCategory==0?"EXPULSIÓN TEMPORAL":
+                sanctionCategory==1?"EXPULSIÓN DEFINITIVA":"INCIDENCIA SIN CLASIFICAR";
+            String[] temporalReasons={"Falta reiterada","Falta reiterada de equipo",
+                "Actitud contra árbitros","Juego sucio","Otros motivos"};
+            String[] definitiveReasons={"Doble expulsión temporal","Agresión al contrario",
+                "Actitud contra árbitros","Otros motivos","Expulsión TR 20'"};
+            String motive="Código "+item[2]+" · comprobar en el PDF";
+            if(item[2].length()==1){
+                int index=Character.toUpperCase(item[2].charAt(0))-'A';
+                if(index>=0&&index<5){
+                    if(sanctionCategory==0)motive=temporalReasons[index];
+                    if(sanctionCategory==1)motive=definitiveReasons[index];
+                }
+            }
+            card.addView(text(sanction+"  ·  MINUTO "+item[1]+"'",14,true));
+            TextView motiveView=text(motive,13,true);
+            motiveView.setTextColor(0xffffb1a1);
+            card.addView(motiveView);
+            String playerName=names[team].get(item[3]);
+            TextView player=text(teamName+"  ·  Nº "+item[3]+
+                (playerName==null?"":"  ·  "+playerName),12,false);
+            player.setTextColor(0xffb8c9d9);card.addView(player);
+        }
+        TextView original=text("Las sanciones sin sección identificable se dejan sin clasificar para evitar motivos incorrectos.",12,false);
+        original.setPadding(0,dp(14),0,0);host.addView(original);
+    }
+    private void showActChanges(ScrollView scroll,String events,String lineups,String home,String away){
+        LinearLayout host=new LinearLayout(this);host.setOrientation(1);
+        host.setPadding(dp(4),dp(6),dp(4),dp(14));
+        scroll.removeAllViews();scroll.addView(host);
+        String[] teams={
+            home==null||home.trim().isEmpty()?"Equipo local":home.trim(),
+            away==null||away.trim().isEmpty()?"Equipo visitante":away.trim()
+        };
+        java.util.Map<String,String>[] players=new java.util.HashMap[]{
+            new java.util.HashMap<String,String>(),new java.util.HashMap<String,String>()
+        };
+        if(lineups!=null){
+            int team=-1;
+            java.util.regex.Pattern player=java.util.regex.Pattern.compile(
+                "^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*\\d{7}.*$");
+            for(String line:lineups.split("\\r?\\n")){
+                String value=line.trim();
+                if(value.equals("EQUIPO LOCAL"))team=0;
+                else if(value.equals("EQUIPO VISITANTE"))team=1;
+                else if(team>=0){
+                    java.util.regex.Matcher m=player.matcher(value);
+                    if(m.matches())players[team].put(m.group(1),m.group(2).trim());
+                }
+            }
+        }
+        java.util.ArrayList<String[]>[] changes=new java.util.ArrayList[]{
+            new java.util.ArrayList<String[]>(),new java.util.ArrayList<String[]>()
+        };
+        int side=-1;
+        java.util.regex.Pattern change=java.util.regex.Pattern.compile(
+            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*Cambio\\s*·\\s*Entra\\s*n[º°o]?\\s*(\\d+)\\s*·\\s*Sale\\s*n[º°o]?\\s*(\\d+)\\s*$",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        for(String line:(events==null?"":events).split("\\r?\\n")){
+            String value=line.trim();
+            if(value.toLowerCase(java.util.Locale.ROOT).startsWith("equipo local:"))side=0;
+            else if(value.toLowerCase(java.util.Locale.ROOT).startsWith("equipo visitante:"))side=1;
+            else if(side>=0){
+                java.util.regex.Matcher m=change.matcher(value);
+                if(m.matches())changes[side].add(new String[]{m.group(1),m.group(2),m.group(3)});
+            }
+        }
+        for(java.util.ArrayList<String[]> list:changes)
+            java.util.Collections.sort(list,(a,b)->Integer.compare(
+                Integer.parseInt(a[0]),Integer.parseInt(b[0])));
+        LinearLayout tabs=new LinearLayout(this);
+        host.addView(tabs,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout cards=new LinearLayout(this);cards.setOrientation(1);
+        host.addView(cards,new LinearLayout.LayoutParams(-1,-2));
+        final int[] selected={0};
+        Runnable render=new Runnable(){
+            @Override public void run(){
+                tabs.removeAllViews();cards.removeAllViews();
+                for(int i=0;i<2;i++){
+                    final int idx=i;
+                    Button b=new Button(RugbyHubActivity.this);
+                    b.setAllCaps(false);b.setTextSize(11);b.setMaxLines(2);
+                    b.setText(teams[i]+" ("+changes[i].size()+")");
+                    b.setAlpha(i==selected[0]?1f:.6f);
+                    tabs.addView(b,new LinearLayout.LayoutParams(0,dp(52),1));
+                    b.setOnClickListener(v->{selected[0]=idx;this.run();
+                        scroll.post(()->scroll.scrollTo(0,0));});
+                }
+                int team=selected[0];
+                if(changes[team].isEmpty()){
+                    TextView empty=text("No hay sustituciones registradas para este equipo.",13,false);
+                    empty.setPadding(dp(8),dp(18),dp(8),dp(10));cards.addView(empty);
+                    return;
+                }
+                for(String[] changeRow:changes[team]){
+                    LinearLayout card=new LinearLayout(RugbyHubActivity.this);
+                    card.setOrientation(1);card.setPadding(dp(12),dp(9),dp(12),dp(9));
+                    android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+                    bg.setColor(0xff1b2a39);bg.setCornerRadius(dp(10));
+                    card.setBackground(bg);
+                    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+                    lp.setMargins(0,dp(5),0,dp(3));cards.addView(card,lp);
+                    card.addView(text("MINUTO "+changeRow[0]+"'",12,true));
+                    String outName=players[team].get(changeRow[2]);
+                    TextView outgoing=text("↓  SALE · Nº "+changeRow[2]+"  "+
+                        (outName==null?"Nombre no identificado":outName),13,true);
+                    outgoing.setTextColor(0xffffa0a0);
+                    outgoing.setPadding(0,dp(6),0,dp(3));card.addView(outgoing);
+                    String inName=players[team].get(changeRow[1]);
+                    TextView incoming=text("↑  ENTRA · Nº "+changeRow[1]+"  "+
+                        (inName==null?"Nombre no identificado":inName),13,true);
+                    incoming.setTextColor(0xff93e0b2);card.addView(incoming);
+                }
+            }
+        };
+        render.run();
+    }
+    private void showActScoreboard(ScrollView scroll,String events,String lineups,String home,String away){
+        LinearLayout host=new LinearLayout(this);host.setOrientation(1);
+        host.setPadding(dp(4),dp(7),dp(4),dp(18));
+        scroll.removeAllViews();scroll.addView(host);
+        String[] names={
+            home==null||home.trim().isEmpty()?"Equipo local":home.trim(),
+            away==null||away.trim().isEmpty()?"Equipo visitante":away.trim()
+        };
+        java.util.Map<String,String>[] players=new java.util.HashMap[]{
+            new java.util.HashMap<String,String>(),new java.util.HashMap<String,String>()
+        };
+        if(lineups!=null){
+            int side=-1;
+            java.util.regex.Pattern player=java.util.regex.Pattern.compile(
+                "^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*\\d{7}.*$");
+            for(String line:lineups.split("\\r?\\n")){
+                String t=line.trim();
+                if(t.equals("EQUIPO LOCAL"))side=0;
+                else if(t.equals("EQUIPO VISITANTE"))side=1;
+                else if(side>=0){
+                    java.util.regex.Matcher pm=player.matcher(t);
+                    if(pm.matches())players[side].put(pm.group(1),pm.group(2).trim());
+                }
+            }
+        }
+        java.util.ArrayList<String[]> items=new java.util.ArrayList<>();
+        int[] score={0,0};
+        int side=-1;
+        java.util.regex.Pattern row=java.util.regex.Pattern.compile(
+            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*(.*?)\\s*·\\s*Dorsal\\s+(\\d+)\\s*$");
+        for(String line:(events==null?"":events).split("\\r?\\n")){
+            String t=line.trim();
+            if(t.toLowerCase(java.util.Locale.ROOT).startsWith("equipo local:"))side=0;
+            else if(t.toLowerCase(java.util.Locale.ROOT).startsWith("equipo visitante:"))side=1;
+            else if(side>=0){
+                java.util.regex.Matcher m=row.matcher(t);
+                if(!m.matches())continue;
+                String type=m.group(2).trim();
+                java.util.regex.Matcher points=java.util.regex.Pattern.compile(
+                    "\\((\\d+)\\s+puntos?\\)",java.util.regex.Pattern.CASE_INSENSITIVE).matcher(type);
+                if(!points.find())continue;
+                int value=Integer.parseInt(points.group(1));
+                score[side]+=value;
+                String dorsal=m.group(3);
+                String playerName=players[side].get(dorsal);
+                items.add(new String[]{m.group(1),type.replaceAll("\\s*\\(\\d+\\s+puntos?\\)",""),
+                    dorsal,playerName==null?"":playerName,String.valueOf(value),String.valueOf(side)});
+            }
+        }
+        LinearLayout header=new LinearLayout(this);header.setOrientation(1);
+        header.setPadding(dp(10),dp(12),dp(10),dp(12));
+        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+        bg.setColor(0xff1b2a39);bg.setCornerRadius(dp(12));header.setBackground(bg);
+        host.addView(header);
+        TextView teams=text(names[0]+"  ·  "+names[1],13,true);
+        teams.setGravity(Gravity.CENTER);header.addView(teams);
+        TextView result=text(score[0]+"  –  "+score[1],30,true);
+        result.setGravity(Gravity.CENTER);header.addView(result);
+        TextView qualifier=text("Resultado calculado de las anotaciones del acta",10,false);
+        qualifier.setGravity(Gravity.CENTER);qualifier.setTextColor(0xffaab9c9);
+        header.addView(qualifier);
+        if(items.isEmpty()){
+            TextView empty=text("No se han identificado anotaciones suficientes. Consulta el PDF original.",13,false);
+            empty.setPadding(dp(6),dp(16),dp(6),dp(8));host.addView(empty);
+            return;
+        }
+        java.util.Collections.sort(items,(a,b)->Integer.compare(
+            Integer.parseInt(a[0]),Integer.parseInt(b[0])));
+        int[] running={0,0};
+        for(String[] item:items){
+            running[Integer.parseInt(item[5])]+=Integer.parseInt(item[4]);
+            String accumulated=running[0]+" – "+running[1];
+            LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+            card.setPadding(dp(12),dp(7),dp(12),dp(7));
+            android.graphics.drawable.GradientDrawable cardBg=new android.graphics.drawable.GradientDrawable();
+            cardBg.setColor(0xff1b2a39);cardBg.setCornerRadius(dp(9));
+            card.setBackground(cardBg);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+            lp.setMargins(0,dp(4),0,dp(2));host.addView(card,lp);
+            card.addView(text(item[0]+"'  ·  "+item[1]+"  ·  +"+item[4],14,true));
+            String who=item[3].isEmpty()?"Dorsal "+item[2]:
+                item[3]+"  ·  Nº "+item[2];
+            TextView detail=text(names[Integer.parseInt(item[5])]+"  ·  "+who,11,false);
+            detail.setTextColor(0xffb8c9d9);card.addView(detail);
+            TextView partial=text("Marcador acumulado: "+accumulated,11,true);
+            partial.setTextColor(0xff82c7ff);card.addView(partial);
+        }
+    }
+    private void showActSummary(ScrollView scroll,String raw,String home,String away){
+        LinearLayout host=new LinearLayout(this);host.setOrientation(1);
+        host.setPadding(dp(4),dp(6),dp(4),dp(10));
+        scroll.removeAllViews();scroll.addView(host);
+        TextView matchup=text((home==null||home.isEmpty()?"Equipo local":home)+
+            "   VS   "+(away==null||away.isEmpty()?"Equipo visitante":away),18,true);
+        matchup.setGravity(Gravity.CENTER);
+        matchup.setPadding(dp(8),dp(10),dp(8),dp(10));
+        android.graphics.drawable.GradientDrawable header=new android.graphics.drawable.GradientDrawable();
+        header.setColor(0xff1b2a39);header.setCornerRadius(dp(12));
+        matchup.setBackground(header);host.addView(matchup);
+        String clean=raw==null?"":raw.replaceAll("(?im)^\\s*PÁGINA\\s+\\d+\\s*$","").trim();
+        java.util.regex.Pattern fields=java.util.regex.Pattern.compile(
+            "(?i)(Celebrado en:|Categoría:|Jornada:|Organizador:|El día:|A la hora:|En el campo:|Equipo local:|Equipo visitante:)");
+        java.util.regex.Matcher matcher=fields.matcher(clean);
+        java.util.ArrayList<String> keys=new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> starts=new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> ends=new java.util.ArrayList<>();
+        while(matcher.find()){keys.add(matcher.group(1));starts.add(matcher.start());ends.add(matcher.end());}
+        java.util.LinkedHashMap<String,String> found=new java.util.LinkedHashMap<>();
+        for(int i=0;i<keys.size();i++){
+            String key=keys.get(i).toLowerCase(java.util.Locale.ROOT);
+            String value=clean.substring(ends.get(i),i+1<keys.size()?starts.get(i+1):clean.length()).trim();
+            if(value.isEmpty())continue;
+            if(key.startsWith("celebrado"))found.put("Localidad",value);
+            else if(key.startsWith("categor"))found.put("Competición",value);
+            else if(key.startsWith("jornada"))found.put("Jornada",value);
+            else if(key.startsWith("organizador"))found.put("Organizador",value);
+            else if(key.startsWith("el d"))found.put("Fecha",value);
+            else if(key.startsWith("a la"))found.put("Hora",value);
+            else if(key.startsWith("en el"))found.put("Campo",value);
+        }
+        // In federation PDFs "Jornada 1.1.- 1ª" is embedded inside Categoría,
+        // while the later "Jornada: Fase." is a separate label.
+        String competition=found.get("Competición");
+        if(competition!=null){
+            java.util.regex.Matcher embedded=java.util.regex.Pattern.compile(
+                "(?i)\\bJornada\\s+([0-9][^\\r\\n]*)").matcher(competition);
+            if(embedded.find()){
+                String number=embedded.group(1).trim();
+                String category=competition.substring(0,embedded.start()).trim();
+                if(!category.isEmpty())found.put("Competición",category);
+                if(!number.isEmpty()){
+                    String phase=found.get("Jornada");
+                    if(phase!=null && phase.matches("(?i)fase\\.?"))phase="";
+                    found.put("Jornada",number+(phase==null||phase.isEmpty()?"":" · "+phase));
+                }
+            }else{
+                String phase=found.get("Jornada");
+                if(phase!=null && phase.matches("(?i)fase\\.?"))
+                    found.remove("Jornada");
+            }
+        }
+        for(java.util.Map.Entry<String,String> field:found.entrySet()){
+            LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+            card.setPadding(dp(12),dp(6),dp(12),dp(6));
+            android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+            bg.setColor(0xff1b2a39);bg.setCornerRadius(dp(9));card.setBackground(bg);
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+            lp.setMargins(0,dp(3),0,dp(2));host.addView(card,lp);
+            TextView label=text(field.getKey().toUpperCase(java.util.Locale.ROOT),11,true);
+            label.setTextColor(0xffaab9c9);card.addView(label);
+            card.addView(text(field.getValue(),14,false));
+            if("Campo".equals(field.getKey())){
+                TextView mapHint=text("📍  Abrir en Google Maps",11,true);
+                mapHint.setTextColor(0xff82c7ff);mapHint.setPadding(0,dp(2),0,0);
+                card.addView(mapHint);
+                card.setClickable(true);card.setFocusable(true);
+                card.setOnClickListener(v->{
+                    String place=field.getValue();
+                    String city=found.get("Localidad");
+                    String query=place+(city==null||city.trim().isEmpty()?"":", "+city.trim());
+                    android.net.Uri uri=android.net.Uri.parse(
+                        "https://www.google.com/maps/search/?api=1&query="+
+                        android.net.Uri.encode(query));
+                    Intent intent=new Intent(Intent.ACTION_VIEW,uri);
+                    intent.setPackage("com.google.android.apps.maps");
+                    try{startActivity(intent);}
+                    catch(android.content.ActivityNotFoundException ex){
+                        Intent browser=new Intent(Intent.ACTION_VIEW,uri);
+                        try{startActivity(browser);}
+                        catch(Exception ignored){
+                            Toast.makeText(this,"No se pudo abrir Google Maps",Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+            }
+        }
+        if(found.isEmpty()){
+            TextView fallback=text(clean,13,false);fallback.setPadding(dp(4),dp(12),dp(4),0);
+            host.addView(fallback);
+        }
+    }
+    private void showLineupCards(ScrollView scroll,String lineups,String homeName,String awayName){
+        LinearLayout host=new LinearLayout(this);host.setOrientation(1);
+        host.setPadding(dp(2),dp(4),dp(2),dp(12));
+        scroll.removeAllViews();scroll.addView(host);
+        String[] teams=lineups.split("(?=EQUIPO VISITANTE)");
+        LinearLayout teamTabs=new LinearLayout(this);teamTabs.setOrientation(0);
+        host.addView(teamTabs);
+        LinearLayout groupTabs=new LinearLayout(this);groupTabs.setOrientation(0);
+        host.addView(groupTabs);
+        LinearLayout rows=new LinearLayout(this);rows.setOrientation(1);
+        host.addView(rows);
+        final int[] selectedTeam={0},selectedGroup={0};
+        Runnable render=()->{
+            teamTabs.removeAllViews();groupTabs.removeAllViews();rows.removeAllViews();
+            for(int i=0;i<teams.length;i++){
+                final int index=i;
+                Button b=new Button(this);
+                String label=i==0?homeName:awayName;
+                b.setText(label==null||label.trim().isEmpty()?(i==0?"LOCAL":"VISITANTE"):label.trim());
+                b.setTextSize(11);b.setAllCaps(false);b.setMaxLines(2);
+                b.setAlpha(i==selectedTeam[0]?1f:.6f);
+                teamTabs.addView(b,new LinearLayout.LayoutParams(0,dp(44),1));
+                b.setOnClickListener(v->{selectedTeam[0]=index;selectedGroup[0]=0;
+                    showLineupCardsSelection(host,teams,selectedTeam,selectedGroup,scroll);});
+            }
+            showLineupGroupTabs(groupTabs,rows,teams,selectedTeam,selectedGroup,scroll);
+        };
+        render.run();
+    }
+    private void showLineupCardsSelection(LinearLayout host,String[] teams,int[] selectedTeam,
+            int[] selectedGroup,ScrollView scroll){
+        LinearLayout teamTabs=(LinearLayout)host.getChildAt(0);
+        LinearLayout groupTabs=(LinearLayout)host.getChildAt(1);
+        LinearLayout rows=(LinearLayout)host.getChildAt(2);
+        for(int i=0;i<teamTabs.getChildCount();i++)
+            teamTabs.getChildAt(i).setAlpha(i==selectedTeam[0]?1f:.6f);
+        showLineupGroupTabs(groupTabs,rows,teams,selectedTeam,selectedGroup,scroll);
+        scroll.post(()->scroll.scrollTo(0,0));
+    }
+    private void showLineupGroupTabs(LinearLayout tabs,LinearLayout rows,String[] teams,
+            int[] selectedTeam,int[] selectedGroup,ScrollView scroll){
+        tabs.removeAllViews();rows.removeAllViews();
+        String team=teams[Math.min(selectedTeam[0],teams.length-1)];
+        String[] parts=team.split("(?=TITULARES \\(|SUPLENTES \\()");
+        String[] labels={"TITULARES","SUPLENTES"};
+        for(int i=0;i<2;i++){
+            final int idx=i;
+            int count=0;
+            for(String part:parts)if(part.startsWith(labels[i]+" (")){
+                java.util.regex.Matcher cm=java.util.regex.Pattern.compile("\\((\\d+)\\)").matcher(part);
+                if(cm.find())count=Integer.parseInt(cm.group(1));
+            }
+            Button b=new Button(this);b.setText(labels[i]+" ("+count+")");
+            b.setTextSize(11);b.setAllCaps(false);
+            b.setAlpha(i==selectedGroup[0]?1f:.6f);
+            tabs.addView(b,new LinearLayout.LayoutParams(0,dp(40),1));
+            b.setOnClickListener(v->{selectedGroup[0]=idx;
+                showLineupGroupTabs(tabs,rows,teams,selectedTeam,selectedGroup,scroll);
+                scroll.post(()->scroll.scrollTo(0,0));});
+        }
+        String wanted=labels[selectedGroup[0]]+" (";
+        java.util.regex.Pattern player=java.util.regex.Pattern.compile(
+            "^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7})(.*)$");
+        int shown=0;
+        for(String part:parts){
+            if(!part.startsWith(wanted))continue;
+            for(String line:part.split("\\r?\\n")){
+                java.util.regex.Matcher m=player.matcher(line.trim());
+                if(!m.matches())continue;
+                LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+                card.setPadding(dp(10),dp(6),dp(10),dp(6));
+                android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+                bg.setColor(0xff1b2a39);bg.setCornerRadius(dp(9));
+                card.setBackground(bg);
+                LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);
+                cp.setMargins(0,dp(2),0,dp(2));rows.addView(card,cp);
+                TextView name=text(m.group(1)+"  "+m.group(2).trim(),13,true);
+                card.addView(name);
+                String note=m.group(4).trim().replaceFirst("^·\\s*","");
+                TextView details=text("Licencia: "+m.group(3)+
+                    (note.isEmpty()?"":"   ·   "+note),10,false);
+                details.setTextColor(0xffb8c9d9);card.addView(details);
+                shown++;
+            }
+        }
+        if(shown==0)rows.addView(text("No hay jugadores identificados en este grupo.",13,false));
+    }
+    private String extractLineupColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
+        try{
+            com.tom_roush.pdfbox.pdmodel.PDPage page=pdf.getPage(0);
+            float w=page.getCropBox().getWidth(),h=page.getCropBox().getHeight();
+            com.tom_roush.pdfbox.text.PDFTextStripperByArea area=
+                new com.tom_roush.pdfbox.text.PDFTextStripperByArea();
+            area.setSortByPosition(true);
+            area.addRegion("local",new android.graphics.RectF(0,0,w*.495f,h));
+            area.addRegion("visitor",new android.graphics.RectF(w*.505f,0,w,h));
+            area.extractRegions(page);
+            String left=parseSingleLineup(area.getTextForRegion("local"));
+            String right=parseSingleLineup(area.getTextForRegion("visitor"));
+            if(left.isEmpty()||right.isEmpty())return null;
+            return "EQUIPO LOCAL\n"+left+"\nEQUIPO VISITANTE\n"+right;
+        }catch(Exception ignored){return null;}
+    }
+    private String parseSingleLineup(String text){
+        StringBuilder starters=new StringBuilder(),subs=new StringBuilder();
+        java.util.regex.Pattern player=java.util.regex.Pattern.compile(
+            "^\\s*(\\d{1,2})\\s+(?:([XC])\\s+)?(.+?)\\s+(\\d{7})(?:\\s+(F))?\\s*$");
+        boolean reserve=false,explicitSplit=false;
+        int starterCount=0,subCount=0;
+        for(String line:text.split("\\r?\n")){
+            String t=line.trim();
+            String normalized=java.text.Normalizer.normalize(t,java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}","").toLowerCase(java.util.Locale.ROOT);
+            if(normalized.matches(".*\\b(suplentes|reservas|sustitutos)\\b.*")){
+                reserve=true;explicitSplit=true;continue;
+            }
+            if(normalized.matches(".*\\b(titulares|equipo inicial)\\b.*")){
+                reserve=false;explicitSplit=true;continue;
+            }
+            java.util.regex.Matcher m=player.matcher(t);
+            if(!m.matches())continue;
+            String name=m.group(3).trim();
+            if(name.matches("(?i).*licencia.*")||name.length()<5)continue;
+            boolean isSub=explicitSplit?reserve:(starterCount>=15);
+            StringBuilder target=isSub?subs:starters;
+            target.append(m.group(1)).append("  ·  ").append(name)
+                .append("  |  ").append(m.group(4));
+            if("C".equals(m.group(2)))target.append("  ·  Capitán");
+            if("X".equals(m.group(2)))target.append("  ·  Primera línea");
+            if(m.group(5)!=null)target.append("  ·  Formación");
+            target.append("\n");
+            if(isSub)subCount++;else starterCount++;
+        }
+        if(starterCount+subCount==0)return "";
+return "TITULARES ("+starterCount+")\n"+starters+
+            "SUPLENTES ("+subCount+")\n"+subs;
+    }
+    private java.util.LinkedHashMap<String,String> structuredActSections(String raw){
+        java.util.LinkedHashMap<String,String> source=splitActSections(raw);
+        java.util.LinkedHashMap<String,String> result=new java.util.LinkedHashMap<>();
+        result.put("Resumen",source.containsKey("Resumen")?source.get("Resumen"):"Consulta el acta original.");
+        String roster=source.get("Alineaciones");
+        if(roster!=null){
+            StringBuilder local=new StringBuilder(),away=new StringBuilder();
+            int count=0; int unmatched=0; StringBuilder uncertain=new StringBuilder();
+            // The federation PDF prints two players on each physical line.
+            // Split at the seven-digit licence, not at spaces in player names.
+            java.util.regex.Pattern player=java.util.regex.Pattern.compile(
+                "(\\d{1,3})\\s+([XC]?)[\\s]*([^\\n]*?)\\s+(\\d{7})(?:\\s+(F))?(?=\\s+\\d{1,3}\\s|$)");
+            for(String line:roster.split("\\r?\\n")){
+                java.util.regex.Matcher m=player.matcher(line.trim());
+                java.util.ArrayList<String> row=new java.util.ArrayList<>();
+                while(m.find()){
+                    String item="Nº "+m.group(1)+" · "+m.group(3).trim()+
+                        "\nLicencia: "+m.group(4)+
+                        ("C".equals(m.group(2))?" · Capitán":"")+
+                        ("X".equals(m.group(2))?" · Primera línea":"")+
+                        (m.group(5)!=null?" · Formación":"")+"\n\n";
+                    row.add(item);count++;
+                }
+                if(row.size()==2){local.append(row.get(0));away.append(row.get(1));}
+                else if(!row.isEmpty()){unmatched+=row.size();for(String item:row)uncertain.append(item);}
+            }
+            if(count>=4 && local.length()>0 && away.length()>0)
+                result.put("Alineaciones","EQUIPO LOCAL\n\n"+local+"EQUIPO VISITANTE\n\n"+away+
+                    (unmatched>0?"JUGADORES SIN EQUIPO VERIFICADO\n\n"+uncertain:""));
+            else result.put("Alineaciones","No se pudieron separar todas las licencias con seguridad. Consulta el PDF original.\n\n"+roster);
+        }
+        result.put("Marcador",parseActEventSection(source.get("Marcador"),"Marcador"));
+        result.put("Cambios",parseActEventSection(source.get("Cambios"),"Cambios"));
+        String temp=parseActEventSection(source.get("Expulsiones temporales"),"Expulsiones");
+        String permanent=parseActEventSection(source.get("Expulsiones definitivas"),"Expulsiones");
+        result.put("Expulsiones","TEMPORALES\n"+temp+"\n\nDEFINITIVAS\n"+permanent);
+        return result;
+    }
+    private String parseActEventSection(String raw,String kind){
+        if(raw==null||raw.trim().isEmpty())return "Sin información en el acta.";
+        StringBuilder out=new StringBuilder();
+        String[] blocks=raw.split("(?i)(?=Equipo (?:local|visitante):)");
+        boolean any=false;
+        for(String block:blocks){
+            String normalized=block.trim();
+            if(!normalized.matches("(?s)(?i)^Equipo (local|visitante):.*"))continue;
+            String[] lines=normalized.split("\\r?\n");
+            String team=lines[0].trim();
+            java.util.LinkedHashMap<String,java.util.List<String>> columns=new java.util.LinkedHashMap<>();
+            for(String line:lines){
+                java.util.regex.Matcher m=java.util.regex.Pattern.compile(
+                    "(?i)^\\s*(Dorsal entra|Dorsal sale|Dorsal|Minuto|Tipo)\\s*(?:\\*)?\\s*(.*)$").matcher(line.trim());
+                if(m.find()){
+                    String key=m.group(1).toLowerCase(Locale.ROOT);
+                    String value=m.group(2).trim();
+                    java.util.ArrayList<String> tokens=new java.util.ArrayList<>();
+                    for(String token:value.split("\\s+"))if(!token.isEmpty()&&!token.equals("*"))tokens.add(token);
+                    columns.put(key,tokens);
+                }
+            }
+            out.append(team).append("\n");
+            java.util.List<String> types=columns.get("tipo");
+            java.util.List<String> minutes=columns.get("minuto");
+            int n=minutes==null?0:minutes.size();
+            if(types!=null)n=Math.max(n,types.size());
+            if(n==0){out.append("Sin incidencias registradas.\n\n");any=true;continue;}
+            boolean valid=true;
+            for(java.util.List<String> values:columns.values())if(values.size()!=n)valid=false;
+            if(!valid){
+                out.append("La tabla no se ha podido reconstruir con seguridad. Comprueba el PDF.\n");
+                out.append(normalized).append("\n\n");any=true;continue;
+            }
+            for(int i=0;i<n;i++){
+                out.append(i+1).append(". ");
+                if(minutes!=null)out.append("Min ").append(minutes.get(i)).append(" · ");
+                if(types!=null)out.append(eventDescription(types.get(i),kind)).append(" · ");
+                if(columns.containsKey("dorsal"))out.append("Dorsal ").append(columns.get("dorsal").get(i));
+                if(columns.containsKey("dorsal entra"))out.append("Entra nº ").append(columns.get("dorsal entra").get(i));
+                if(columns.containsKey("dorsal sale"))out.append(" · Sale nº ").append(columns.get("dorsal sale").get(i));
+                out.append("\n");
+            }
+            out.append("\n");any=true;
+        }
+        return any?out.toString().trim():"No se ha podido interpretar la tabla.\n\n"+raw;
+    }
+    private String eventDescription(String type,String kind){
+        if("Marcador".equals(kind)){
+            if("E".equalsIgnoreCase(type))return "Ensayo (5 puntos)";
+            if("T".equalsIgnoreCase(type))return "Transformación (2 puntos)";
+            if("D".equalsIgnoreCase(type))return "Drop (3 puntos)";
+            if("PC".equalsIgnoreCase(type))return "Puntapié de castigo (3 puntos)";
+            if("EC".equalsIgnoreCase(type))return "Ensayo de castigo (7 puntos)";
+        }
+        if("Cambios".equals(kind)&&"CT".equalsIgnoreCase(type))return "Cambio";
+        return "Tipo "+type;
+    }
+    private java.util.LinkedHashMap<String,String> splitActSections(String raw){
+        java.util.LinkedHashMap<String,StringBuilder> grouped=new java.util.LinkedHashMap<>();
+        String current="Resumen";
+        grouped.put(current,new StringBuilder());
+        for(String line:raw.split("\\r?\\n")){
+            String trimmed=line.trim();
+            if(trimmed.isEmpty())continue;
+            String normalized=java.text.Normalizer.normalize(trimmed,
+                java.text.Normalizer.Form.NFD).replaceAll("\\p{M}","")
+                .toLowerCase(Locale.ROOT);
+            String next=null;
+            if(normalized.equals("alineaciones"))next="Alineaciones";
+            else if(normalized.equals("marcador"))next="Marcador";
+            else if(normalized.equals("cambios"))next="Cambios";
+            else if(normalized.equals("expulsiones temporales"))next="Expulsiones temporales";
+            else if(normalized.equals("expulsiones definitivas"))next="Expulsiones definitivas";
+            else if(normalized.startsWith("pagina "))next="Página original "+trimmed.replaceAll("[^0-9]","");
+            if(next!=null){
+                if(next.startsWith("Página original")){
+                    // Page markers are retained within the current section.
+                    grouped.get(current).append("\n").append(trimmed).append("\n");
+                    continue;
+                }
+                current=next;
+                if(!grouped.containsKey(current))grouped.put(current,new StringBuilder());
+                continue;
+            }
+            grouped.get(current).append(trimmed).append("\n");
+        }
+        java.util.LinkedHashMap<String,String> result=new java.util.LinkedHashMap<>();
+        for(java.util.Map.Entry<String,StringBuilder> e:grouped.entrySet()){
+            String value=e.getValue().toString().trim();
+            if(!value.isEmpty())result.put(e.getKey(),value);
+        }
+        result.put("Texto completo",raw);
+        return result;
+    }
+    private void showStatistics(String url,JSONObject match){
+        Dialog dialog=new Dialog(this);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(1);
+        root.setPadding(dp(10),dp(8),dp(10),dp(8));root.setBackgroundColor(0xff101a24);
+        TextView title=text("Estadísticas del partido",21,true);root.addView(title);
+        LinearLayout toolbar=new LinearLayout(this);
+        Button close=new Button(this);close.setText("Cerrar");close.setTextSize(12);
+        toolbar.addView(close,new LinearLayout.LayoutParams(0,dp(45),1));
+        close.setOnClickListener(v->dialog.dismiss());
+        Button original=new Button(this);original.setText("Web original");original.setTextSize(12);
+        toolbar.addView(original,new LinearLayout.LayoutParams(0,dp(45),1));
+        original.setOnClickListener(v->openExternal(url));root.addView(toolbar);
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout body=new LinearLayout(this);body.setOrientation(1);
+        body.setPadding(dp(2),dp(8),dp(2),dp(20));
+        scroll.addView(body);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        TextView loading=text("Cargando datos oficiales…",15,false);body.addView(loading);
+        android.webkit.WebView extractor=new android.webkit.WebView(this);
+        extractor.setVisibility(View.GONE);extractor.getSettings().setJavaScriptEnabled(true);
+        extractor.getSettings().setDomStorageEnabled(true);
+        root.addView(extractor,new LinearLayout.LayoutParams(1,1));
+        extractor.setWebViewClient(new android.webkit.WebViewClient(){
+            @Override public void onPageFinished(android.webkit.WebView view,String loaded){
+                String js="(function(){try{"+
+                    "var txt=document.body.innerText||'';var sections=[];var current=null;"+
+                    "document.querySelectorAll('h3,h4,table').forEach(function(el){"+
+                    "if(el.tagName==='H3'||el.tagName==='H4'){var h=el.innerText.trim();"+
+                    "if(/^(Anotadores|Cambios equipo|Expulsiones temporales equipo|Expulsiones definitivas equipo)/i.test(h)){current={title:h,rows:[]};sections.push(current);}return;}"+
+                    "if(current){el.querySelectorAll('tr').forEach(function(tr){"+
+                    "var cells=[...tr.querySelectorAll('td')].map(function(td){return td.innerText.trim();});"+
+                    "if(cells.length)current.rows.push(cells);});}});"+
+                    "var match=txt.match(/(\\d+)\\s*Puntos[\\s\\S]{0,130}?(\\d+)\\s*Puntos/i);"+
+                    "var teams=[...document.querySelectorAll('h4')].map(e=>e.innerText.trim()).filter(x=>x&&!/^(Anotadores|Cambios|Expulsiones)/i.test(x));"+
+                    "return JSON.stringify({score:match?[+match[1],+match[2]]:null,teams:teams,sections:sections});"+
+                    "}catch(e){return JSON.stringify({error:String(e)});}})()";
+                view.evaluateJavascript(js,raw->{
+                    try{
+                        String decoded=new JSONTokener(raw).nextValue().toString();
+                        JSONObject data=new JSONObject(decoded);
+                        if(data.has("error"))throw new Exception(data.getString("error"));
+                        JSONArray score=data.optJSONArray("score");
+                        JSONArray sections=data.optJSONArray("sections");
+                        if(score==null||sections==null||sections.length()==0)throw new Exception("Sin datos");
+                        body.removeAllViews();
+                        JSONArray teams=data.optJSONArray("teams");
+                        String homeName=match.optString("home","Equipo local");
+                        String awayName=match.optString("away","Equipo visitante");
+                        LinearLayout scoreboard=new LinearLayout(RugbyHubActivity.this);
+                        scoreboard.setGravity(Gravity.CENTER_VERTICAL);
+                        scoreboard.setPadding(dp(2),dp(12),dp(2),dp(12));
+                        scoreboard.setBackgroundColor(0xff1b3042);
+                        LinearLayout homeCol=new LinearLayout(RugbyHubActivity.this);
+                        homeCol.setGravity(Gravity.CENTER);homeCol.setOrientation(1);
+                        homeCol.addView(teamLogo(match.optString("homeLogo")),
+                            new LinearLayout.LayoutParams(dp(56),dp(56)));
+                        TextView homeLabel=text(homeName,12,true);homeLabel.setGravity(Gravity.CENTER);homeLabel.setMaxLines(2);
+                        homeCol.addView(homeLabel);scoreboard.addView(homeCol,new LinearLayout.LayoutParams(0,-2,1));
+                        TextView result=text(score.optInt(0)+"–"+score.optInt(1),28,true);
+                        result.setGravity(Gravity.CENTER);
+                        result.setSingleLine(true);
+                        result.setEllipsize(null);
+                        result.setAutoSizeTextTypeUniformWithConfiguration(18,28,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+                        scoreboard.addView(result,new LinearLayout.LayoutParams(dp(118),dp(60)));
+                        LinearLayout awayCol=new LinearLayout(RugbyHubActivity.this);
+                        awayCol.setGravity(Gravity.CENTER);awayCol.setOrientation(1);
+                        awayCol.addView(teamLogo(match.optString("awayLogo")),
+                            new LinearLayout.LayoutParams(dp(68),dp(68)));
+                        TextView awayLabel=text(awayName,12,true);awayLabel.setGravity(Gravity.CENTER);awayLabel.setMaxLines(2);
+                        awayCol.addView(awayLabel);scoreboard.addView(awayCol,new LinearLayout.LayoutParams(0,-2,1));
+                        body.addView(scoreboard);
+                        JSONArray homeEvents=null,awayEvents=null;
+                        for(int i=0;i<sections.length();i++){
+                            JSONObject sec=sections.optJSONObject(i);if(sec==null)continue;
+                            if("Anotadores".equalsIgnoreCase(sec.optString("title"))){
+                                JSONArray candidate=sec.optJSONArray("rows");
+                                boolean isEvent=false;
+                                if(candidate!=null)for(int k=0;k<candidate.length();k++){
+                                    JSONArray r=candidate.optJSONArray(k);
+                                    if(r!=null&&r.length()>=3&&r.optString(0).matches("[0-9]{1,3}")&&r.optString(1).matches("(?i)E|T|GC|P|F|D")){isEvent=true;break;}
+                                }
+                                if(!isEvent)continue;
+                                if(homeEvents==null)homeEvents=sec.optJSONArray("rows");
+                                else if(awayEvents==null)awayEvents=sec.optJSONArray("rows");
+                            }
+                        }
+                        if(homeEvents!=null||awayEvents!=null){
+                            TextView graphTitle=text("EVOLUCIÓN DEL MARCADOR",17,true);
+                            graphTitle.setPadding(0,dp(22),0,dp(8));body.addView(graphTitle);
+                            ArrayList<int[]> events=new ArrayList<>();
+                            JSONArray[] arrays={homeEvents,awayEvents};
+                            for(int team=0;team<2;team++){
+                                JSONArray arr=arrays[team];if(arr==null)continue;
+                                for(int j=0;j<arr.length();j++){
+                                    JSONArray row=arr.optJSONArray(j);if(row==null||row.length()<2)continue;
+                                    try{
+                                        int minute=Integer.parseInt(row.optString(0));
+                                        String kind=row.optString(1).trim();
+                                        int pts="E".equalsIgnoreCase(kind)?5:"T".equalsIgnoreCase(kind)?2:
+                                            ("F".equalsIgnoreCase(kind)||"GC".equalsIgnoreCase(kind)||
+                                             "P".equalsIgnoreCase(kind)||"D".equalsIgnoreCase(kind))?3:0;
+                                        if(pts>0)events.add(new int[]{minute,team,pts});
+                                    }catch(Exception ignored){}
+                                }
+                            }
+                            java.util.Collections.sort(events,(x,y)->Integer.compare(x[0],y[0]));
+                            final ArrayList<int[]> graphEvents=events;
+                            int[] calculated={0,0};
+                            for(int[] event:events)calculated[event[1]]+=event[2];
+                            boolean graphMatches=calculated[0]==score.optInt(0)&&calculated[1]==score.optInt(1);
+                            View graph=new View(RugbyHubActivity.this){
+                                android.graphics.Paint p=new android.graphics.Paint(3);
+                                @Override protected void onDraw(android.graphics.Canvas c){
+                                    super.onDraw(c);
+                                    float left=dp(36),top=dp(20),right=getWidth()-dp(15),bottom=getHeight()-dp(35);
+                                    int maxMinute=40,maxPoints=Math.max(5,Math.max(score.optInt(0),score.optInt(1)));
+                                    for(int[] e:graphEvents)maxMinute=Math.max(maxMinute,e[0]);
+                                    p.setStrokeWidth(dp(1));p.setColor(0xff435567);
+                                    for(int i=0;i<=4;i++){
+                                        float y=bottom-(bottom-top)*i/4f;c.drawLine(left,y,right,y,p);
+                                        p.setColor(Color.WHITE);p.setTextSize(dp(10));
+                                        c.drawText(String.valueOf(Math.round(maxPoints*i/4f)),dp(3),y+dp(3),p);
+                                        p.setColor(0xff435567);
+                                    }
+                                    for(int i=0;i<=4;i++){
+                                        float x=left+(right-left)*i/4f;
+                                        p.setColor(0xffaab9c9);p.setTextSize(dp(10));
+                                        c.drawText(String.valueOf(Math.round(maxMinute*i/4f))+"'",x-dp(9),bottom+dp(18),p);
+                                    }
+                                    int[] totals={0,0};float[] lastX={left,left};float[] lastY={bottom,bottom};
+                                    int[] colors={0xff54b6ef,0xffe99a64};
+                                    for(int[] e:graphEvents){
+                                        int team=e[1];float x=left+(right-left)*e[0]/maxMinute;
+                                        float newY=bottom-(bottom-top)*(totals[team]+e[2])/maxPoints;
+                                        p.setColor(colors[team]);p.setStrokeWidth(dp(3));
+                                        c.drawLine(lastX[team],lastY[team],x,lastY[team],p);
+                                        c.drawLine(x,lastY[team],x,newY,p);
+                                        totals[team]+=e[2];lastX[team]=x;lastY[team]=newY;
+                                    }
+                                    for(int team=0;team<2;team++){
+                                        p.setColor(colors[team]);p.setStrokeWidth(dp(3));
+                                        c.drawLine(lastX[team],lastY[team],right,lastY[team],p);
+                                    }
+                                }
+                            };
+                            graph.setBackgroundColor(0xff1b3042);
+                            if(!graphMatches){
+                                TextView warning=text("Aviso: la evolución extraída ("+calculated[0]+"–"+calculated[1]+
+                                    ") no coincide con el marcador oficial ("+score.optInt(0)+"–"+score.optInt(1)+").",14,true);
+                                warning.setTextColor(0xffffc777);warning.setPadding(dp(8),dp(10),dp(8),dp(10));
+                                body.addView(warning);
+                            }
+                            body.addView(graph,new LinearLayout.LayoutParams(-1,dp(260)));
+                            TextView legend=text("● Azul: "+homeName+"\n● Naranja: "+awayName,15,false);
+                            legend.setPadding(dp(8),dp(12),dp(8),dp(12));body.addView(legend);
+                            java.util.LinkedHashMap<String,Integer> players=new java.util.LinkedHashMap<>();
+                            java.util.LinkedHashMap<String,String> playerTeams=new java.util.LinkedHashMap<>();
+                            for(int team=0;team<arrays.length;team++){
+                                JSONArray arr=arrays[team];
+                                if(arr==null)continue;
+                                for(int j=0;j<arr.length();j++){
+                                    JSONArray r=arr.optJSONArray(j);if(r==null||r.length()<3)continue;
+                                    String code=r.optString(1).trim().toUpperCase(java.util.Locale.ROOT);
+                                    int pts="E".equals(code)?5:"T".equals(code)?2:
+                                        ("F".equals(code)||"GC".equals(code)||"P".equals(code)||"D".equals(code))?3:0;
+                                    if(pts>0&&r.optString(0).matches("[0-9]{1,3}")){
+                                        String name=r.optString(2).trim();
+                                        String key=team+"|"+name;
+                                        players.put(key,players.containsKey(key)?players.get(key)+pts:pts);
+                                        playerTeams.put(key,team==0?homeName:awayName);
+                                    }
+                                }
+                            }
+                            TextView pieTitle=text("PUNTOS POR ANOTADOR",17,true);
+                            pieTitle.setPadding(0,dp(22),0,dp(8));body.addView(pieTitle);
+                            final ArrayList<Integer> amounts=new ArrayList<>(players.values());
+                            final int[] palette={0xff58b7e7,0xffe99a64,0xff7ecf9e,0xffbd95ed,0xffe3c16c,0xffed8aa6,0xff86c7c9,0xffc9a47d};
+                            View pie=new View(RugbyHubActivity.this){
+                                android.graphics.Paint p=new android.graphics.Paint(3);
+                                @Override protected void onDraw(android.graphics.Canvas c){
+                                    super.onDraw(c);
+                                    int total=0;for(int v:amounts)total+=v;
+                                    if(total==0)return;
+                                    float size=Math.min(getWidth(),getHeight())-dp(20);
+                                    float l=(getWidth()-size)/2f,t=(getHeight()-size)/2f;
+                                    android.graphics.RectF bounds=new android.graphics.RectF(l,t,l+size,t+size);
+                                    float angle=-90;
+                                    for(int i=0;i<amounts.size();i++){
+                                        float sweep=360f*amounts.get(i)/total;
+                                        p.setColor(palette[i%palette.length]);p.setStyle(android.graphics.Paint.Style.FILL);
+                                        c.drawArc(bounds,angle,sweep,true,p);angle+=sweep;
+                                    }
+                                }
+                            };
+                            body.addView(pie,new LinearLayout.LayoutParams(-1,dp(250)));
+                            int total=0;for(int v:amounts)total+=v;
+                            int idx=0;for(java.util.Map.Entry<String,Integer> e:players.entrySet()){
+                                TextView player=text("●  "+e.getKey().substring(e.getKey().indexOf('|')+1)+
+                                    "\n    "+playerTeams.get(e.getKey())+" · "+e.getValue()+" puntos ("+
+                                    (total==0?0:Math.round(100f*e.getValue()/total))+"%)",16,false);
+                                player.setTextColor(palette[idx++%palette.length]);player.setPadding(dp(10),dp(10),dp(10),dp(10));body.addView(player);
+                            }
+                            java.util.LinkedHashMap<String,Integer> types=new java.util.LinkedHashMap<>();
+                            types.put("Ensayos",0);types.put("Transformaciones",0);
+                            types.put("Golpes de castigo",0);types.put("Drops",0);
+                            int[][] teamTypeCounts=new int[2][4];
+                            for(int team=0;team<arrays.length;team++){
+                                JSONArray arr=arrays[team];if(arr==null)continue;
+                                for(int j=0;j<arr.length();j++){
+                                    JSONArray r=arr.optJSONArray(j);if(r==null||r.length()<3)continue;
+                                    if(!r.optString(0).matches("[0-9]{1,3}"))continue;
+                                    String code=r.optString(1).trim().toUpperCase(java.util.Locale.ROOT);
+                                    int index="E".equals(code)?0:"T".equals(code)?1:
+                                        ("GC".equals(code)||"P".equals(code)||"F".equals(code))?2:
+                                        "D".equals(code)?3:-1;
+                                    if(index>=0)teamTypeCounts[team][index]++;
+                                }
+                            }
+                            String[] typeNames={"Ensayos","Transformaciones","Golpes de castigo","Drops"};
+                            for(int k=0;k<typeNames.length;k++)
+                                types.put(typeNames[k],teamTypeCounts[0][k]+teamTypeCounts[1][k]);
+                            TextView typeHeading=text("ANOTACIONES POR TIPO",17,true);
+                            typeHeading.setPadding(0,dp(22),0,dp(8));body.addView(typeHeading);
+                            final ArrayList<Integer> counts=new ArrayList<>(types.values());
+                            final int[] typeColors={0xff58b7e7,0xffe99a64,0xff7ecf9e,0xffbd95ed};
+                            View typePie=new View(RugbyHubActivity.this){
+                                android.graphics.Paint p=new android.graphics.Paint(3);
+                                @Override protected void onDraw(android.graphics.Canvas c){
+                                    super.onDraw(c);
+                                    int sum=0;for(int n:counts)sum+=n;if(sum==0)return;
+                                    float size=Math.min(getWidth(),getHeight())-dp(20);
+                                    float left=(getWidth()-size)/2f,top=(getHeight()-size)/2f;
+                                    android.graphics.RectF rect=new android.graphics.RectF(left,top,left+size,top+size);
+                                    float start=-90;
+                                    for(int k=0;k<counts.size();k++){
+                                        float sweep=360f*counts.get(k)/sum;
+                                        p.setColor(typeColors[k]);p.setStyle(android.graphics.Paint.Style.FILL);
+                                        c.drawArc(rect,start,sweep,true,p);start+=sweep;
+                                    }
+                                }
+                            };
+                            body.addView(typePie,new LinearLayout.LayoutParams(-1,dp(250)));
+                            int sum=0;for(int n:counts)sum+=n;
+                            TextView typeExplanation=text("Porcentaje calculado sobre el número de anotaciones. Los puntos se muestran por separado.",14,false);
+                            typeExplanation.setTextColor(0xffaab9c9);typeExplanation.setPadding(dp(8),dp(10),dp(8),dp(12));body.addView(typeExplanation);
+                            int[] typePointTotals=new int[2];
+                            for(int team=0;team<2;team++){
+                                LinearLayout teamCard=new LinearLayout(RugbyHubActivity.this);
+                                teamCard.setOrientation(1);
+                                teamCard.setPadding(dp(12),dp(12),dp(12),dp(12));
+                                teamCard.setBackgroundColor(0xff1b3042);
+                                LinearLayout.LayoutParams teamParams=new LinearLayout.LayoutParams(-1,-2);
+                                teamParams.topMargin=dp(12);
+                                body.addView(teamCard,teamParams);
+                                String teamName=team==0?homeName:awayName;
+                                int official=score.optInt(team);
+                                TextView teamTitle=text((team==0?"LOCAL · ":"VISITANTE · ")+teamName,16,true);
+                                teamTitle.setTextColor(team==0?0xff58b7e7:0xffe99a64);
+                                teamCard.addView(teamTitle);
+                                for(int k=0;k<typeNames.length;k++){
+                                    int n=teamTypeCounts[team][k];
+                                    int pts=k==0?5:k==1?2:3;
+                                    typePointTotals[team]+=n*pts;
+                                    if(n==0)continue;
+                                    TextView detail=text(typeNames[k]+": "+n+" × "+pts+" = "+(n*pts)+" puntos",15,false);
+                                    detail.setPadding(0,dp(7),0,0);
+                                    teamCard.addView(detail);
+                                }
+                                TextView teamTotal=text("TOTAL  "+typePointTotals[team]+" puntos",16,true);
+                                teamTotal.setPadding(0,dp(12),0,0);
+                                teamCard.addView(teamTotal);
+                                if(typePointTotals[team]!=official){
+                                    TextView mismatch=text("⚠ No coincide con el marcador oficial ("+official+")",13,true);
+                                    mismatch.setTextColor(0xffffc777);
+                                    mismatch.setPadding(0,dp(7),0,0);
+                                    teamCard.addView(mismatch);
+                                }
+                            }
+                            if(typePointTotals[0]==score.optInt(0)&&typePointTotals[1]==score.optInt(1)){
+                                TextView verified=text("✓ Recuento comprobado",11,false);
+                                verified.setTextColor(0xff8295a5);
+                                verified.setGravity(Gravity.END);
+                                verified.setPadding(0,dp(6),dp(4),0);
+                                body.addView(verified);
+                            }
+                            int typeIndex=0;for(java.util.Map.Entry<String,Integer> e:types.entrySet()){
+                                int color=typeColors[typeIndex++];
+                                if(e.getValue()==0)continue;
+                                int typePoints="Ensayos".equals(e.getKey())?5:"Transformaciones".equals(e.getKey())?2:3;
+                                TextView item=text("●  "+e.getKey()+" · "+e.getValue()+" anotaciones · "+
+                                    (e.getValue()*typePoints)+" puntos ("+
+                                    (sum==0?0:Math.round(100f*e.getValue()/sum))+"%)",16,false);
+                                item.setTextColor(color);item.setPadding(dp(10),dp(10),dp(10),dp(10));
+                                body.addView(item);
+                            }
+                        }
+                        // Present local scoring events before visitor scoring events.
+                        JSONArray orderedSections=new JSONArray();
+                        for(int pass=0;pass<3;pass++){
+                            for(int i=0;i<sections.length();i++){
+                                JSONObject sec=sections.optJSONObject(i);if(sec==null)continue;
+                                String name=sec.optString("title");
+                                JSONArray rows=sec.optJSONArray("rows");
+                                boolean localScoring="Anotadores".equalsIgnoreCase(name)&&rows==homeEvents;
+                                boolean awayScoring="Anotadores".equalsIgnoreCase(name)&&rows==awayEvents;
+                                if((pass==0&&localScoring)||(pass==1&&awayScoring)||
+                                    (pass==2&&!localScoring&&!awayScoring))orderedSections.put(sec);
+                            }
+                        }
+                        if(homeEvents==null||homeEvents.length()==0){
+                            TextView noHome=text("ANOTACIONES · EQUIPO LOCAL",17,true);
+                            noHome.setPadding(0,dp(22),0,dp(8));body.addView(noHome);
+                            TextView emptyHome=text("Sin anotaciones",15,false);
+                            emptyHome.setTextColor(0xffaab9c9);body.addView(emptyHome);
+                        }
+                        for(int i=0;i<orderedSections.length();i++){
+                            JSONObject sec=orderedSections.optJSONObject(i);if(sec==null)continue;
+                            String sectionName=sec.optString("title");
+                            if("Anotadores".equalsIgnoreCase(sectionName)){
+                                JSONArray sectionRows=sec.optJSONArray("rows");
+                                if(sectionRows!=homeEvents&&sectionRows!=awayEvents)continue;
+                                sectionName="ANOTACIONES · "+(sectionRows==homeEvents?"EQUIPO LOCAL":"EQUIPO VISITANTE");
+                            }
+                            TextView heading=text(sectionName.toUpperCase(java.util.Locale.ROOT),18,true);
+                            heading.setPadding(0,dp(22),0,dp(9));body.addView(heading);
+                            JSONArray rows=sec.optJSONArray("rows");
+                            if(rows==null||rows.length()==0){
+                                TextView none=text("Sin registros",13,false);
+                                none.setTextColor(0xffaab9c9);body.addView(none);continue;
+                            }
+                            for(int j=0;j<rows.length();j++){
+                                JSONArray row=rows.optJSONArray(j);if(row==null)continue;
+                                if("Anotadores".equalsIgnoreCase(sec.optString("title"))&&
+                                    (row.length()<3||!row.optString(0).matches("[0-9]{1,3}")||
+                                     !row.optString(1).matches("(?i)E|T|GC|P|F|D")))continue;
+                                StringBuilder line=new StringBuilder();
+                                String category=sec.optString("title").toLowerCase(java.util.Locale.ROOT);
+                                if(category.contains("cambios")&&row.length()>=3){
+                                    line.append("SALE ↓  ").append(row.optString(0)).append("\n");
+                                    line.append("ENTRA ↑  ").append(row.optString(1)).append("\n");
+                                    for(int k=2;k<row.length();k++){if(k>2)line.append(" · ");line.append(row.optString(k));}
+                                }else for(int k=0;k<row.length();k++){
+                                    if(k>0)line.append("  ·  ");line.append(row.optString(k));
+                                }
+                                if(category.contains("cambios")&&row.length()>=3){
+                                    LinearLayout changeCard=new LinearLayout(RugbyHubActivity.this);
+                                    changeCard.setOrientation(1);changeCard.setPadding(dp(12),dp(10),dp(12),dp(10));
+                                    changeCard.setBackgroundColor(0xff1b3042);
+                                    TextView out=text("↓ SALE  "+row.optString(0),16,true);
+                                    out.setTextColor(0xffff9c9c);changeCard.addView(out);
+                                    TextView in=text("↑ ENTRA  "+row.optString(1),16,true);
+                                    in.setTextColor(0xff8be3b6);in.setPadding(0,dp(5),0,0);
+                                    changeCard.addView(in);
+                                    StringBuilder detail=new StringBuilder();
+                                    for(int k=2;k<row.length();k++){
+                                        if(k>2)detail.append(" · ");detail.append(row.optString(k));
+                                    }
+                                    TextView reason=text(detail.toString(),13,false);
+                                    reason.setTextColor(0xffaab9c9);reason.setPadding(0,dp(6),0,0);
+                                    changeCard.addView(reason);
+                                    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);
+                                    cp.bottomMargin=dp(8);body.addView(changeCard,cp);
+                                    continue;
+                                }
+                                TextView card=text(line.toString(),16,false);
+                                card.setPadding(dp(13),dp(13),dp(13),dp(13));
+                                card.setBackgroundColor(category.contains("expulsiones definitivas")?0xff512a32:
+                                    category.contains("expulsiones temporales")?0xff51412b:0xff1b3042);
+                                LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+                                params.bottomMargin=dp(6);body.addView(card,params);
+                            }
+                        }
+                        if(awayEvents==null||awayEvents.length()==0){
+                            TextView noAway=text("ANOTACIONES · EQUIPO VISITANTE",17,true);
+                            noAway.setPadding(0,dp(22),0,dp(8));body.addView(noAway);
+                            TextView emptyAway=text("Sin anotaciones",15,false);
+                            emptyAway.setTextColor(0xffaab9c9);body.addView(emptyAway);
+                        }
+                    }catch(Exception ex){
+                        loading.setText("No se han podido extraer las estadísticas completas. Usa «Web original» para consultarlas.");
+                    }
+                });
+            }
+        });
+        dialog.setContentView(root);dialog.show();dialog.getWindow().setLayout(-1,-1);
+        dialog.setOnDismissListener(d->extractor.destroy());extractor.loadUrl(url);
+    }
+    private void showActPdf(String url){
+        android.app.Dialog dialog=new android.app.Dialog(this);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(1);
+        root.setPadding(dp(6),dp(8),dp(6),dp(8));root.setBackgroundColor(0xff101a24);
+        LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        Button close=new Button(this);close.setText("Cerrar");toolbar.addView(close);
+        Button outside=new Button(this);outside.setText("Abrir fuera");toolbar.addView(outside);
+        close.setOnClickListener(v->dialog.dismiss());
+        outside.setOnClickListener(v->openExternal(url));
+        root.addView(toolbar);
+        TextView status=text("Descargando acta oficial…",13,false);root.addView(status);
+        TextView hint=text("Amplía con dos dedos y arrastra para leer",12,false);root.addView(hint);
+        android.widget.ImageView pageImage=new android.widget.ImageView(this);
+        pageImage.setScaleType(android.widget.ImageView.ScaleType.MATRIX);
+        android.graphics.Matrix zoomMatrix=new android.graphics.Matrix();
+        final float[] zoom={1f},lastX={0f},lastY={0f};
+        android.view.ScaleGestureDetector pinch=new android.view.ScaleGestureDetector(this,
+            new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener(){
+                @Override public boolean onScale(android.view.ScaleGestureDetector detector){
+                    float factor=detector.getScaleFactor();
+                    float next=Math.max(1f,Math.min(5f,zoom[0]*factor));
+                    factor=next/zoom[0];zoom[0]=next;
+                    zoomMatrix.postScale(factor,factor,detector.getFocusX(),detector.getFocusY());
+                    pageImage.setImageMatrix(zoomMatrix);return true;
+                }
+            });
+        pageImage.setOnTouchListener((v,event)->{
+            pinch.onTouchEvent(event);
+            if(event.getPointerCount()==1){
+                if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){
+                    lastX[0]=event.getX();lastY[0]=event.getY();return true;
+                }
+                if(event.getActionMasked()==android.view.MotionEvent.ACTION_MOVE&&zoom[0]>1f){
+                    zoomMatrix.postTranslate(event.getX()-lastX[0],event.getY()-lastY[0]);
+                    pageImage.setImageMatrix(zoomMatrix);
+                    lastX[0]=event.getX();lastY[0]=event.getY();return true;
+                }
+            }
+            return true;
+        });
+        android.widget.FrameLayout scroller=new android.widget.FrameLayout(this);
+        scroller.addView(pageImage,new android.widget.FrameLayout.LayoutParams(-1,-1));
+        root.addView(scroller,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout navigation=new LinearLayout(this);navigation.setGravity(Gravity.CENTER);
+        Button previous=new Button(this);previous.setText("Anterior");
+        Button next=new Button(this);next.setText("Siguiente");
+        navigation.addView(previous);navigation.addView(next);root.addView(navigation);
+        previous.setEnabled(false);next.setEnabled(false);
+        final android.graphics.pdf.PdfRenderer[] renderer={null};
+        final android.os.ParcelFileDescriptor[] descriptor={null};
+        final java.io.File[] temporary={null};
+        final int[] index={0};
+        Runnable render=()->{
+            try{
+                android.graphics.pdf.PdfRenderer pdf=renderer[0];
+                if(pdf==null)return;
+                android.graphics.pdf.PdfRenderer.Page page=pdf.openPage(index[0]);
+                int width=Math.max(dp(360),getResources().getDisplayMetrics().widthPixels-dp(20));
+                int height=Math.max(1,(int)((double)width*page.getHeight()/page.getWidth()));
+                android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(width,height,android.graphics.Bitmap.Config.ARGB_8888);
+                bitmap.eraseColor(Color.WHITE);
+                page.render(bitmap,null,null,android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                page.close();pageImage.setImageBitmap(bitmap);
+                zoom[0]=1f;zoomMatrix.reset();
+                float viewWidth=getResources().getDisplayMetrics().widthPixels-dp(12);
+                float viewHeight=getResources().getDisplayMetrics().heightPixels-dp(250);
+                float fit=Math.min(viewWidth/width,viewHeight/height);
+                zoomMatrix.postScale(fit,fit);
+                zoomMatrix.postTranslate((viewWidth-width*fit)/2f,(viewHeight-height*fit)/2f);
+                pageImage.setImageMatrix(zoomMatrix);
+                status.setText("Página "+(index[0]+1)+" de "+pdf.getPageCount());
+                previous.setEnabled(index[0]>0);next.setEnabled(index[0]<pdf.getPageCount()-1);
+            }catch(Exception ex){status.setText("No se pudo mostrar esta página.");}
+        };
+        previous.setOnClickListener(v->{index[0]--;render.run();});
+        next.setOnClickListener(v->{index[0]++;render.run();});
+        dialog.setContentView(root);dialog.show();dialog.getWindow().setLayout(-1,-1);
+        dialog.setOnDismissListener(d->{
+            try{if(renderer[0]!=null)renderer[0].close();}catch(Exception ignored){}
+            try{if(descriptor[0]!=null)descriptor[0].close();}catch(Exception ignored){}
+            if(temporary[0]!=null)temporary[0].delete();
+        });
+        new Thread(()->{
+            java.net.HttpURLConnection connection=null;
+            try{
+                connection=(java.net.HttpURLConnection)new java.net.URL(url).openConnection();
+                connection.setConnectTimeout(10000);connection.setReadTimeout(20000);
+                java.io.File file=java.io.File.createTempFile("rugby_act_",".pdf",getCacheDir());
+                temporary[0]=file;
+                try(java.io.InputStream in=connection.getInputStream();
+                    java.io.FileOutputStream out=new java.io.FileOutputStream(file)){
+                    byte[] buffer=new byte[16384];int n;
+                    while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
+                }
+                runOnUiThread(()->{
+                    if(!dialog.isShowing())return;
+                    try{
+                        descriptor[0]=android.os.ParcelFileDescriptor.open(file,android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+                        renderer[0]=new android.graphics.pdf.PdfRenderer(descriptor[0]);
+                        render.run();
+                    }catch(Exception ex){status.setText("No se pudo visualizar el PDF. Usa «Abrir fuera».");}
+                });
+            }catch(Exception ex){runOnUiThread(()->{if(dialog.isShowing())status.setText("No se pudo descargar el acta. Usa «Abrir fuera».");});}
+            finally{if(connection!=null)connection.disconnect();}
+        }).start();
+    }
+    private void detailLine(LinearLayout parent,String label,String value){
+        if(value==null||value.trim().isEmpty())return;
+        TextView line=text(label+": "+value,14,false);
+        line.setPadding(0,dp(6),0,dp(6));parent.addView(line);
+    }
+    private void openExternal(String url){
+        try{startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(url)));}
+        catch(Exception ex){Toast.makeText(this,"No se pudo abrir el enlace",Toast.LENGTH_SHORT).show();}
+    }
+    private final java.util.Map<String,android.graphics.Bitmap> logoCache=
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private android.widget.ImageView teamLogo(String url){
+        android.widget.ImageView image=new android.widget.ImageView(this);
+        image.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        if(url==null||url.isEmpty())return image;
+        image.setTag(url);
+        android.graphics.Bitmap cached=logoCache.get(url);
+        if(cached!=null){image.setImageBitmap(cached);return image;}
+        new Thread(()->{
+            java.net.HttpURLConnection conn=null;
+            try{
+                conn=(java.net.HttpURLConnection)new java.net.URL(url).openConnection();
+                conn.setConnectTimeout(7000);conn.setReadTimeout(7000);
+                android.graphics.Bitmap bitmap;
+                try(java.io.InputStream stream=conn.getInputStream()){
+                    bitmap=android.graphics.BitmapFactory.decodeStream(stream);
+                }
+                if(bitmap!=null){
+                    logoCache.put(url,bitmap);
+                    runOnUiThread(()->{if(url.equals(image.getTag()))image.setImageBitmap(bitmap);});
+                }
+            }catch(Exception ignored){}
+            finally{if(conn!=null)conn.disconnect();}
+        }).start();
+        return image;
+    }
+    private void showMatches(){
+        clear();
+        screenTitle.setText("Rugby M14");
+        screenSubtitle.setText("Todas las jornadas y organizadores sincronizados");
+        Button refresh=new Button(this);
+        refresh.setText("Actualizar datos");
+        list.addView(refresh);
+        TextView status=text("",12,false);status.setTextColor(0xffaab9c9);
+        list.addView(status);
+        refresh.setOnClickListener(v->updateOfficial(status));
+        Button inspect=new Button(this);
+        inspect.setText("Comprobar estructura de jornadas");
+        list.addView(inspect);
+        inspect.setOnClickListener(v->inspectOfficial());
+        android.content.SharedPreferences prefs=getSharedPreferences("rugby_official",MODE_PRIVATE);
+        long updated=prefs.getLong("updated",0);
+        status.setText(updated==0?"Aún no se han descargado datos oficiales":
+            "Última actualización: "+new SimpleDateFormat("dd/MM/yyyy HH:mm",Locale.getDefault()).format(new Date(updated)));
+        JSONArray records;
+        try{records=new JSONArray(prefs.getString("matches","[]"));}
+        catch(Exception ex){records=new JSONArray();}
+        if(records.length()==0){
+            list.addView(text("Pulsa Actualizar datos para descargar los partidos desde la federación.",15,false));
+            return;
+        }
+        LinkedHashMap<String,ArrayList<JSONObject>> grouped=new LinkedHashMap<>();
+        for(int i=0;i<records.length();i++){
+            JSONObject item=records.optJSONObject(i);if(item==null)continue;
+            String key=item.optString("jornada",item.optString("date")+" · "+item.optString("organizer"));
+            if(!grouped.containsKey(key))grouped.put(key,new ArrayList<>());
+            grouped.get(key).add(item);
+        }
+        for(Map.Entry<String,ArrayList<JSONObject>> group:grouped.entrySet()){
+            LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+            card.setPadding(dp(14),dp(12),dp(14),dp(12));
+            android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+            bg.setColor(0xff223343);bg.setCornerRadius(dp(14));card.setBackground(bg);
+            LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.topMargin=dp(12);list.addView(card,cp);
+            String heading=group.getKey();
+            String[] parts=heading.split("(?i)\\.\\s*Organizador:\\s*",2);
+            TextView roundTitle=text(parts[0].replaceFirst("(?i)\\s*-\\s*1.ª?\\s*Fase\\.?","").trim(),17,true);
+            card.addView(roundTitle);
+            if(parts.length>1){
+                TextView organizer=text("Organizador: "+parts[1],12,false);
+                organizer.setTextColor(0xffaab9c9);card.addView(organizer);
+            }
+            String groupDate=group.getValue().isEmpty()?"":group.getValue().get(0).optString("date");
+            if(!groupDate.isEmpty()){
+                TextView headingDate=text(groupDate,14,false);
+                headingDate.setTextColor(0xffaab9c9);
+                LinearLayout.LayoutParams hd=new LinearLayout.LayoutParams(-1,-2);hd.topMargin=dp(7);
+                card.addView(headingDate,hd);
+            }
+            int matchIndex=0;
+            for(JSONObject match:group.getValue()){
+                if(matchIndex++>0){
+                    View separator=new View(this);separator.setBackgroundColor(0xff3b4b5b);
+                    LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,dp(1));
+                    sp.topMargin=dp(10);card.addView(separator,sp);
+                }
+                LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(0,dp(12),0,dp(8));card.addView(row);
+                row.setOnClickListener(v->openMatchDetail(match));
+                LinearLayout homeColumn=new LinearLayout(this);homeColumn.setOrientation(1);
+                homeColumn.setGravity(Gravity.CENTER);row.addView(homeColumn,new LinearLayout.LayoutParams(0,-2,1));
+                android.widget.ImageView homeLogo=teamLogo(match.optString("homeLogo"));
+                homeColumn.addView(homeLogo,new LinearLayout.LayoutParams(dp(42),dp(42)));
+                TextView home=text(match.optString("home"),12,true);home.setGravity(Gravity.CENTER);
+                homeColumn.addView(home);
+                LinearLayout center=new LinearLayout(this);center.setOrientation(1);
+                center.setGravity(Gravity.CENTER);row.addView(center,new LinearLayout.LayoutParams(dp(84),-2));
+                TextView score=text(match.optString("score","").isEmpty()?"VS":match.optString("score"),19,true);
+                score.setTextColor(0xff85ddbd);score.setGravity(Gravity.CENTER);center.addView(score);
+                TextView time=text(match.optString("time","").isEmpty()?"Hora pendiente":match.optString("time"),12,false);
+                time.setGravity(Gravity.CENTER);center.addView(time);
+                LinearLayout awayColumn=new LinearLayout(this);awayColumn.setOrientation(1);
+                awayColumn.setGravity(Gravity.CENTER);row.addView(awayColumn,new LinearLayout.LayoutParams(0,-2,1));
+                android.widget.ImageView awayLogo=teamLogo(match.optString("awayLogo"));
+                awayColumn.addView(awayLogo,new LinearLayout.LayoutParams(dp(42),dp(42)));
+                TextView away=text(match.optString("away"),12,true);away.setGravity(Gravity.CENTER);
+                awayColumn.addView(away);
+            }
+        }
+    }
+}
