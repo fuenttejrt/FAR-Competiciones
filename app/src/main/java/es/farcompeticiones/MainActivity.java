@@ -264,7 +264,7 @@ public class MainActivity extends Activity {
                 if(!kind.equals("standing"))continue;
                 Button expand=new Button(this);expand.setAllCaps(false);expand.setText(showStandingDetails?"Ocultar estadísticas":"Ver estadísticas completas");body.addView(expand);
                 expand.setOnClickListener(v->{showStandingDetails=!showStandingDetails;showCompetitionTab(selectedTab);});
-                String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD","Pts"};
+                String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
                 int unit=(int)(getResources().getDisplayMetrics().density*42);
                 java.util.ArrayList<android.widget.HorizontalScrollView> scrollRows=new java.util.ArrayList<>();
                 LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);heading.setBackgroundColor(panel);body.addView(heading);
@@ -275,6 +275,7 @@ public class MainActivity extends Activity {
                 LinearLayout headerStats=new LinearLayout(this);
                 for(int k=2;k<labels.length;k++)addStandingFixed(headerStats,labels[k],unit,accent);
                 headerScroll.addView(headerStats);heading.addView(headerScroll,new LinearLayout.LayoutParams(0,-2,1));
+                addStandingFixed(heading,"Pts",unit,accent);
                 scrollRows.add(headerScroll);
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
@@ -297,8 +298,9 @@ public class MainActivity extends Activity {
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
                     scroller.setHorizontalScrollBarEnabled(false);
                     LinearLayout statsLine=new LinearLayout(this);
-                    for(int k=2;k<vals.length;k++)addStandingFixed(statsLine,vals[k],unit,Color.WHITE);
+                    for(int k=2;k<vals.length-1;k++)addStandingFixed(statsLine,vals[k],unit,Color.WHITE);
                     scroller.addView(statsLine);line.addView(scroller,new LinearLayout.LayoutParams(0,-2,1));
+                    addStandingFixed(line,vals[vals.length-1],unit,accent);
                     scrollRows.add(scroller);
                     if(showStandingDetails){
                         if(stats!=null){
