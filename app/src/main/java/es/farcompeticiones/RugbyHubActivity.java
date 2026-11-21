@@ -1223,7 +1223,7 @@ return "TITULARES ("+starterCount+")\n"+starters+
     private String parseActEventSection(String raw,String kind){
         if(raw==null||raw.trim().isEmpty())return "Sin información en el acta.";
         StringBuilder out=new StringBuilder();
-        String[] blocks=raw.split("(?im)(?=^\\s*Equipo\\s+(?:local|visitante):)");
+        String[] blocks=raw.split("(?im)(?=^[ \\t]*Equipo[ \\t]+(?:local|visitante):)");
         boolean any=false;
         for(String block:blocks){
             String normalized=block.trim();
