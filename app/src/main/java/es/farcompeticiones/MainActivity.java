@@ -297,7 +297,7 @@ public class MainActivity extends Activity {
                 java.util.ArrayList<android.widget.HorizontalScrollView> scrollRows=new java.util.ArrayList<>();
                 LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);heading.setBackgroundColor(panel);body.addView(heading);
                 addStandingFixed(heading,"#",unit*3/5,accent);
-                addStandingFixed(heading,"Equipo",unit*4,accent);
+                addStandingFixed(heading,"Equipo",(int)(getResources().getDisplayMetrics().density*168),accent);
                 android.widget.HorizontalScrollView headerScroll=new android.widget.HorizontalScrollView(this);
                 headerScroll.setHorizontalScrollBarEnabled(false);
                 LinearLayout headerStats=new LinearLayout(this);
@@ -322,7 +322,7 @@ public class MainActivity extends Activity {
                         standingStat(stats,"bd","bonus defensivo"),
                         row.optString("points","—")};
                     addStandingFixed(line,vals[0],unit*3/5,Color.WHITE);
-                    addStandingTeam(line,vals[1],row.optString("crest",""),unit*4);
+                    addStandingTeam(line,vals[1],row.optString("crest",""),(int)(getResources().getDisplayMetrics().density*168));
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
                     scroller.setHorizontalScrollBarEnabled(false);
                     LinearLayout statsLine=new LinearLayout(this);
