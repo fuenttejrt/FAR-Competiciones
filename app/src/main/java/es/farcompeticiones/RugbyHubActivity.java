@@ -560,6 +560,8 @@ public final class RugbyHubActivity extends Activity {
     }
     // Extract scoring rows from the score-table region, separately from page text.
     private String extractScoreboardColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
+        // MatchReady puts local and visitor score tables one below the other.
+        // The previous narrow .16-.21 region excluded the visitor's table.
         for(int p=0;p<pdf.getNumberOfPages();p++){
             try{
                 com.tom_roush.pdfbox.pdmodel.PDPage page=pdf.getPage(p);
@@ -567,12 +569,19 @@ public final class RugbyHubActivity extends Activity {
                 com.tom_roush.pdfbox.text.PDFTextStripperByArea area=
                     new com.tom_roush.pdfbox.text.PDFTextStripperByArea();
                 area.setSortByPosition(true);
-                area.addRegion("score",new android.graphics.RectF(0,h*.16f,w,h*.21f));
+                area.addRegion("score",new android.graphics.RectF(0,h*.13f,w,h*.47f));
                 area.extractRegions(page);
-                String score=area.getTextForRegion("score");
-                if(score==null||!score.toLowerCase(java.util.Locale.ROOT).contains("equipo local")||
-                   !score.toLowerCase(java.util.Locale.ROOT).contains("equipo visitante"))continue;
+                String extracted=area.getTextForRegion("score");
+                if(extracted==null)continue;
+                java.util.regex.Matcher heading=java.util.regex.Pattern.compile(
+                    "(?im)^\\s*Marcador\\s*$").matcher(extracted);
+                if(!heading.find())continue;
+                String score=extracted.substring(heading.end());
+                java.util.regex.Matcher next=java.util.regex.Pattern.compile(
+                    "(?im)^\\s*(?:Cambios|Expulsiones\\s+temporales|Expulsiones\\s+definitivas)\\s*$").matcher(score);
+                if(next.find())score=score.substring(0,next.start());
                 String parsed=parseActEventSection(score,"Marcador");
+                // Never replace the normal extraction with an incomplete single-team result.
                 if(parsed.contains("Equipo local:")&&parsed.contains("Equipo visitante:")&&
                    parsed.contains("puntos"))return parsed;
             }catch(Exception ignored){}
