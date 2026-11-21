@@ -127,40 +127,55 @@ public class MainActivity extends Activity {
         if(raw.isEmpty()){body.addView(txt("Pulsa Actualizar datos de MatchReady para cargar las tablas oficiales.",13,Color.LTGRAY));return;}
         try{renderNative(new org.json.JSONObject(raw));}catch(Exception ex){body.addView(txt("Los datos guardados no se pueden leer. Actualiza de nuevo.",13,Color.LTGRAY));}
     }
+    void addMatchCard(org.json.JSONArray cells){
+        if(cells.length()<4)return;
+        String when=cells.optString(0,""),home=cells.optString(1,""),score=cells.optString(2,""),away=cells.optString(3,"");
+        if(home.equalsIgnoreCase("Equipo local")||home.isEmpty()||away.isEmpty())return;
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(12,10,12,10);card.setBackgroundColor(panel);
+        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,4,0,4);body.addView(card,cp);
+        card.addView(txt(when,12,accent));
+        LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
+        TextView left=txt(home.replaceAll("(?i)Árbitro:.*$","").trim(),14,Color.WHITE);
+        TextView mid=txt(score.trim().isEmpty()?"VS":score.trim(),20,accent);mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
+        TextView right=txt(away.replaceAll("(?i)Campo:.*$","").trim(),14,Color.WHITE);
+        line.addView(left,new LinearLayout.LayoutParams(0,-2,1));line.addView(mid,new LinearLayout.LayoutParams(-2,-2));line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
+        String extra=(home.contains("Árbitro:")?home.substring(home.indexOf("Árbitro:")):"")+" "+(away.contains("Campo:")?away.substring(away.indexOf("Campo:")):"");
+        if(!extra.trim().isEmpty()){TextView details=txt(extra.trim(),12,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
+    }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
-        org.json.JSONArray tables=data.optJSONArray("tables");
-        if(tables==null)return;
+        org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
         for(int i=0;i<tables.length();i++){
             org.json.JSONObject table=tables.optJSONObject(i);if(table==null)continue;
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null||rows.length()==0)continue;
             boolean standing=table.optBoolean("standing");
             if(selectedTab.equals("Clasificación")!=standing)continue;
-            String title=table.optString("heading",standing?"Clasificación":"Partidos");
-            TextView head=txt(title.isEmpty()?(standing?"Clasificación":"Jornada"):title,16,accent);
-            head.setTypeface(null,Typeface.BOLD);body.addView(head);
-            int max=standing?rows.length():rows.length();
-            for(int j=0;j<max;j++){
-                org.json.JSONArray cells=rows.optJSONArray(j);if(cells==null||cells.length()==0)continue;
-                StringBuilder line=new StringBuilder();
-                for(int k=0;k<cells.length();k++){
-                    String value=cells.optString(k,"").trim();
-                    if(value.isEmpty())continue;
-                    if(line.length()>0)line.append(standing?"  ·  ":"  |  ");
-                    line.append(value);
+            TextView head=txt(standing?"CLASIFICACIÓN":"Jornada "+(i+1),16,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
+            if(standing){
+                HorizontalScrollView horizontal=new HorizontalScrollView(this);
+                LinearLayout stack=new LinearLayout(this);stack.setOrientation(1);horizontal.addView(stack);body.addView(horizontal);
+                for(int j=0;j<rows.length();j++){
+                    org.json.JSONArray cells=rows.optJSONArray(j);if(cells==null)continue;
+                    LinearLayout line=new LinearLayout(this);line.setBackgroundColor(j%2==0?panel:bg);stack.addView(line);
+                    for(int k=0;k<cells.length();k++){
+                        TextView cell=txt(cells.optString(k,""),12,j==0?accent:Color.WHITE);
+                        cell.setMinWidth((int)(getResources().getDisplayMetrics().density*(k==1?160:54)));
+                        line.addView(cell);
+                    }
+                    count++;
                 }
-                if(line.length()==0)continue;
-                String rowText=line.toString();
-                boolean score=rowText.matches("(?s).*\\d+\\s*[-–]\\s*\\d+.*");
-                if(selectedTab.equals("Resultados")&&!score)continue;
-                TextView item=txt(rowText,standing?12:14,Color.WHITE);
-                item.setBackgroundColor(panel);
-                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,2,0,2);body.addView(item,lp);
-                count++;
+            }else{
+                for(int j=0;j<rows.length();j++){
+                    org.json.JSONArray cells=rows.optJSONArray(j);if(cells==null||cells.length()<4)continue;
+                    String score=cells.optString(2,"");
+                    if(selectedTab.equals("Resultados")&&!score.matches("(?s).*\\\\d+\\\\s*[-–]\\\\s*\\\\d+.*"))continue;
+                    if(cells.optString(1,"").equalsIgnoreCase("Equipo local"))continue;
+                    addMatchCard(cells);count++;
+                }
             }
         }
-        if(count==0)body.addView(txt("No se encontraron filas para esta pestaña. Consulta la fuente oficial.",13,Color.LTGRAY));
-        else body.addView(txt("Datos de MatchReady guardados en este dispositivo. Actualiza para comprobar cambios.",12,Color.LTGRAY));
+        if(count==0)body.addView(txt("No se encontraron datos para esta pestaña.",13,Color.LTGRAY));
+        else body.addView(txt("Fuente: MatchReady · Datos guardados localmente",12,Color.LTGRAY));
     }
     void refreshNative(String url){
         if(dataBrowser!=null){dataBrowser.destroy();dataBrowser=null;}
