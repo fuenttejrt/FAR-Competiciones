@@ -20,12 +20,13 @@ public class MainActivity extends Activity {
     final int bg=Color.rgb(15,25,38),panel=Color.rgb(27,43,59),accent=Color.rgb(102,225,164);
     LinearLayout root,body;
     String category="M14", page="home", selectedCompetition="", selectedTab="Calendario", season="2026/27";
-    WebView browser;
+    WebView browser, dataBrowser;
     String lastInspectedStructure="";
     String lastBrowserUrl="";
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
+        if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
         browser=null;
         ScrollView sc=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(16,20,16,20);root.setBackgroundColor(bg);sc.addView(root);setContentView(sc);
         TextView title=txt(heading,23,Color.WHITE);title.setTypeface(null,Typeface.BOLD);root.addView(title);
@@ -95,6 +96,8 @@ public class MainActivity extends Activity {
         if(!official.isEmpty()){
             body.addView(txt("Fuente: calendario público oficial FAR / MatchReady · "+season,13,accent));
             button("Ver "+tab.toLowerCase()+" oficial",()->openBrowser(official));
+            button("Actualizar datos de MatchReady",()->refreshNative(official));
+            showCachedNative();
         }else body.addView(txt("Sin datos sincronizados. No se muestran resultados ni clasificaciones sin verificar.",14,Color.LTGRAY));
         String saved=getPreferences(0).getString("url_"+season+"_"+category+"_"+selectedCompetition,"");
         if(official.isEmpty()&&saved.startsWith("https://farugby.matchready.es/"))button("Consultar "+tab.toLowerCase()+" en MatchReady",()->openBrowser(saved));
@@ -117,6 +120,75 @@ public class MainActivity extends Activity {
         });
         button("Volver a categorías",()->home());
         body.addView(txt("Enlaces guardados por temporada, categoría y competición. La importación automática sigue en desarrollo.",13,Color.LTGRAY));
+    }
+    String cacheKey(){return "native_"+season+"_"+category+"_"+selectedCompetition;}
+    void showCachedNative(){
+        String raw=getPreferences(0).getString(cacheKey(),"");
+        if(raw.isEmpty()){body.addView(txt("Pulsa Actualizar datos de MatchReady para cargar las tablas oficiales.",13,Color.LTGRAY));return;}
+        try{renderNative(new org.json.JSONObject(raw));}catch(Exception ex){body.addView(txt("Los datos guardados no se pueden leer. Actualiza de nuevo.",13,Color.LTGRAY));}
+    }
+    void renderNative(org.json.JSONObject data)throws org.json.JSONException{
+        org.json.JSONArray tables=data.optJSONArray("tables");
+        if(tables==null)return;
+        int count=0;
+        for(int i=0;i<tables.length();i++){
+            org.json.JSONObject table=tables.optJSONObject(i);if(table==null)continue;
+            org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null||rows.length()==0)continue;
+            boolean standing=table.optBoolean("standing");
+            if(selectedTab.equals("Clasificación")!=standing)continue;
+            String title=table.optString("heading",standing?"Clasificación":"Partidos");
+            TextView head=txt(title.isEmpty()?(standing?"Clasificación":"Jornada"):title,16,accent);
+            head.setTypeface(null,Typeface.BOLD);body.addView(head);
+            int max=standing?rows.length():rows.length();
+            for(int j=0;j<max;j++){
+                org.json.JSONArray cells=rows.optJSONArray(j);if(cells==null||cells.length()==0)continue;
+                StringBuilder line=new StringBuilder();
+                for(int k=0;k<cells.length();k++){
+                    String value=cells.optString(k,"").trim();
+                    if(value.isEmpty())continue;
+                    if(line.length()>0)line.append(standing?"  ·  ":"  |  ");
+                    line.append(value);
+                }
+                if(line.length()==0)continue;
+                String rowText=line.toString();
+                boolean score=rowText.matches("(?s).*\\\\d+\\\\s*[-–]\\\\s*\\\\d+.*");
+                if(selectedTab.equals("Resultados")&&!score)continue;
+                TextView item=txt(rowText,standing?12:14,Color.WHITE);
+                item.setBackgroundColor(panel);
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,2,0,2);body.addView(item,lp);
+                count++;
+            }
+        }
+        if(count==0)body.addView(txt("No se encontraron filas para esta pestaña. Consulta la fuente oficial.",13,Color.LTGRAY));
+        else body.addView(txt("Datos de MatchReady guardados en este dispositivo. Actualiza para comprobar cambios.",12,Color.LTGRAY));
+    }
+    void refreshNative(String url){
+        if(dataBrowser!=null){dataBrowser.destroy();dataBrowser=null;}
+        final String key=cacheKey();
+        Toast.makeText(this,"Leyendo calendario oficial…",Toast.LENGTH_SHORT).show();
+        dataBrowser=new WebView(this);
+        dataBrowser.getSettings().setJavaScriptEnabled(true);
+        dataBrowser.getSettings().setDomStorageEnabled(true);
+        dataBrowser.setWebViewClient(new WebViewClient(){
+            @Override public void onPageFinished(WebView view,String loaded){
+                if(!loaded.startsWith("https://farugby.matchready.es/"))return;
+                view.postDelayed(()->{
+                    if(dataBrowser!=view||!page.equals("detail")||!key.equals(cacheKey()))return;
+                    String js="(function(){var ts=[].slice.call(document.querySelectorAll('table'));return JSON.stringify({url:location.href,title:document.title,tables:ts.map(function(t){var h=[].slice.call(t.querySelectorAll('th')).map(function(c){return c.innerText.trim().toLowerCase()});var standing=h.some(function(x){return x==='puntos'||x==='ptos'||x==='pts'})||h.some(function(x){return x==='pj'||x==='j'})&&h.some(function(x){return x==='g'});var n=t.previousElementSibling;var heading='';for(var i=0;n&&i<5;i++,n=n.previousElementSibling){if(n.innerText&&n.innerText.trim()){heading=n.innerText.trim().slice(0,100);break}}return {heading:heading,standing:standing,rows:[].slice.call(t.querySelectorAll('tr')).map(function(r){return [].slice.call(r.querySelectorAll('th,td')).map(function(c){return c.innerText.trim().replace(/\\\\s+/g,' ')})}).filter(function(r){return r.length>1})}})})})})()";
+                    view.evaluateJavascript(js,result->{
+                        try{
+                            String decoded=new org.json.JSONTokener(result).nextValue().toString();
+                            org.json.JSONObject obj=new org.json.JSONObject(decoded);
+                            org.json.JSONArray tables=obj.optJSONArray("tables");
+                            if(tables==null||tables.length()==0){Toast.makeText(MainActivity.this,"No se encontraron tablas. Abre la fuente oficial.",Toast.LENGTH_LONG).show();return;}
+                            getPreferences(0).edit().putString(key,obj.toString()).apply();
+                            showCompetitionTab(selectedTab);
+                        }catch(Exception ex){Toast.makeText(MainActivity.this,"No se pudieron interpretar los datos.",Toast.LENGTH_LONG).show();}
+                    });
+                },1500);
+            }
+        });
+        dataBrowser.loadUrl(url);
     }
     void openExternal(String url){startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
     void openBrowser(String url){
@@ -159,5 +231,5 @@ public class MainActivity extends Activity {
         });
     }
     @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else if(page.equals("browser")&&!selectedCompetition.isEmpty())showCompetitionTab(selectedTab);else home();}
-    @Override protected void onDestroy(){if(browser!=null)browser.destroy();super.onDestroy();}
+    @Override protected void onDestroy(){if(browser!=null)browser.destroy();if(dataBrowser!=null)dataBrowser.destroy();super.onDestroy();}
 }
