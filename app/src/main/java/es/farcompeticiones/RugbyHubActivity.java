@@ -1279,6 +1279,16 @@ return "TITULARES ("+starterCount+")\n"+starters+
                 }
                 columns.put("dorsal",aligned);
             }
+            // In changes and sanctions, do not shift numbers onto the wrong event.
+            // Keep the event and mark an incomplete column as unknown.
+            for(String optional:new String[]{"dorsal entra","dorsal sale","dorsal"}){
+                java.util.List<String> values=columns.get(optional);
+                if(values==null||values.size()!=n){
+                    java.util.ArrayList<String> blanks=new java.util.ArrayList<>();
+                    for(int event=0;event<n;event++)blanks.add("");
+                    columns.put(optional,blanks);
+                }
+            }
             // Other optional columns can also be absent; do not reject the whole team.
             if(!valid){
                 out.append("Datos de tipo o minuto incompletos; comprueba el PDF.\n");
@@ -1289,8 +1299,8 @@ return "TITULARES ("+starterCount+")\n"+starters+
                 if(minutes!=null)out.append("Min ").append(minutes.get(i)).append(" · ");
                 if(types!=null)out.append(eventDescription(types.get(i),kind)).append(" · ");
                 if(columns.containsKey("dorsal"))out.append(columns.get("dorsal").get(i).isEmpty()?"Dorsal no indicado":"Dorsal "+columns.get("dorsal").get(i));
-                if(columns.containsKey("dorsal entra"))out.append("Entra nº ").append(columns.get("dorsal entra").get(i));
-                if(columns.containsKey("dorsal sale"))out.append(" · Sale nº ").append(columns.get("dorsal sale").get(i));
+                if(columns.containsKey("dorsal entra"))out.append(columns.get("dorsal entra").get(i).isEmpty()?"Entra sin dorsal":"Entra nº "+columns.get("dorsal entra").get(i));
+                if(columns.containsKey("dorsal sale"))out.append(columns.get("dorsal sale").get(i).isEmpty()?" · Sale sin dorsal":" · Sale nº "+columns.get("dorsal sale").get(i));
                 out.append("\n");
             }
             out.append("\n");any=true;
