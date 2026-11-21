@@ -167,6 +167,7 @@ public class MainActivity extends Activity {
         final String key=cacheKey();
         Toast.makeText(this,"Leyendo calendario oficial…",Toast.LENGTH_SHORT).show();
         dataBrowser=new WebView(this);
+        body.addView(dataBrowser,new LinearLayout.LayoutParams(1,1));
         dataBrowser.getSettings().setJavaScriptEnabled(true);
         dataBrowser.getSettings().setDomStorageEnabled(true);
         dataBrowser.setWebViewClient(new WebViewClient(){
@@ -182,10 +183,11 @@ public class MainActivity extends Activity {
                             org.json.JSONArray tables=obj.optJSONArray("tables");
                             if(tables==null||tables.length()==0){Toast.makeText(MainActivity.this,"No se encontraron tablas. Abre la fuente oficial.",Toast.LENGTH_LONG).show();return;}
                             getPreferences(0).edit().putString(key,obj.toString()).apply();
+                            Toast.makeText(MainActivity.this,"Tablas descargadas: "+tables.length(),Toast.LENGTH_LONG).show();
                             showCompetitionTab(selectedTab);
                         }catch(Exception ex){Toast.makeText(MainActivity.this,"No se pudieron interpretar los datos.",Toast.LENGTH_LONG).show();}
                     });
-                },1500);
+                },2500);
             }
         });
         dataBrowser.loadUrl(url);
