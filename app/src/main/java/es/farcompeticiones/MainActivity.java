@@ -215,6 +215,18 @@ public class MainActivity extends Activity {
         String extra=(referee+" "+field).trim();
         if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
     }
+    String formatMatchDate(String value){
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})(?:\\s+(\\d{1,2}:\\d{2}))?").matcher(value);
+        if(!m.find())return value;
+        try{
+            java.text.SimpleDateFormat input=new java.text.SimpleDateFormat("dd/MM/yyyy",new java.util.Locale("es","ES"));
+            input.setLenient(false);
+            java.util.Date date=input.parse(m.group(1)+"/"+m.group(2)+"/"+m.group(3));
+            java.text.SimpleDateFormat output=new java.text.SimpleDateFormat("EEEE d 'de' MMMM",new java.util.Locale("es","ES"));
+            String formatted=output.format(date);
+            return Character.toUpperCase(formatted.charAt(0))+formatted.substring(1)+(m.group(4)==null?"":" · "+m.group(4)+" h");
+        }catch(Exception ignored){return value;}
+    }
     long matchTimestamp(org.json.JSONObject row,boolean endOfDay){
         String when=row.optString("when","");
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})(?:\\s+(\\d{1,2}):(\\d{2}))?").matcher(when);
@@ -374,11 +386,20 @@ public class MainActivity extends Activity {
                     if(!matchVisible(row))continue;
                     LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(10,8,10,8);card.setBackgroundColor(panel);
                     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,3,0,3);body.addView(card,cp);
-                    card.addView(txt(row.optString("when",""),12,selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent));
+                    String dateLabel=row.optString("when","");
+                    TextView dateView=txt(formatMatchDate(dateLabel),12,accent);
+                    dateView.setTypeface(null,Typeface.BOLD);
+                    dateView.setPadding(2,0,0,5);
+                    card.addView(dateView);
                     LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
                     TextView left=txt(row.optString("home",""),13,Color.WHITE);
-                    TextView mid=txt(selectedTab.equals("Calendario")&&isUpcomingMatch(row)?"VS":isScore(score)?score:"VS",19,selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent);mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
-                    TextView right=txt(row.optString("away",""),13,Color.WHITE);right.setGravity(android.view.Gravity.RIGHT);
+                    left.setMaxLines(3);left.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    TextView mid=txt(selectedTab.equals("Calendario")&&isUpcomingMatch(row)?"VS":isScore(score)?score:"VS",19,selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent);
+                    mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
+                    mid.setMinWidth((int)(getResources().getDisplayMetrics().density*52));
+                    TextView right=txt(row.optString("away",""),13,Color.WHITE);
+                    right.setMaxLines(3);right.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    right.setGravity(android.view.Gravity.RIGHT);
                     line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
                     line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
                     line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
