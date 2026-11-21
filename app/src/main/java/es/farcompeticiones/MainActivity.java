@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
         }
         String official=officialCalendar();
         if(!official.isEmpty()){
-            if(selectedCompetition.startsWith("Segunda División"))body.addView(txt("M14 · "+selectedCompetition+" · "+season,12,accent));
+
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
             Button refresh=new Button(this);refresh.setText("↻ Actualizar");refresh.setTextSize(12);refresh.setAllCaps(false);
             actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));refresh.setOnClickListener(v->refreshNative(official));
