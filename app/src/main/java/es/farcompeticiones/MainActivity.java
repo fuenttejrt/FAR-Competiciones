@@ -322,12 +322,6 @@ public class MainActivity extends Activity {
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
-        if(selectedTab.equals("Calendario")){
-            Button mode=new Button(this);mode.setAllCaps(false);
-            mode.setText(calendarUpcomingOnly?"Ver calendario completo":"Ver próximos partidos");mode.setTextSize(12);
-            LinearLayout.LayoutParams modeParams=new LinearLayout.LayoutParams(-1,(int)(42*getResources().getDisplayMetrics().density));modeParams.setMargins(0,0,0,2);body.addView(mode,modeParams);
-            mode.setOnClickListener(v->{calendarUpcomingOnly=!calendarUpcomingOnly;selectedMatchGroup=-1;showCompetitionTab("Calendario");});
-        }
         if(!selectedTab.equals("Clasificación")){
             java.util.ArrayList<Integer> groupIds=new java.util.ArrayList<>();
             java.util.ArrayList<String> groupNames=new java.util.ArrayList<>();
@@ -346,11 +340,18 @@ public class MainActivity extends Activity {
                 java.util.ArrayList<String> options=new java.util.ArrayList<>();
                 options.add(selectedTab.equals("Calendario")&&calendarUpcomingOnly?"Próximas jornadas":selectedTab.equals("Resultados")?"Todos los resultados":"Todas las jornadas");
                 options.addAll(groupNames);
+                if(selectedTab.equals("Calendario"))options.add(calendarUpcomingOnly?"Ver calendario completo":"Ver próximos partidos");
                 ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options);
                 picker.setAdapter(adapter);picker.setSelection(selectedMatchGroup+1);LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,(int)(42*getResources().getDisplayMetrics().density));body.addView(picker,pickerParams);
                 picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
                     public void onNothingSelected(AdapterView<?> p){}
                     public void onItemSelected(AdapterView<?> p,View v,int position,long id){
+                        if(selectedTab.equals("Calendario")&&position==options.size()-1){
+                            calendarUpcomingOnly=!calendarUpcomingOnly;
+                            selectedMatchGroup=-1;
+                            showCompetitionTab("Calendario");
+                            return;
+                        }
                         int next=position-1;
                         if(next!=selectedMatchGroup){selectedMatchGroup=next;showCompetitionTab(selectedTab);}
                     }
@@ -446,7 +447,7 @@ public class MainActivity extends Activity {
                 if(!sectionTitle.isEmpty()){
                     TextView head=txt(sectionTitle,roundAlreadyInSelector?12:15,accent);
                     head.setTypeface(null,Typeface.BOLD);
-                    head.setPadding(0,selectedTab.equals("Resultados")?3:5,0,0);
+                    head.setPadding(0,2,0,0);
                     body.addView(head);
                 }
                 if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY));
@@ -459,7 +460,7 @@ public class MainActivity extends Activity {
                     if(!dateLabel.equals(lastDate)){
                         TextView dateView=txt(dateLabel,12,accent);
                         dateView.setTypeface(null,Typeface.BOLD);
-                        dateView.setPadding(5,5,0,3);
+                        dateView.setPadding(5,2,0,2);
                         body.addView(dateView);
                         lastDate=dateLabel;
                     }
