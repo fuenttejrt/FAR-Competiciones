@@ -591,6 +591,7 @@ public class MainActivity extends Activity {
                             intent.putExtra("far_act_url",act);
                             intent.putExtra("far_home",row.optString("home",""));
                             intent.putExtra("far_away",row.optString("away",""));
+                            intent.putExtra("far_official_score",row.optString("score",""));
                             startActivity(intent);
                         }else showMatchDetail(row,full,organizerText,homeLogo,awayLogo);
                     });
