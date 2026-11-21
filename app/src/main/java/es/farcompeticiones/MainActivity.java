@@ -12,12 +12,16 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.widget.ProgressBar;
+import android.content.SharedPreferences;
 
 public class MainActivity extends Activity {
     final int bg=Color.rgb(15,25,38),panel=Color.rgb(27,43,59),accent=Color.rgb(102,225,164);
     LinearLayout root,body;
     String category="M14", page="home";
     WebView browser;
+    String lastBrowserUrl="";
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
@@ -42,6 +46,8 @@ public class MainActivity extends Activity {
             public void onItemSelected(AdapterView<?> parent,View view,int pos,long id){category=cats[pos];list();}
         });
         button("Abrir portal público MatchReady",()->openBrowser("https://farugby.matchready.es/"));
+        String last=getPreferences(0).getString("last_url","");
+        if(last.startsWith("https://farugby.matchready.es/")||last.startsWith("https://farugby.com/"))button("Continuar última consulta",()->openBrowser(last));
         button("Abrir web oficial FAR",()->openExternal("https://farugby.com/"));
         body.addView(txt("Los resultados no se inventan. Las consultas web requieren conexión.",13,Color.LTGRAY));
     }
@@ -58,6 +64,11 @@ public class MainActivity extends Activity {
         body.addView(txt("FUENTES OFICIALES",17,accent));
         button("Consultar categoría en FAR",()->openBrowser(farUrl()));
         button("Consultar MatchReady",()->openBrowser("https://farugby.matchready.es/"));
+        if(category.equals("M14")){
+            body.addView(txt("EJEMPLO VERIFICADO · TEMPORADA 2025/26",14,accent));
+            button("Ver competición M14 histórica en MatchReady",()->openBrowser("https://farugby.matchready.es/es/public/competition/4282/"));
+            body.addView(txt("Este enlace es histórico (2025/26), no corresponde a 2026/27.",12,Color.LTGRAY));
+        }
         body.addView(txt("¿Tienes el enlace público de esta competición en MatchReady? Puedes guardarlo aquí para acceder directamente.",14,Color.LTGRAY));
         String key="url_"+category+"_"+competition;
         EditText url=new EditText(this);url.setSingleLine(true);url.setText(getPreferences(0).getString(key,""));url.setHint("https://farugby.matchready.es/...");url.setTextColor(Color.WHITE);url.setHintTextColor(Color.LTGRAY);body.addView(url);
@@ -73,14 +84,18 @@ public class MainActivity extends Activity {
     void openBrowser(String url){
         page="browser";layout("CONSULTA OFICIAL");
         button("Volver",()->home());
-        button("Abrir en navegador externo",()->openExternal(url));
+        button("Abrir en navegador externo",()->openExternal(browser!=null?browser.getUrl():url));
+        button("Actualizar página",()->{if(browser!=null)browser.reload();});
+        ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);body.addView(progress);
         browser=new WebView(this);browser.getSettings().setJavaScriptEnabled(true);browser.getSettings().setDomStorageEnabled(true);
         browser.setWebViewClient(new WebViewClient(){
+            @Override public void onPageStarted(WebView view,String target,android.graphics.Bitmap icon){progress.setVisibility(View.VISIBLE);lastBrowserUrl=target;}
+            @Override public void onPageFinished(WebView view,String target){progress.setVisibility(View.GONE);lastBrowserUrl=target;getPreferences(0).edit().putString("last_url",target).apply();}
             @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){
                 String host=r.getUrl().getHost();return host==null||!(host.equals("farugby.com")||host.endsWith(".farugby.com")||host.equals("farugby.matchready.es"));
             }
         });
-        browser.setWebChromeClient(new WebChromeClient());
+        browser.setWebChromeClient(new WebChromeClient(){@Override public void onProgressChanged(WebView view,int newProgress){progress.setProgress(newProgress);}});
         body.addView(browser,new LinearLayout.LayoutParams(-1,(int)(getResources().getDisplayMetrics().heightPixels*0.72)));
         browser.loadUrl(url);
     }
