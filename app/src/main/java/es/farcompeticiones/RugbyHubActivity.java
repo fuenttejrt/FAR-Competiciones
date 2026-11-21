@@ -1267,16 +1267,15 @@ return "TITULARES ("+starterCount+")\n"+starters+
             java.util.List<String> dorsals=columns.get("dorsal");
             if(valid&&dorsals!=null&&dorsals.size()!=n){
                 java.util.ArrayList<String> aligned=new java.util.ArrayList<>();
-                int index=0;
-                for(int event=0;event<n;event++){
-                    String type=types.get(event);
-                    int remainingNonPenalty=0;
-                    for(int j=event+1;j<n;j++)
-                        if(!"EC".equalsIgnoreCase(types.get(j)))remainingNonPenalty++;
-                    if("EC".equalsIgnoreCase(type))aligned.add("");
-                    else if(dorsals.size()-index>remainingNonPenalty)
-                        aligned.add(dorsals.get(index++));
-                    else aligned.add("");
+                int nonPenalty=0;
+                for(String type:types)if(!"EC".equalsIgnoreCase(type))nonPenalty++;
+                if(dorsals.size()==nonPenalty){
+                    int index=0;
+                    for(String type:types)
+                        aligned.add("EC".equalsIgnoreCase(type)?"":dorsals.get(index++));
+                }else{
+                    // Ambiguous alignment: never attach a number to the wrong player.
+                    for(int event=0;event<n;event++)aligned.add("");
                 }
                 columns.put("dorsal",aligned);
             }
