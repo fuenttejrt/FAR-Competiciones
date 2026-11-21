@@ -136,6 +136,12 @@ public class MainActivity extends Activity {
         }
         return cells;
     }
+    void addStandingFixed(LinearLayout parent,String value,int width,int color){
+        TextView cell=txt(value,11,color);
+        cell.setGravity(android.view.Gravity.CENTER_VERTICAL|android.view.Gravity.CENTER_HORIZONTAL);
+        cell.setPadding(2,8,2,8);
+        parent.addView(cell,new LinearLayout.LayoutParams(width,-2));
+    }
     String standingStat(org.json.JSONObject stats,String... names){
         if(stats==null)return "–";
         java.util.Iterator<String> keys=stats.keys();
@@ -258,24 +264,42 @@ public class MainActivity extends Activity {
                 if(!kind.equals("standing"))continue;
                 Button expand=new Button(this);expand.setAllCaps(false);expand.setText(showStandingDetails?"Ocultar estadísticas":"Ver estadísticas completas");body.addView(expand);
                 expand.setOnClickListener(v->{showStandingDetails=!showStandingDetails;showCompetitionTab(selectedTab);});
-                String[] labels={"#","Equipo","J","G","E","P","PB","Pts"};
-                float[] widths={0.55f,3.7f,0.62f,0.62f,0.62f,0.62f,0.72f,0.85f};
+                String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD","Pts"};
+                int unit=(int)(getResources().getDisplayMetrics().density*42);
+                java.util.ArrayList<android.widget.HorizontalScrollView> scrollRows=new java.util.ArrayList<>();
                 LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);heading.setBackgroundColor(panel);body.addView(heading);
-                for(int k=0;k<labels.length;k++){
-                    TextView cell=txt(labels[k],k==1?11:10,accent);
-                    cell.setGravity(k==1?android.view.Gravity.START:android.view.Gravity.CENTER);
-                    heading.addView(cell,new LinearLayout.LayoutParams(0,-2,widths[k]));
-                }
+                addStandingFixed(heading,"#",unit*3/5,accent);
+                addStandingFixed(heading,"Equipo",unit*4,accent);
+                android.widget.HorizontalScrollView headerScroll=new android.widget.HorizontalScrollView(this);
+                headerScroll.setHorizontalScrollBarEnabled(false);
+                LinearLayout headerStats=new LinearLayout(this);
+                for(int k=2;k<labels.length;k++)addStandingFixed(headerStats,labels[k],unit,accent);
+                headerScroll.addView(headerStats);heading.addView(headerScroll,new LinearLayout.LayoutParams(0,-2,1));
+                scrollRows.add(headerScroll);
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
-                    LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);line.setMinimumHeight((int)(30*getResources().getDisplayMetrics().density));line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
+                    LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);line.setMinimumHeight((int)(40*getResources().getDisplayMetrics().density));line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
                     org.json.JSONObject stats=row.optJSONObject("stats");
-                    String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),standingStat(stats,"g","ganados","ganados/as","victorias","pg","v","gan","gan.","ganados (g)"),standingStat(stats,"e","empatados","empates","pe","emp","emp.","empatados (e)"),standingStat(stats,"p","perdidos","derrotas","pp","d","per","per.","perdidos (p)"),standingStat(stats,"pb","bonus","puntos bonus","puntos de bonus","bon","b","bonificacion","bonificaciones","ptos bonus"),row.optString("points","—")};
-                    for(int k=0;k<vals.length;k++){
-                        TextView cell=txt(vals[k],k==1?11:12,Color.WHITE);
-                        cell.setGravity(k==1?android.view.Gravity.START:android.view.Gravity.CENTER);
-                        line.addView(cell,new LinearLayout.LayoutParams(0,-2,widths[k]));
-                    }
+                    String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),
+                        standingStat(stats,"g","ganados","victorias","pg","v"),
+                        standingStat(stats,"e","empatados","empates","pe"),
+                        standingStat(stats,"p","perdidos","derrotas","pp"),
+                        standingStat(stats,"tf","tantos favor","tantos a favor","puntos a favor"),
+                        standingStat(stats,"tc","tantos contra","tantos en contra","puntos en contra"),
+                        standingStat(stats,"dt","diferencia tantos","diferencia","dif"),
+                        standingStat(stats,"ef","ensayos favor","ensayos a favor"),
+                        standingStat(stats,"ec","ensayos contra","ensayos en contra"),
+                        standingStat(stats,"bo","bonus ofensivo"),
+                        standingStat(stats,"bd","bonus defensivo"),
+                        row.optString("points","—")};
+                    addStandingFixed(line,vals[0],unit*3/5,Color.WHITE);
+                    addStandingFixed(line,vals[1],unit*4,Color.WHITE);
+                    android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
+                    scroller.setHorizontalScrollBarEnabled(false);
+                    LinearLayout statsLine=new LinearLayout(this);
+                    for(int k=2;k<vals.length;k++)addStandingFixed(statsLine,vals[k],unit,Color.WHITE);
+                    scroller.addView(statsLine);line.addView(scroller,new LinearLayout.LayoutParams(0,-2,1));
+                    scrollRows.add(scroller);
                     if(showStandingDetails){
                         if(stats!=null){
                             StringBuilder detail=new StringBuilder();
@@ -285,6 +309,11 @@ public class MainActivity extends Activity {
                         }
                     }
                     count++;
+                }
+                for(android.widget.HorizontalScrollView scroller:scrollRows){
+                    scroller.setOnScrollChangeListener((View.OnScrollChangeListener)(v,x,y,oldX,oldY)->{
+                        for(android.widget.HorizontalScrollView other:scrollRows)if(other!=v&&other.getScrollX()!=x)other.scrollTo(x,0);
+                    });
                 }
             }else{
                 if(!kind.equals("matches"))continue;
