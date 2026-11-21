@@ -162,30 +162,30 @@ public class MainActivity extends Activity {
         String extra=(referee+" "+field).trim();
         if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
     }
-    boolean isPlayedMatch(org.json.JSONObject row){
-        String score=row.optString("score","").trim();
-        if(!isScore(score))return false;
+    long matchTimestamp(org.json.JSONObject row,boolean endOfDay){
         String when=row.optString("when","");
-        java.util.regex.Matcher date=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})").matcher(when);
-        if(date.find()){
-            try{
-                java.util.Calendar match=java.util.Calendar.getInstance();
-                match.set(java.lang.Integer.parseInt(date.group(3)),java.lang.Integer.parseInt(date.group(2))-1,java.lang.Integer.parseInt(date.group(1)),23,59,59);
-                if(match.getTimeInMillis()>System.currentTimeMillis())return false;
-            }catch(Exception ignored){}
-        }
-        return true;
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})(?:\\s+(\\d{1,2}):(\\d{2}))?").matcher(when);
+        if(!m.find())return -1;
+        try{
+            java.util.Calendar c=java.util.Calendar.getInstance();
+            c.setLenient(false);
+            boolean hasTime=m.group(4)!=null;
+            int hour=hasTime?Integer.parseInt(m.group(4)):(endOfDay?23:0);
+            int minute=hasTime?Integer.parseInt(m.group(5)):(endOfDay?59:0);
+            c.set(Integer.parseInt(m.group(3)),Integer.parseInt(m.group(2))-1,Integer.parseInt(m.group(1)),hour,minute,endOfDay&&!hasTime?59:0);
+            c.set(java.util.Calendar.MILLISECOND,0);
+            return c.getTimeInMillis();
+        }catch(Exception ex){return -1;}
+    }
+    boolean isPlayedMatch(org.json.JSONObject row){
+        if(!isScore(row.optString("score","")))return false;
+        long date=matchTimestamp(row,false);
+        return date<0||date<=System.currentTimeMillis();
     }
     boolean isUpcomingMatch(org.json.JSONObject row){
-        String when=row.optString("when","");
-        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d{2})/(\\d{2})/(\\d{4})").matcher(when);
-        if(!m.find())return !isScore(row.optString("score",""));
-        try{
-            java.util.Calendar day=java.util.Calendar.getInstance();
-            day.setLenient(false);
-            day.set(Integer.parseInt(m.group(3)),Integer.parseInt(m.group(2))-1,Integer.parseInt(m.group(1)),23,59,59);
-            return day.getTimeInMillis()>=System.currentTimeMillis();
-        }catch(Exception ex){return false;}
+        if(isPlayedMatch(row))return false;
+        long date=matchTimestamp(row,true);
+        return date<0||date>=System.currentTimeMillis();
     }
     boolean matchVisible(org.json.JSONObject row){
         if(selectedTab.equals("Resultados"))return isPlayedMatch(row);
