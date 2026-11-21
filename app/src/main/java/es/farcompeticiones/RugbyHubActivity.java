@@ -441,6 +441,14 @@ public final class RugbyHubActivity extends Activity {
         scroll.setFillViewport(false);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
         LinearLayout actions=new LinearLayout(this);root.addView(actions);
+        final String[] diagnostics={""};
+        Button debug=new Button(this);debug.setText("Diagnóstico");debug.setEnabled(false);actions.addView(debug);
+        debug.setOnClickListener(v->{
+            android.content.ClipboardManager clipboard=(android.content.ClipboardManager)
+                getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Diagnóstico acta",diagnostics[0]));
+            android.widget.Toast.makeText(this,"Diagnóstico copiado. Pégalo en el chat.",android.widget.Toast.LENGTH_LONG).show();
+        });
         Button original=new Button(this);original.setText("PDF original");actions.addView(original);
         original.setOnClickListener(v->showActPdf(url));
         Button close=new Button(this);close.setText("Cerrar");actions.addView(close);
@@ -481,8 +489,13 @@ public final class RugbyHubActivity extends Activity {
                 final String safeLineups=lineupColumns;
                 final String safeDiscipline=disciplinaryColumns;
                 final String safeScoreboard=scoreboardColumns;
+                final String rawDiagnosis="ACTA: "+url+"\\n"+
+                    "EXTRACCION DE ZONA MARCADOR: "+(safeScoreboard==null?"NO DISPONIBLE":safeScoreboard)+"\\n"+
+                    "TEXTO COMPLETO DEL PDF:\\n"+content;
                 runOnUiThread(()->{
                     if(!dialog.isShowing())return;
+                    diagnostics[0]=rawDiagnosis;
+                    debug.setEnabled(true);
                     if(content.isEmpty()){
                         status.setText("El PDF no contiene texto extraíble.");
                         body.setText("Consulta el documento original. No se han inventado datos.");
