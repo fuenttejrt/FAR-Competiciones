@@ -1261,31 +1261,35 @@ return "TITULARES ("+starterCount+")\n"+starters+
             int n=minutes==null?0:minutes.size();
             if(types!=null)n=Math.max(n,types.size());
             if(n==0){out.append("Sin incidencias registradas.\n\n");any=true;continue;}
+            // A missing dorsal must never discard otherwise valid events.
+            // Types and minutes identify the event; missing numbers are optional.
             boolean valid=types!=null&&minutes!=null&&types.size()==n&&minutes.size()==n;
             java.util.List<String> dorsals=columns.get("dorsal");
-            // MatchReady omits the dorsal for penalty tries (EC).
             if(valid&&dorsals!=null&&dorsals.size()!=n){
-                int expected=0;
-                for(String type:types)if(!"EC".equalsIgnoreCase(type))expected++;
-                if(dorsals.size()==expected){
-                    java.util.ArrayList<String> aligned=new java.util.ArrayList<>();
-                    int dorsalIndex=0;
-                    for(String type:types)
-                        aligned.add("EC".equalsIgnoreCase(type)?"":dorsals.get(dorsalIndex++));
-                    columns.put("dorsal",aligned);
-                }else valid=false;
+                java.util.ArrayList<String> aligned=new java.util.ArrayList<>();
+                int index=0;
+                for(int event=0;event<n;event++){
+                    String type=types.get(event);
+                    int remainingNonPenalty=0;
+                    for(int j=event+1;j<n;j++)
+                        if(!"EC".equalsIgnoreCase(types.get(j)))remainingNonPenalty++;
+                    if("EC".equalsIgnoreCase(type))aligned.add("");
+                    else if(dorsals.size()-index>remainingNonPenalty)
+                        aligned.add(dorsals.get(index++));
+                    else aligned.add("");
+                }
+                columns.put("dorsal",aligned);
             }
-            for(java.util.Map.Entry<String,java.util.List<String>> column:columns.entrySet())
-                if(!"dorsal".equals(column.getKey())&&column.getValue().size()!=n)valid=false;
+            // Other optional columns can also be absent; do not reject the whole team.
             if(!valid){
-                out.append("La tabla no se ha podido reconstruir con seguridad. Comprueba el PDF.\n");
+                out.append("Datos de tipo o minuto incompletos; comprueba el PDF.\n");
                 out.append(normalized).append("\n\n");any=true;continue;
             }
             for(int i=0;i<n;i++){
                 out.append(i+1).append(". ");
                 if(minutes!=null)out.append("Min ").append(minutes.get(i)).append(" · ");
                 if(types!=null)out.append(eventDescription(types.get(i),kind)).append(" · ");
-                if(columns.containsKey("dorsal")&&!columns.get("dorsal").get(i).isEmpty())out.append("Dorsal ").append(columns.get("dorsal").get(i));
+                if(columns.containsKey("dorsal"))out.append(columns.get("dorsal").get(i).isEmpty()?"Dorsal no indicado":"Dorsal "+columns.get("dorsal").get(i));
                 if(columns.containsKey("dorsal entra"))out.append("Entra nº ").append(columns.get("dorsal entra").get(i));
                 if(columns.containsKey("dorsal sale"))out.append(" · Sale nº ").append(columns.get("dorsal sale").get(i));
                 out.append("\n");
