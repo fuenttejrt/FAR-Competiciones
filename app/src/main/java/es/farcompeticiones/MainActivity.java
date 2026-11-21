@@ -268,7 +268,7 @@ public class MainActivity extends Activity {
                 }
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
-                    LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);line.setMinimumHeight(dp(30));line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
+                    LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);line.setMinimumHeight((int)(30*getResources().getDisplayMetrics().density));line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
                     org.json.JSONObject stats=row.optJSONObject("stats");
                     String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),standingStat(stats,"g","ganados","ganados/as","victorias","pg"),standingStat(stats,"e","empatados","empates","pe"),standingStat(stats,"p","perdidos","derrotas","pp"),row.optString("points","—")};
                     for(int k=0;k<vals.length;k++){
