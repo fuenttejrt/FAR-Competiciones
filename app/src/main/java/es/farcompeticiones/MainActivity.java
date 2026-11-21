@@ -208,7 +208,7 @@ public class MainActivity extends Activity {
                     boolean any=false;
                     for(int n=0;n<group.optJSONArray("rows").length();n++){org.json.JSONObject row=group.optJSONArray("rows").optJSONObject(n);if(row!=null&&matchVisible(row)){any=true;break;}}
                     if(!any)continue;
-                    groupIds.add(t);groupNames.add(group.optString("heading","Jornada "+(t+1)));
+                    if(selectedTab.equals("Resultados")){groupIds.add(0,t);groupNames.add(0,group.optString("heading","Jornada "+(t+1)));}else{groupIds.add(t);groupNames.add(group.optString("heading","Jornada "+(t+1)));}
                 }
             }
             if(!groupIds.isEmpty()){
@@ -232,7 +232,7 @@ public class MainActivity extends Activity {
             org.json.JSONObject table=tables.optJSONObject(i);if(table==null)continue;
             String kind=table.optString("kind","");
             if(!selectedTab.equals("Clasificación")&&selectedMatchGroup>=0&&kind.equals("matches")){
-                int groupIndex=0;for(int k=0;k<i;k++){org.json.JSONObject prev=tables.optJSONObject(k);if(prev!=null&&prev.optString("kind").equals("matches")&&prev.optJSONArray("rows")!=null&&prev.optJSONArray("rows").length()>0){
+                int groupIndex=0;for(int k=selectedTab.equals("Resultados")?tables.length()-1:0;selectedTab.equals("Resultados")?k>i:k<i;k+=selectedTab.equals("Resultados")?-1:1){org.json.JSONObject prev=tables.optJSONObject(k);if(prev!=null&&prev.optString("kind").equals("matches")&&prev.optJSONArray("rows")!=null&&prev.optJSONArray("rows").length()>0){
                     boolean any=false;
                     for(int n=0;n<prev.optJSONArray("rows").length();n++){org.json.JSONObject item=prev.optJSONArray("rows").optJSONObject(n);if(item!=null&&matchVisible(item)){any=true;break;}}
                     if(any)groupIndex++;
