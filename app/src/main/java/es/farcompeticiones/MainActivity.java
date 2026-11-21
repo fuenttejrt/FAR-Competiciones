@@ -26,7 +26,6 @@ public class MainActivity extends Activity {
     int selectedMatchGroup=-1;
     boolean showStandingDetails=false;
     boolean calendarUpcomingOnly=true;
-    boolean latestResultsOnOpen=true;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
@@ -89,7 +88,6 @@ public class MainActivity extends Activity {
     void details(String competition){
         selectedCompetition=competition;
         selectedMatchGroup=-1;
-        latestResultsOnOpen=true;
         calendarUpcomingOnly=true;
         showCompetitionTab("Calendario");
     }
@@ -100,7 +98,7 @@ public class MainActivity extends Activity {
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             Button b=new Button(this);b.setText(item);b.setTextSize(11);b.setAllCaps(false);
             b.setTextColor(item.equals(tab)?accent:Color.WHITE);
-            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->{if(!item.equals(selectedTab)){selectedMatchGroup=item.equals("Resultados")?0:-1;latestResultsOnOpen=item.equals("Resultados");}showCompetitionTab(item);});
+            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->{if(!item.equals(selectedTab)){selectedMatchGroup=item.equals("Resultados")?0:-1;}showCompetitionTab(item);});
         }
         String official=officialCalendar();
         if(!official.isEmpty()){
@@ -226,7 +224,7 @@ public class MainActivity extends Activity {
                     public void onNothingSelected(AdapterView<?> p){}
                     public void onItemSelected(AdapterView<?> p,View v,int position,long id){
                         int next=position-1;
-                        if(next!=selectedMatchGroup){selectedMatchGroup=next;latestResultsOnOpen=false;showCompetitionTab(selectedTab);}
+                        if(next!=selectedMatchGroup){selectedMatchGroup=next;showCompetitionTab(selectedTab);}
                     }
                 });
 
