@@ -864,11 +864,27 @@ public final class RugbyHubActivity extends Activity {
         host.addView(header);
         TextView teams=text(names[0]+"  ·  "+names[1],13,true);
         teams.setGravity(Gravity.CENTER);header.addView(teams);
-        TextView result=text(score[0]+"  –  "+score[1],30,true);
+        String official=getIntent().getStringExtra("far_official_score");
+        java.util.regex.Matcher officialMatch=java.util.regex.Pattern.compile(
+            "(\\d+)\\s*[-–:]\\s*(\\d+)").matcher(official==null?"":official);
+        boolean hasOfficial=officialMatch.find();
+        String officialValue=hasOfficial?officialMatch.group(1)+"  –  "+officialMatch.group(2):"";
+        boolean mismatch=hasOfficial && (
+            score[0]!=Integer.parseInt(officialMatch.group(1)) ||
+            score[1]!=Integer.parseInt(officialMatch.group(2)));
+        TextView result=text(hasOfficial?officialValue:score[0]+"  –  "+score[1],30,true);
         result.setGravity(Gravity.CENTER);header.addView(result);
-        TextView qualifier=text("Resultado calculado de las anotaciones del acta",10,false);
+        TextView qualifier=text(hasOfficial?"Resultado oficial del partido":
+            "Anotaciones identificadas en el acta (resultado no verificado)",10,false);
         qualifier.setGravity(Gravity.CENTER);qualifier.setTextColor(0xffaab9c9);
         header.addView(qualifier);
+        if(mismatch){
+            TextView warning=text("Anotaciones detectadas: "+score[0]+" – "+score[1]+
+                ". El desglose es incompleto y no coincide con el resultado oficial.",11,false);
+            warning.setTextColor(0xffffcf85);
+            warning.setPadding(dp(4),dp(8),dp(4),0);
+            header.addView(warning);
+        }
         if(items.isEmpty()){
             TextView empty=text("No se han identificado anotaciones suficientes. Consulta el PDF original.",13,false);
             empty.setPadding(dp(6),dp(16),dp(6),dp(8));host.addView(empty);
