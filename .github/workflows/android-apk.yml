@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -24,3 +24,12 @@ jobs:
           name: FAR-Competiciones-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+      - name: Publicar APK directa en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk FAR-Competiciones-v0.1.apk
+          gh release delete v0.1 --yes 2>/dev/null || true
+          git tag -f v0.1
+          git push origin refs/tags/v0.1 --force
+          gh release create v0.1 FAR-Competiciones-v0.1.apk --title "FAR Competiciones v0.1" --notes "Primera APK de prueba Android. Sin conexión todavía a los resultados oficiales." --prerelease
