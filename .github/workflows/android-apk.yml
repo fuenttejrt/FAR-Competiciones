@@ -51,15 +51,15 @@ jobs:
         run: gradle --no-daemon :app:assembleRelease
       - uses: actions/upload-artifact@v4
         with:
-          name: FAR-Competiciones-v0.46-APK
+          name: FAR-Competiciones-v0.47-APK
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 30
       - name: Publicar APK directa en Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk FAR-Competiciones-v0.46.apk
-          gh release delete v0.46 --yes 2>/dev/null || true
-          git tag -f v0.46
-          git push origin refs/tags/v0.46 --force
-          gh release create v0.46 FAR-Competiciones-v0.46.apk --title "FAR Competiciones v0.46" --notes "APK con firma permanente." --prerelease
+          cp app/build/outputs/apk/release/app-release.apk FAR-Competiciones-v0.47.apk
+          gh release delete v0.47 --yes 2>/dev/null || true
+          git tag -f v0.47
+          git push origin refs/tags/v0.47 --force
+          gh release create v0.47 FAR-Competiciones-v0.47.apk --title "FAR Competiciones v0.47" --notes "APK con firma permanente." --prerelease
