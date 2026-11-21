@@ -293,7 +293,7 @@ public class MainActivity extends Activity {
                 if(!kind.equals("standing"))continue;
                 body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
                 String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
-                int unit=(int)(getResources().getDisplayMetrics().density*42);
+                int unit=(int)(getResources().getDisplayMetrics().density*34);
                 java.util.ArrayList<android.widget.HorizontalScrollView> scrollRows=new java.util.ArrayList<>();
                 LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);heading.setBackgroundColor(panel);body.addView(heading);
                 addStandingFixed(heading,"#",unit*3/5,accent);
