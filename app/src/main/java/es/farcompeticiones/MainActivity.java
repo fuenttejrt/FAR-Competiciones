@@ -584,7 +584,16 @@ public class MainActivity extends Activity {
                     String organizerText=organizer>=0?full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim():"";
                     String homeLogo=matchCrest(tables,row.optString("home",""),row.optString("homeCrest",""));
                     String awayLogo=matchCrest(tables,row.optString("away",""),row.optString("awayCrest",""));
-                    card.setOnClickListener(v->showMatchDetail(row,full,organizerText,homeLogo,awayLogo));
+                    card.setOnClickListener(v->{
+                        String act=row.optString("actUrl","");
+                        if(act.startsWith("https://farugby.matchready.es/")){
+                            Intent intent=new Intent(this,RugbyHubActivity.class);
+                            intent.putExtra("far_act_url",act);
+                            intent.putExtra("far_home",row.optString("home",""));
+                            intent.putExtra("far_away",row.optString("away",""));
+                            startActivity(intent);
+                        }else showMatchDetail(row,full,organizerText,homeLogo,awayLogo);
+                    });
                     String extra=row.optString("extra","");if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);}
                     count++;
                 }
