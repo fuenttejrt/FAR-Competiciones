@@ -19,7 +19,7 @@ import android.content.SharedPreferences;
 public class MainActivity extends Activity {
     final int bg=Color.rgb(15,25,38),panel=Color.rgb(27,43,59),accent=Color.rgb(102,225,164);
     LinearLayout root,body;
-    String category="M14", page="home", selectedCompetition="", selectedTab="Calendario";
+    String category="M14", page="home", selectedCompetition="", selectedTab="Calendario", season="2026/27";
     WebView browser;
     String lastBrowserUrl="";
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
@@ -36,6 +36,14 @@ public class MainActivity extends Activity {
     void home(){
         page="home";layout("FAR COMPETICIONES");
         body.addView(txt("Rugby andaluz · Consulta de competiciones",14,accent));
+        body.addView(txt("Temporada",17,Color.WHITE));
+        String[] seasons={"2026/27","2025/26"};
+        Spinner seasonSpinner=new Spinner(this);ArrayAdapter<String> seasonAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,seasons);seasonSpinner.setAdapter(seasonAdapter);body.addView(seasonSpinner);
+        seasonSpinner.setSelection(season.equals("2025/26")?1:0);
+        seasonSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+            public void onNothingSelected(AdapterView<?> p){}
+            public void onItemSelected(AdapterView<?> p,View v,int pos,long id){season=seasons[pos];if(body!=null&&body.getChildCount()>5)list();}
+        });
         body.addView(txt("Selecciona una categoría",18,Color.WHITE));
         String[] cats={"M14","M16","M18","Sénior masculino","Sénior femenino","Otras categorías"};
         Spinner sp=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,cats);sp.setAdapter(adapter);body.addView(sp);
@@ -52,8 +60,8 @@ public class MainActivity extends Activity {
         body.addView(txt("Los resultados no se inventan. Las consultas web requieren conexión.",13,Color.LTGRAY));
     }
     void list(){
-        while(body.getChildCount()>3)body.removeViewAt(3);
-        body.addView(txt("Competiciones · "+category,19,accent));
+        while(body.getChildCount()>5)body.removeViewAt(5);
+        body.addView(txt("Competiciones · "+category+" · "+season,19,accent));
         String[] entries=category.equals("M14")?new String[]{"Primera División","Segunda División · Grupos","Segunda fase","Promoción","Copa FAR"}:category.equals("M16")?new String[]{"Primera División","Segunda División · Grupos","Otras fases"}:category.equals("M18")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:new String[]{"Consultar competiciones oficiales"};
         for(String entry:entries){TextView card=txt(entry+"  ›",17,Color.WHITE);card.setBackgroundColor(panel);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,5,0,5);body.addView(card,lp);card.setOnClickListener(v->details(entry));}
         body.addView(txt("Estructura orientativa: las divisiones y grupos deben verificarse para cada temporada.",12,Color.LTGRAY));
@@ -64,7 +72,7 @@ public class MainActivity extends Activity {
         showCompetitionTab("Calendario");
     }
     void showCompetitionTab(String tab){
-        selectedTab=tab;page="detail";layout(category+" · "+selectedCompetition);
+        selectedTab=tab;page="detail";layout(category+" · "+selectedCompetition+" · "+season);
         LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);body.addView(tabs);
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             Button b=new Button(this);b.setText(item);b.setTextSize(11);b.setAllCaps(false);
@@ -73,19 +81,19 @@ public class MainActivity extends Activity {
         }
         body.addView(txt(tab.toUpperCase(),18,accent));
         body.addView(txt("Sin datos sincronizados todavía. Estamos preparando la lectura de los datos públicos de MatchReady. No se muestran marcadores ni clasificaciones sin verificar.",14,Color.LTGRAY));
-        String saved=getPreferences(0).getString("url_"+category+"_"+selectedCompetition,"");
+        String saved=getPreferences(0).getString("url_"+season+"_"+category+"_"+selectedCompetition,"");
         if(saved.startsWith("https://farugby.matchready.es/"))button("Consultar "+tab.toLowerCase()+" en MatchReady",()->openBrowser(saved));
         else button("Buscar "+tab.toLowerCase()+" en MatchReady",()->openBrowser("https://farugby.matchready.es/"));
         body.addView(txt("FUENTES OFICIALES",17,accent));
         button("Consultar categoría en FAR",()->openBrowser(farUrl()));
         button("Consultar MatchReady",()->openBrowser("https://farugby.matchready.es/"));
-        if(category.equals("M14")){
+        if(category.equals("M14")&&season.equals("2025/26")){
             body.addView(txt("EJEMPLO VERIFICADO · TEMPORADA 2025/26",14,accent));
             button("Ver competición M14 histórica en MatchReady",()->openBrowser("https://farugby.matchready.es/es/public/competition/4282/"));
             body.addView(txt("Este enlace es histórico (2025/26), no corresponde a 2026/27.",12,Color.LTGRAY));
         }
         body.addView(txt("¿Tienes el enlace público de esta competición en MatchReady? Puedes guardarlo aquí para acceder directamente.",14,Color.LTGRAY));
-        String key="url_"+category+"_"+selectedCompetition;
+        String key="url_"+season+"_"+category+"_"+selectedCompetition;
         EditText url=new EditText(this);url.setSingleLine(true);url.setText(getPreferences(0).getString(key,""));url.setHint("https://farugby.matchready.es/...");url.setTextColor(Color.WHITE);url.setHintTextColor(Color.LTGRAY);body.addView(url);
         button("Guardar y abrir enlace",()->{
             String link=url.getText().toString().trim();
@@ -93,7 +101,7 @@ public class MainActivity extends Activity {
             getPreferences(0).edit().putString(key,link).apply();openBrowser(link);
         });
         button("Volver a categorías",()->home());
-        body.addView(txt("La importación automática y la clasificación integrada siguen en desarrollo.",13,Color.LTGRAY));
+        body.addView(txt("Enlaces guardados por temporada, categoría y competición. La importación automática sigue en desarrollo.",13,Color.LTGRAY));
     }
     void openExternal(String url){startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
     void openBrowser(String url){
