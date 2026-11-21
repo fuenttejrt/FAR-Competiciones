@@ -112,7 +112,7 @@ public class MainActivity extends Activity {
     void showCachedNative(){
         String raw=getPreferences(0).getString(cacheKey(),"");
         if(raw.isEmpty()){body.addView(txt("Pulsa Actualizar datos de MatchReady para cargar las tablas oficiales.",13,Color.LTGRAY));return;}
-        try{renderNative(new org.json.JSONObject(raw));}catch(Exception ex){body.addView(txt("Los datos guardados no se pueden leer. Actualiza de nuevo.",13,Color.LTGRAY));}
+        try{org.json.JSONObject cached=new org.json.JSONObject(raw);if(cached.optInt("format",0)!=2){body.addView(txt("Actualiza para convertir los datos al nuevo formato.",13,Color.LTGRAY));return;}renderNative(cached);}catch(Exception ex){body.addView(txt("Los datos guardados no se pueden leer. Actualiza de nuevo.",13,Color.LTGRAY));}
     }
     String clean(String text,String marker){
         int index=text.toLowerCase(java.util.Locale.ROOT).indexOf(marker.toLowerCase(java.util.Locale.ROOT));
@@ -158,36 +158,43 @@ public class MainActivity extends Activity {
         int count=0;
         for(int i=0;i<tables.length();i++){
             org.json.JSONObject table=tables.optJSONObject(i);if(table==null)continue;
-            org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null||rows.length()==0)continue;
-            boolean standing=table.optBoolean("standing");
-            if(selectedTab.equals("Clasificación")!=standing)continue;
-            if(standing){
-                org.json.JSONArray header=normalizedCells(rows.optJSONArray(0));
-                int points=-1;
-                for(int k=0;k<header.length();k++){String h=header.optString(k,"").toUpperCase(java.util.Locale.ROOT);if(h.equals("PUNTOS")||h.equals("PTS")||h.equals("PTOS"))points=k;}
+            String kind=table.optString("kind","");
+            org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
+            if(selectedTab.equals("Clasificación")){
+                if(!kind.equals("standing"))continue;
                 LinearLayout heading=new LinearLayout(this);heading.setBackgroundColor(panel);body.addView(heading);
                 for(String h:new String[]{"#","Equipo","J","Pts"}){TextView v=txt(h,12,accent);heading.addView(v,new LinearLayout.LayoutParams(0,-2,h.equals("Equipo")?4:1));}
-                for(int j=1;j<rows.length();j++){
-                    org.json.JSONArray cells=normalizedCells(rows.optJSONArray(j));if(cells.length()<3)continue;
+                for(int j=0;j<rows.length();j++){
+                    org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
                     LinearLayout line=new LinearLayout(this);line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
-                    String[] vals={cells.optString(0,""),cells.optString(1,""),cells.optString(2,""),points>=0?cells.optString(points,""):"—"};
+                    String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),row.optString("points","—")};
                     for(int k=0;k<vals.length;k++){TextView v=txt(vals[k],k==1?12:13,Color.WHITE);line.addView(v,new LinearLayout.LayoutParams(0,-2,k==1?4:1));}
                     count++;
                 }
-                if(points<0)body.addView(txt("No se ha identificado la columna de puntos en la fuente.",12,Color.LTGRAY));
             }else{
-                TextView head=txt("Grupo de partidos "+(i+1),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
+                if(!kind.equals("matches"))continue;
+                if(rows.length()==0)continue;
+                TextView head=txt(table.optString("heading","Jornada"),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
                 for(int j=0;j<rows.length();j++){
-                    org.json.JSONArray raw=rows.optJSONArray(j);if(raw==null)continue;
-                    org.json.JSONArray cells=normalizedCells(raw);if(cells.length()<4)continue;
-                    String score=cells.optString(2,"");
+                    org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
+                    String score=row.optString("score","");
                     if(selectedTab.equals("Resultados")&&!isScore(score))continue;
-                    if(cells.optString(1,"").equalsIgnoreCase("Equipo local"))continue;
-                    addMatchCard(raw);count++;
+                    LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(10,8,10,8);card.setBackgroundColor(panel);
+                    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,3,0,3);body.addView(card,cp);
+                    card.addView(txt(row.optString("when",""),12,accent));
+                    LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
+                    TextView left=txt(row.optString("home",""),13,Color.WHITE);
+                    TextView mid=txt(isScore(score)?score:"VS",19,accent);mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
+                    TextView right=txt(row.optString("away",""),13,Color.WHITE);right.setGravity(android.view.Gravity.RIGHT);
+                    line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
+                    line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
+                    line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
+                    String extra=row.optString("extra","");if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
+                    count++;
                 }
             }
         }
-        if(count==0)body.addView(txt("No hay datos disponibles para esta pestaña.",13,Color.LTGRAY));
+        if(count==0)body.addView(txt("No hay datos estructurados para esta pestaña. Pulsa Actualizar para volver a importar desde MatchReady.",13,Color.LTGRAY));
         else body.addView(txt("MatchReady · Datos guardados en el móvil",11,Color.LTGRAY));
     }
     void refreshNative(String url){
@@ -203,7 +210,7 @@ public class MainActivity extends Activity {
                 if(!loaded.startsWith("https://farugby.matchready.es/"))return;
                 view.postDelayed(()->{
                     if(dataBrowser!=view||!page.equals("detail")||!key.equals(cacheKey()))return;
-                    String js="(function(){try{var tables=Array.from(document.querySelectorAll('table')).map(function(t){var headers=Array.from(t.querySelectorAll('th')).map(function(c){return (c.innerText||'').trim().toLowerCase()});var standing=headers.some(function(x){return x==='puntos'||x==='ptos'||x==='pts'||x==='punt os'})||(headers.indexOf('j')>=0&&headers.indexOf('g')>=0);var rows=Array.from(t.querySelectorAll('tr')).map(function(r){return Array.from(r.querySelectorAll('th,td')).map(function(c){return (c.innerText||'').trim().replace(/\\s+/g,' ')})}).filter(function(r){return r.length>1});return {heading:'',standing:standing,rows:rows}});return JSON.stringify({url:location.href,title:document.title,tables:tables})}catch(e){return JSON.stringify({error:String(e)})}})()";
+                    String js="(function(){try{\nvar norm=function(s){return (s||'').trim().replace(/\\s+/g,' ')};\nvar tables=Array.from(document.querySelectorAll('table')).map(function(t){\n var tr=Array.from(t.querySelectorAll('tr'));\n var first=tr.find(function(r){return r.querySelector('th')});\n if(!first)return null;\n var h=Array.from(first.children).map(function(c){return norm(c.innerText).toLowerCase()});\n var find=function(names){return h.findIndex(function(v){return names.some(function(n){return v===n||v.indexOf(n)>=0})})};\n var home=find(['equipo local']),away=find(['equipo visitante']),score=find(['resultado']),date=find(['fecha/hora']);\n var team=find(['equipo']),played=find(['j']),points=find(['puntos','ptos','pts','punt']),position=0;\n var kind=home>=0&&away>=0&&score>=0&&date>=0?'matches':team>=0&&played>=0&&points>=0?'standing':'other';\n if(kind==='other')return null;\n var node=t,heading='';\n for(var n=0;n<8&&node;n++){node=node.previousElementSibling||node.parentElement;if(!node||node===document.body)break;if(node.matches&&node.matches('h1,h2,h3,h4,h5')){heading=norm(node.innerText);break}var x=node.querySelector&&node.querySelector('h1,h2,h3,h4,h5');if(x){heading=norm(x.innerText);break}}\n var rows=tr.slice(tr.indexOf(first)+1).map(function(r){\n var cells=Array.from(r.children).filter(function(c){return c.matches('td,th')}).map(function(c){return norm(c.innerText)});\n if(kind==='matches'){if(cells.length<=Math.max(home,away,score,date))return null;var a=cells[home],b=cells[away];if(!a||!b||a.toLowerCase()==='equipo local'||b.toLowerCase()==='equipo visitante')return null;return {when:cells[date],home:a.replace(/Árbitro:.*$/i,'').trim(),score:cells[score],away:b.replace(/Campo:.*$/i,'').trim(),extra:((a.match(/Árbitro:.*$/i)||[])[0]||'')+' '+((b.match(/Campo:.*$/i)||[])[0]||'')}}\n if(cells.length<=Math.max(team,played,points))return null;\n return {position:cells[position],team:cells[team],played:cells[played],points:cells[points]};\n }).filter(Boolean);\n return {kind:kind,heading:heading|| (kind==='matches'?'Jornada':'Clasificación'),rows:rows};\n}).filter(Boolean);\nreturn JSON.stringify({url:location.href,title:document.title,format:2,tables:tables});\n}catch(e){return JSON.stringify({error:String(e)})}})()";
                     view.evaluateJavascript(js,result->{
                         try{
                             String decoded=new org.json.JSONTokener(result).nextValue().toString();
