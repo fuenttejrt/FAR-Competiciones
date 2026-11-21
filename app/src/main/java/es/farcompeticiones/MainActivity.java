@@ -84,42 +84,29 @@ public class MainActivity extends Activity {
         showCompetitionTab("Calendario");
     }
     void showCompetitionTab(String tab){
-        selectedTab=tab;page="detail";layout(category+" · "+selectedCompetition+" · "+season);
+        selectedTab=tab;page="detail";
+        layout(category+" · "+selectedCompetition);
         LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);body.addView(tabs);
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             Button b=new Button(this);b.setText(item);b.setTextSize(11);b.setAllCaps(false);
-            if(item.equals(tab))b.setTextColor(Color.rgb(0,110,65));
+            b.setTextColor(item.equals(tab)?accent:Color.WHITE);
             tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->showCompetitionTab(item));
         }
-        body.addView(txt(tab.toUpperCase(),18,accent));
         String official=officialCalendar();
         if(!official.isEmpty()){
-            body.addView(txt("Fuente: calendario público oficial FAR / MatchReady · "+season,13,accent));
-            button("Ver "+tab.toLowerCase()+" oficial",()->openBrowser(official));
-            button("Actualizar datos de MatchReady",()->refreshNative(official));
+            LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
+            Button refresh=new Button(this);refresh.setText("↻ Actualizar");refresh.setAllCaps(false);
+            actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));refresh.setOnClickListener(v->refreshNative(official));
+            Button source=new Button(this);source.setText("Fuente oficial");source.setAllCaps(false);
+            actions.addView(source,new LinearLayout.LayoutParams(0,-2,1));source.setOnClickListener(v->openBrowser(official));
             showCachedNative();
-        }else body.addView(txt("Sin datos sincronizados. No se muestran resultados ni clasificaciones sin verificar.",14,Color.LTGRAY));
-        String saved=getPreferences(0).getString("url_"+season+"_"+category+"_"+selectedCompetition,"");
-        if(official.isEmpty()&&saved.startsWith("https://farugby.matchready.es/"))button("Consultar "+tab.toLowerCase()+" en MatchReady",()->openBrowser(saved));
-        else if(official.isEmpty())button("Buscar "+tab.toLowerCase()+" en MatchReady",()->openBrowser("https://farugby.matchready.es/"));
-        body.addView(txt("FUENTES OFICIALES",17,accent));
-        button("Consultar categoría en FAR",()->openBrowser(farUrl()));
-        button("Consultar MatchReady",()->openBrowser("https://farugby.matchready.es/"));
-        if(category.equals("M14")&&season.equals("2025/26")){
-            body.addView(txt("EJEMPLO VERIFICADO · TEMPORADA 2025/26",14,accent));
-            button("Ver competición M14 histórica en MatchReady",()->openBrowser("https://farugby.matchready.es/es/public/competition/4282/"));
-            body.addView(txt("Este enlace es histórico (2025/26), no corresponde a 2026/27.",12,Color.LTGRAY));
+        }else{
+            body.addView(txt("Todavía no hay un calendario oficial configurado para esta competición.",14,Color.LTGRAY));
+            String key="url_"+season+"_"+category+"_"+selectedCompetition;
+            EditText url=new EditText(this);url.setSingleLine(true);url.setHint("Enlace público MatchReady");url.setText(getPreferences(0).getString(key,""));body.addView(url);
+            button("Guardar y abrir",()->{String link=url.getText().toString().trim();if(link.startsWith("https://farugby.matchready.es/")){getPreferences(0).edit().putString(key,link).apply();openBrowser(link);}else Toast.makeText(this,"Enlace MatchReady no válido",Toast.LENGTH_LONG).show();});
         }
-        body.addView(txt("¿Tienes el enlace público de esta competición en MatchReady? Puedes guardarlo aquí para acceder directamente.",14,Color.LTGRAY));
-        String key="url_"+season+"_"+category+"_"+selectedCompetition;
-        EditText url=new EditText(this);url.setSingleLine(true);url.setText(getPreferences(0).getString(key,""));url.setHint("https://farugby.matchready.es/...");url.setTextColor(Color.WHITE);url.setHintTextColor(Color.LTGRAY);body.addView(url);
-        button("Guardar y abrir enlace",()->{
-            String link=url.getText().toString().trim();
-            if(!link.startsWith("https://farugby.matchready.es/")){Toast.makeText(this,"Introduce un enlace HTTPS público de farugby.matchready.es",Toast.LENGTH_LONG).show();return;}
-            getPreferences(0).edit().putString(key,link).apply();openBrowser(link);
-        });
-        button("Volver a categorías",()->home());
-        body.addView(txt("Enlaces guardados por temporada, categoría y competición. La importación automática sigue en desarrollo.",13,Color.LTGRAY));
+        button("‹ Competiciones",()->home());
     }
     String cacheKey(){return "native_"+season+"_"+category+"_"+selectedCompetition;}
     void showCachedNative(){
@@ -127,20 +114,44 @@ public class MainActivity extends Activity {
         if(raw.isEmpty()){body.addView(txt("Pulsa Actualizar datos de MatchReady para cargar las tablas oficiales.",13,Color.LTGRAY));return;}
         try{renderNative(new org.json.JSONObject(raw));}catch(Exception ex){body.addView(txt("Los datos guardados no se pueden leer. Actualiza de nuevo.",13,Color.LTGRAY));}
     }
-    void addMatchCard(org.json.JSONArray cells){
+    String clean(String text,String marker){
+        int index=text.toLowerCase(java.util.Locale.ROOT).indexOf(marker.toLowerCase(java.util.Locale.ROOT));
+        return index<0?text.trim():text.substring(0,index).trim();
+    }
+    org.json.JSONArray normalizedCells(org.json.JSONArray original){
+        org.json.JSONArray cells=new org.json.JSONArray();
+        for(int i=0;i<original.length();i++){
+            String v=original.optString(i,"").trim();
+            if(v.isEmpty()&&(i==0||i==original.length()-1))continue;
+            cells.put(v);
+        }
+        return cells;
+    }
+    boolean isScore(String value){return value.matches("(?s).*\\\\d+\\\\s*[-–:]\\\\s*\\\\d+.*");}
+    void addMatchCard(org.json.JSONArray raw){
+        org.json.JSONArray cells=normalizedCells(raw);
         if(cells.length()<4)return;
         String when=cells.optString(0,""),home=cells.optString(1,""),score=cells.optString(2,""),away=cells.optString(3,"");
-        if(home.equalsIgnoreCase("Equipo local")||home.isEmpty()||away.isEmpty())return;
-        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(12,10,12,10);card.setBackgroundColor(panel);
-        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,4,0,4);body.addView(card,cp);
+        if(home.equalsIgnoreCase("Equipo local")||when.equalsIgnoreCase("Fecha/Hora")||home.isEmpty())return;
+        if(!isScore(score)&&isScore(away)&&cells.length()>4){
+            score=away;away=cells.optString(4,"");
+        }
+        String referee=home.contains("Árbitro:")?home.substring(home.indexOf("Árbitro:")):"";
+        String field=away.contains("Campo:")?away.substring(away.indexOf("Campo:")):"";
+        home=clean(home,"Árbitro:");away=clean(away,"Campo:");
+        if(away.isEmpty())return;
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(10,7,10,7);card.setBackgroundColor(panel);
+        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,3,0,3);body.addView(card,cp);
         card.addView(txt(when,12,accent));
         LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
-        TextView left=txt(home.replaceAll("(?i)Árbitro:.*$","").trim(),14,Color.WHITE);
-        TextView mid=txt(score.trim().isEmpty()?"VS":score.trim(),20,accent);mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
-        TextView right=txt(away.replaceAll("(?i)Campo:.*$","").trim(),14,Color.WHITE);
-        line.addView(left,new LinearLayout.LayoutParams(0,-2,1));line.addView(mid,new LinearLayout.LayoutParams(-2,-2));line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
-        String extra=(home.contains("Árbitro:")?home.substring(home.indexOf("Árbitro:")):"")+" "+(away.contains("Campo:")?away.substring(away.indexOf("Campo:")):"");
-        if(!extra.trim().isEmpty()){TextView details=txt(extra.trim(),12,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
+        TextView left=txt(home,13,Color.WHITE);TextView mid=txt(isScore(score)?score:"–",19,accent);
+        mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
+        TextView right=txt(away,13,Color.WHITE);right.setGravity(android.view.Gravity.RIGHT);
+        line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
+        line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
+        line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
+        String extra=(referee+" "+field).trim();
+        if(!extra.isEmpty()){TextView details=txt(extra,11,Color.LTGRAY);details.setVisibility(View.GONE);card.addView(details);card.setOnClickListener(v->details.setVisibility(details.getVisibility()==View.GONE?View.VISIBLE:View.GONE));}
     }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
@@ -150,32 +161,34 @@ public class MainActivity extends Activity {
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null||rows.length()==0)continue;
             boolean standing=table.optBoolean("standing");
             if(selectedTab.equals("Clasificación")!=standing)continue;
-            TextView head=txt(standing?"CLASIFICACIÓN":"Jornada "+(i+1),16,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
             if(standing){
-                HorizontalScrollView horizontal=new HorizontalScrollView(this);
-                LinearLayout stack=new LinearLayout(this);stack.setOrientation(1);horizontal.addView(stack);body.addView(horizontal);
-                for(int j=0;j<rows.length();j++){
-                    org.json.JSONArray cells=rows.optJSONArray(j);if(cells==null)continue;
-                    LinearLayout line=new LinearLayout(this);line.setBackgroundColor(j%2==0?panel:bg);stack.addView(line);
-                    for(int k=0;k<cells.length();k++){
-                        TextView cell=txt(cells.optString(k,""),12,j==0?accent:Color.WHITE);
-                        cell.setMinWidth((int)(getResources().getDisplayMetrics().density*(k==1?160:54)));
-                        line.addView(cell);
-                    }
+                org.json.JSONArray header=normalizedCells(rows.optJSONArray(0));
+                int points=-1;
+                for(int k=0;k<header.length();k++){String h=header.optString(k,"").toUpperCase(java.util.Locale.ROOT);if(h.equals("PUNTOS")||h.equals("PTS")||h.equals("PTOS"))points=k;}
+                LinearLayout heading=new LinearLayout(this);heading.setBackgroundColor(panel);body.addView(heading);
+                for(String h:new String[]{"#","Equipo","J","Pts"}){TextView v=txt(h,12,accent);heading.addView(v,new LinearLayout.LayoutParams(0,-2,h.equals("Equipo")?4:1));}
+                for(int j=1;j<rows.length();j++){
+                    org.json.JSONArray cells=normalizedCells(rows.optJSONArray(j));if(cells.length()<3)continue;
+                    LinearLayout line=new LinearLayout(this);line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
+                    String[] vals={cells.optString(0,""),cells.optString(1,""),cells.optString(2,""),points>=0?cells.optString(points,""):"—"};
+                    for(int k=0;k<vals.length;k++){TextView v=txt(vals[k],k==1?12:13,Color.WHITE);line.addView(v,new LinearLayout.LayoutParams(0,-2,k==1?4:1));}
                     count++;
                 }
+                if(points<0)body.addView(txt("No se ha identificado la columna de puntos en la fuente.",12,Color.LTGRAY));
             }else{
+                TextView head=txt("Grupo de partidos "+(i+1),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
                 for(int j=0;j<rows.length();j++){
-                    org.json.JSONArray cells=rows.optJSONArray(j);if(cells==null||cells.length()<4)continue;
+                    org.json.JSONArray raw=rows.optJSONArray(j);if(raw==null)continue;
+                    org.json.JSONArray cells=normalizedCells(raw);if(cells.length()<4)continue;
                     String score=cells.optString(2,"");
-                    if(selectedTab.equals("Resultados")&&!score.matches("(?s).*\\\\d+\\\\s*[-–]\\\\s*\\\\d+.*"))continue;
+                    if(selectedTab.equals("Resultados")&&!isScore(score))continue;
                     if(cells.optString(1,"").equalsIgnoreCase("Equipo local"))continue;
-                    addMatchCard(cells);count++;
+                    addMatchCard(raw);count++;
                 }
             }
         }
-        if(count==0)body.addView(txt("No se encontraron datos para esta pestaña.",13,Color.LTGRAY));
-        else body.addView(txt("Fuente: MatchReady · Datos guardados localmente",12,Color.LTGRAY));
+        if(count==0)body.addView(txt("No hay datos disponibles para esta pestaña.",13,Color.LTGRAY));
+        else body.addView(txt("MatchReady · Datos guardados en el móvil",11,Color.LTGRAY));
     }
     void refreshNative(String url){
         if(dataBrowser!=null){dataBrowser.destroy();dataBrowser=null;}
