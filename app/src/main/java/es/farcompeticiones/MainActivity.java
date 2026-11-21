@@ -23,13 +23,17 @@ public class MainActivity extends Activity {
     WebView browser, dataBrowser;
     String lastInspectedStructure="";
     String lastBrowserUrl="";
+    int selectedMatchGroup=-1;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
         if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
         browser=null;
-        ScrollView sc=new ScrollView(this);root=new LinearLayout(this);root.setOrientation(1);root.setPadding(16,20,16,20);root.setBackgroundColor(bg);sc.addView(root);setContentView(sc);
-        TextView title=txt(heading,23,Color.WHITE);title.setTypeface(null,Typeface.BOLD);root.addView(title);
+        ScrollView sc=new ScrollView(this);
+        sc.setFitsSystemWindows(true);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        root=new LinearLayout(this);root.setOrientation(1);root.setPadding(12,8,12,16);root.setBackgroundColor(bg);sc.addView(root);setContentView(sc);
+        TextView title=txt(heading,19,Color.WHITE);title.setTypeface(null,Typeface.BOLD);root.addView(title);
         body=new LinearLayout(this);body.setOrientation(1);root.addView(body);
     }
     void button(String title,Runnable click){
@@ -156,9 +160,41 @@ public class MainActivity extends Activity {
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
+        if(!selectedTab.equals("Clasificación")){
+            java.util.ArrayList<Integer> groupIds=new java.util.ArrayList<>();
+            java.util.ArrayList<String> groupNames=new java.util.ArrayList<>();
+            for(int t=0;t<tables.length();t++){
+                org.json.JSONObject group=tables.optJSONObject(t);
+                if(group!=null&&group.optString("kind").equals("matches")&&group.optJSONArray("rows")!=null&&group.optJSONArray("rows").length()>0){
+                    groupIds.add(t);groupNames.add(group.optString("heading","Jornada "+(t+1)));
+                }
+            }
+            if(!groupIds.isEmpty()){
+                if(selectedMatchGroup>=groupIds.size())selectedMatchGroup=-1;
+                Spinner picker=new Spinner(this);
+                java.util.ArrayList<String> options=new java.util.ArrayList<>();options.add("Todas las jornadas");options.addAll(groupNames);
+                ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options);
+                picker.setAdapter(adapter);picker.setSelection(selectedMatchGroup+1);body.addView(picker);
+                picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+                    public void onNothingSelected(AdapterView<?> p){}
+                    public void onItemSelected(AdapterView<?> p,View v,int position,long id){
+                        int next=position-1;
+                        if(next!=selectedMatchGroup){selectedMatchGroup=next;showCompetitionTab(selectedTab);}
+                    }
+                });
+                if(selectedMatchGroup>=0){
+                    int selectedTable=groupIds.get(selectedMatchGroup);
+                    for(int i=0;i<tables.length();i++)if(i!=selectedTable){
+                        org.json.JSONObject other=tables.optJSONObject(i);
+                        if(other!=null&&other.optString("kind").equals("matches"))other.put("_hidden",true);
+                    }
+                }
+            }
+        }
         for(int i=0;i<tables.length();i++){
             org.json.JSONObject table=tables.optJSONObject(i);if(table==null)continue;
             String kind=table.optString("kind","");
+            if(table.optBoolean("_hidden",false))continue;
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
             if(selectedTab.equals("Clasificación")){
                 if(!kind.equals("standing"))continue;
