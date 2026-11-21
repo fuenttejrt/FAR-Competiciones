@@ -440,9 +440,15 @@ public class MainActivity extends Activity {
                 int visibleRows=0;
                 for(int n=0;n<rows.length();n++){org.json.JSONObject candidate=rows.optJSONObject(n);if(candidate!=null&&matchVisible(candidate))visibleRows++;}
                 if(visibleRows==0)continue;
-                TextView head=txt(number.isEmpty()?full:"Jornada "+number+(phase.isEmpty()?"":" · "+phase),15,accent);head.setTypeface(null,Typeface.BOLD);
-                head.setPadding(0,selectedTab.equals("Resultados")?3:5,0,0);
-                body.addView(head);
+                boolean roundAlreadyInSelector=selectedMatchGroup>=0;
+                String roundTitle=number.isEmpty()?shortRoundLabel(full):"Jornada "+number;
+                String sectionTitle=roundAlreadyInSelector?phase:roundTitle+(phase.isEmpty()?"":" · "+phase);
+                if(!sectionTitle.isEmpty()){
+                    TextView head=txt(sectionTitle,roundAlreadyInSelector?12:15,accent);
+                    head.setTypeface(null,Typeface.BOLD);
+                    head.setPadding(0,selectedTab.equals("Resultados")?3:5,0,0);
+                    body.addView(head);
+                }
                 if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY));
                 String lastDate="";
                 for(int j=0;j<rows.length();j++){
