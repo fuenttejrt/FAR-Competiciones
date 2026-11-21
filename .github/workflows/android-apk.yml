@@ -28,8 +28,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk FAR-Competiciones-v0.1.apk
-          gh release delete v0.1 --yes 2>/dev/null || true
-          git tag -f v0.1
-          git push origin refs/tags/v0.1 --force
-          gh release create v0.1 FAR-Competiciones-v0.1.apk --title "FAR Competiciones v0.1" --notes "Primera APK de prueba Android. Sin conexión todavía a los resultados oficiales." --prerelease
+          cp app/build/outputs/apk/debug/app-debug.apk FAR-Competiciones-v0.2.apk
+          gh release delete v0.2 --yes 2>/dev/null || true
+          git tag -f v0.2
+          git push origin refs/tags/v0.2 --force
+          gh release create v0.2 FAR-Competiciones-v0.2.apk --title "FAR Competiciones v0.2" --notes "v0.2: consulta pública FAR y MatchReady en la aplicación; importación automática aún pendiente." --prerelease
