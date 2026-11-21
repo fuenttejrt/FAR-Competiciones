@@ -285,6 +285,28 @@ public class MainActivity extends Activity {
         if(selectedTab.equals("Calendario")&&calendarUpcomingOnly)return isUpcomingMatch(row);
         return true;
     }
+    String teamKey(String name){
+        if(name==null)return "";
+        String normalized=java.text.Normalizer.normalize(name,java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+","");
+        return normalized.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]","");
+    }
+    String matchCrest(org.json.JSONArray tables,String name,String direct){
+        if(direct!=null&&direct.startsWith("https://"))return direct;
+        String key=teamKey(name);
+        if(key.isEmpty())return "";
+        for(int t=0;t<tables.length();t++){
+            org.json.JSONObject group=tables.optJSONObject(t);
+            if(group==null||!"standing".equals(group.optString("kind")))continue;
+            org.json.JSONArray rows=group.optJSONArray("rows");if(rows==null)continue;
+            for(int r=0;r<rows.length();r++){
+                org.json.JSONObject row=rows.optJSONObject(r);
+                if(row==null)continue;
+                String other=teamKey(row.optString("team",""));
+                if(other.equals(key))return row.optString("crest","");
+            }
+        }
+        return "";
+    }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
@@ -424,11 +446,11 @@ public class MainActivity extends Activity {
                     LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(8,5,8,5);card.setBackgroundColor(panel);
                     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,1,0,2);body.addView(card,cp);
                     LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
-                    LinearLayout left=matchTeam(row.optString("home",""),row.optString("homeCrest",""),false);
+                    LinearLayout left=matchTeam(row.optString("home",""),matchCrest(tables,row.optString("home",""),row.optString("homeCrest","")),false);
                     TextView mid=txt(selectedTab.equals("Calendario")&&isUpcomingMatch(row)?"VS":isScore(score)?score:"VS",19,selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent);
                     mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
                     mid.setMinWidth((int)(getResources().getDisplayMetrics().density*52));
-                    LinearLayout right=matchTeam(row.optString("away",""),row.optString("awayCrest",""),true);
+                    LinearLayout right=matchTeam(row.optString("away",""),matchCrest(tables,row.optString("away",""),row.optString("awayCrest","")),true);
                     line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
                     line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
                     line.addView(right,new LinearLayout.LayoutParams(0,-2,1));
