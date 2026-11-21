@@ -258,8 +258,8 @@ public class MainActivity extends Activity {
                 if(!kind.equals("standing"))continue;
                 Button expand=new Button(this);expand.setAllCaps(false);expand.setText(showStandingDetails?"Ocultar estadísticas":"Ver estadísticas completas");body.addView(expand);
                 expand.setOnClickListener(v->{showStandingDetails=!showStandingDetails;showCompetitionTab(selectedTab);});
-                String[] labels={"#","Equipo","J","G","E","P","Pts"};
-                float[] widths={0.55f,4.2f,0.65f,0.65f,0.65f,0.65f,0.85f};
+                String[] labels={"#","Equipo","J","G","E","P","PB","Pts"};
+                float[] widths={0.55f,3.7f,0.62f,0.62f,0.62f,0.62f,0.72f,0.85f};
                 LinearLayout heading=new LinearLayout(this);heading.setGravity(android.view.Gravity.CENTER_VERTICAL);heading.setBackgroundColor(panel);body.addView(heading);
                 for(int k=0;k<labels.length;k++){
                     TextView cell=txt(labels[k],k==1?11:10,accent);
@@ -270,7 +270,7 @@ public class MainActivity extends Activity {
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
                     LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);line.setMinimumHeight((int)(30*getResources().getDisplayMetrics().density));line.setBackgroundColor(j%2==0?panel:bg);body.addView(line);
                     org.json.JSONObject stats=row.optJSONObject("stats");
-                    String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),standingStat(stats,"g","ganados","ganados/as","victorias","pg"),standingStat(stats,"e","empatados","empates","pe"),standingStat(stats,"p","perdidos","derrotas","pp"),row.optString("points","—")};
+                    String[] vals={row.optString("position",""),row.optString("team",""),row.optString("played",""),standingStat(stats,"g","ganados","ganados/as","victorias","pg","v","gan","gan.","ganados (g)"),standingStat(stats,"e","empatados","empates","pe","emp","emp.","empatados (e)"),standingStat(stats,"p","perdidos","derrotas","pp","d","per","per.","perdidos (p)"),standingStat(stats,"pb","bonus","puntos bonus","puntos de bonus","bon","b","bonificacion","bonificaciones","ptos bonus"),row.optString("points","—")};
                     for(int k=0;k<vals.length;k++){
                         TextView cell=txt(vals[k],k==1?11:12,Color.WHITE);
                         cell.setGravity(k==1?android.view.Gravity.START:android.view.Gravity.CENTER);
