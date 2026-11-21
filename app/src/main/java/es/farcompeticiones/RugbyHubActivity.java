@@ -957,7 +957,7 @@ public final class RugbyHubActivity extends Activity {
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
             lp.setMargins(0,dp(4),0,dp(2));host.addView(card,lp);
             card.addView(text(item[0]+"'  ·  "+item[1]+"  ·  +"+item[4],14,true));
-            String who=item[3].isEmpty()?"Dorsal "+item[2]:
+            String who=item[2].isEmpty()?"Sin dorsal (ensayo de castigo)":item[3].isEmpty()?"Dorsal "+item[2]:
                 item[3]+"  ·  Nº "+item[2];
             TextView detail=text(names[Integer.parseInt(item[5])]+"  ·  "+who,11,false);
             detail.setTextColor(0xffb8c9d9);card.addView(detail);
