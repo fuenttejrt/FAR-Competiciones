@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
             body.addView(txt("Este enlace es histórico (2025/26), no corresponde a 2026/27.",12,Color.LTGRAY));
         }
         body.addView(txt("¿Tienes el enlace público de esta competición en MatchReady? Puedes guardarlo aquí para acceder directamente.",14,Color.LTGRAY));
-        String key="url_"+category+"_"+competition;
+        String key="url_"+category+"_"+selectedCompetition;
         EditText url=new EditText(this);url.setSingleLine(true);url.setText(getPreferences(0).getString(key,""));url.setHint("https://farugby.matchready.es/...");url.setTextColor(Color.WHITE);url.setHintTextColor(Color.LTGRAY);body.addView(url);
         button("Guardar y abrir enlace",()->{
             String link=url.getText().toString().trim();
