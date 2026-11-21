@@ -19,7 +19,7 @@ import android.content.SharedPreferences;
 public class MainActivity extends Activity {
     final int bg=Color.rgb(15,25,38),panel=Color.rgb(27,43,59),accent=Color.rgb(102,225,164);
     LinearLayout root,body;
-    String category="M14", page="home";
+    String category="M14", page="home", selectedCompetition="", selectedTab="Calendario";
     WebView browser;
     String lastBrowserUrl="";
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
@@ -60,7 +60,23 @@ public class MainActivity extends Activity {
     }
     String farUrl(){return category.equals("M14")?"https://farugby.com/categoria-m14/":category.equals("M16")?"https://farugby.com/categoria-m16/":category.equals("M18")?"https://farugby.com/categoria-m18/":"https://farugby.com/";}
     void details(String competition){
-        page="detail";layout(category+" · "+competition);
+        selectedCompetition=competition;
+        showCompetitionTab("Calendario");
+    }
+    void showCompetitionTab(String tab){
+        selectedTab=tab;page="detail";layout(category+" · "+selectedCompetition);
+        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);body.addView(tabs);
+        for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
+            Button b=new Button(this);b.setText(item);b.setTextSize(11);b.setAllCaps(false);
+            if(item.equals(tab))b.setTextColor(Color.rgb(0,110,65));
+            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->showCompetitionTab(item));
+        }
+        body.addView(txt(tab.toUpperCase(),18,accent));
+        body.addView(txt("Sin datos sincronizados todavía. Estamos preparando la lectura de los datos públicos de MatchReady. No se muestran marcadores ni clasificaciones sin verificar.",14,Color.LTGRAY));
+        String saved=getPreferences(0).getString("url_"+category+"_"+selectedCompetition,"");
+        if(saved.startsWith("https://farugby.matchready.es/"))button("Consultar "+tab.toLowerCase()+" en MatchReady",()->openBrowser(saved));
+        else button("Buscar "+tab.toLowerCase()+" en MatchReady",()->openBrowser("https://farugby.matchready.es/"));
+        body.addView(txt("FUENTES OFICIALES",17,accent));
         body.addView(txt("FUENTES OFICIALES",17,accent));
         button("Consultar categoría en FAR",()->openBrowser(farUrl()));
         button("Consultar MatchReady",()->openBrowser("https://farugby.matchready.es/"));
@@ -99,6 +115,6 @@ public class MainActivity extends Activity {
         body.addView(browser,new LinearLayout.LayoutParams(-1,(int)(getResources().getDisplayMetrics().heightPixels*0.72)));
         browser.loadUrl(url);
     }
-    @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else home();}
+    @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else if(page.equals("browser")&&!selectedCompetition.isEmpty())showCompetitionTab(selectedTab);else home();}
     @Override protected void onDestroy(){if(browser!=null)browser.destroy();super.onDestroy();}
 }
