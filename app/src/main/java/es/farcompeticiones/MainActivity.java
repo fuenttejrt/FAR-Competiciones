@@ -25,7 +25,7 @@ public class MainActivity extends Activity {
     String lastBrowserUrl="";
     int selectedMatchGroup=-1;
     boolean showStandingDetails=false;
-    boolean calendarUpcomingOnly=false;
+    boolean calendarUpcomingOnly=true;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
@@ -88,6 +88,7 @@ public class MainActivity extends Activity {
     void details(String competition){
         selectedCompetition=competition;
         selectedMatchGroup=-1;
+        calendarUpcomingOnly=true;
         showCompetitionTab("Calendario");
     }
     void showCompetitionTab(String tab){
@@ -97,7 +98,7 @@ public class MainActivity extends Activity {
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             Button b=new Button(this);b.setText(item);b.setTextSize(11);b.setAllCaps(false);
             b.setTextColor(item.equals(tab)?accent:Color.WHITE);
-            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->showCompetitionTab(item));
+            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->{if(!item.equals(selectedTab)){selectedMatchGroup=item.equals("Resultados")?0:-1;}showCompetitionTab(item);});
         }
         String official=officialCalendar();
         if(!official.isEmpty()){
@@ -195,7 +196,7 @@ public class MainActivity extends Activity {
         int count=0;
         if(selectedTab.equals("Calendario")){
             Button mode=new Button(this);mode.setAllCaps(false);
-            mode.setText(calendarUpcomingOnly?"Mostrar calendario completo":"Ver solo próximos partidos");
+            mode.setText(calendarUpcomingOnly?"Ver todas las jornadas":"Ver próximos partidos");
             body.addView(mode);
             mode.setOnClickListener(v->{calendarUpcomingOnly=!calendarUpcomingOnly;selectedMatchGroup=-1;showCompetitionTab("Calendario");});
         }
@@ -294,7 +295,7 @@ public class MainActivity extends Activity {
                 }
             }
         }
-        if(count==0)body.addView(txt(selectedTab.equals("Resultados")?"No hay resultados finalizados disponibles en los datos importados.":"No hay datos estructurados para esta pestaña. Pulsa Actualizar para volver a importar desde MatchReady.",13,Color.LTGRAY));
+        if(count==0)body.addView(txt(selectedTab.equals("Resultados")?"No hay resultados finalizados disponibles en los datos importados.":selectedTab.equals("Calendario")&&calendarUpcomingOnly?"No hay próximos partidos en los datos guardados. Pulsa «Ver todas las jornadas» o «Actualizar» para consultar novedades.":"No hay datos estructurados para esta pestaña. Pulsa Actualizar para volver a importar desde MatchReady.",13,Color.LTGRAY));
         else body.addView(txt("MatchReady · Datos guardados en el móvil",11,Color.LTGRAY));
     }
     void refreshNative(String url){
