@@ -428,7 +428,9 @@ public class MainActivity extends Activity {
                 int visibleRows=0;
                 for(int n=0;n<rows.length();n++){org.json.JSONObject candidate=rows.optJSONObject(n);if(candidate!=null&&matchVisible(candidate))visibleRows++;}
                 if(visibleRows==0)continue;
-                TextView head=txt(number.isEmpty()?full:"Jornada "+number+(phase.isEmpty()?"":" · "+phase),15,accent);head.setTypeface(null,Typeface.BOLD);body.addView(head);
+                TextView head=txt(number.isEmpty()?full:"Jornada "+number+(phase.isEmpty()?"":" · "+phase),15,accent);head.setTypeface(null,Typeface.BOLD);
+                head.setPadding(0,selectedTab.equals("Resultados")?3:5,0,0);
+                body.addView(head);
                 if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY));
                 String lastDate="";
                 for(int j=0;j<rows.length();j++){
@@ -447,9 +449,17 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,1,0,2);body.addView(card,cp);
                     LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
                     LinearLayout left=matchTeam(row.optString("home",""),matchCrest(tables,row.optString("home",""),row.optString("homeCrest","")),false);
-                    TextView mid=txt(selectedTab.equals("Calendario")&&isUpcomingMatch(row)?"VS":isScore(score)?score:"VS",19,selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent);
+                    boolean finished=selectedTab.equals("Resultados")&&isScore(score);
+                    TextView mid=txt(selectedTab.equals("Calendario")&&isUpcomingMatch(row)?"VS":isScore(score)?score:"VS",finished?20:19,finished?Color.WHITE:selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent);
                     mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
-                    mid.setMinWidth((int)(getResources().getDisplayMetrics().density*52));
+                    mid.setMinWidth((int)(getResources().getDisplayMetrics().density*(finished?66:52)));
+                    if(finished){
+                        android.graphics.drawable.GradientDrawable scoreBg=new android.graphics.drawable.GradientDrawable();
+                        scoreBg.setColor(Color.rgb(35,75,71));
+                        scoreBg.setCornerRadius(9*getResources().getDisplayMetrics().density);
+                        mid.setBackground(scoreBg);
+                        mid.setPadding(5,7,5,7);
+                    }
                     LinearLayout right=matchTeam(row.optString("away",""),matchCrest(tables,row.optString("away",""),row.optString("awayCrest","")),true);
                     line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
                     line.addView(mid,new LinearLayout.LayoutParams(-2,-2));
