@@ -122,7 +122,7 @@ public class MainActivity extends Activity {
             showCachedNative();
             // Al abrir la clasificación M14, comprobar periódicamente si MatchReady ha publicado una fase nueva.
             // El intervalo evita descargas continuas al cambiar de pestaña y al terminar una importación.
-            if(tab.equals("Clasificación")&&category.equals("M14")&&season.equals("2026/27")){
+            if(tab.equals("Clasificación")&&category.equals("M14")&&(season.equals("2026/27")||season.equals("2025/26"))){
                 long now=System.currentTimeMillis();
                 long last=getPreferences(0).getLong("checked_"+cacheKey(),0L);
                 if(now-last>=6L*60L*60L*1000L&&now-lastAutomaticRefreshAttempt>=60L*1000L){
@@ -266,7 +266,7 @@ public class MainActivity extends Activity {
         return 0;
     }
     String m14PositionGuide(int rank){
-        if(!category.equals("M14")||!season.equals("2026/27"))return "";
+        if(!category.equals("M14")||!(season.equals("2026/27")||season.equals("2025/26")))return "";
         if(selectedCompetition.equals("Primera División")){
             if(rank>=1&&rank<=5)return "Referencia 1.ª fase: permanencia en Primera";
             if(rank==6)return "Referencia 1.ª fase: triangular de promoción";
@@ -555,7 +555,7 @@ public class MainActivity extends Activity {
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
             if(selectedTab.equals("Clasificación")){
                 if(!kind.equals("standing"))continue;
-                boolean m14Legend=category.equals("M14")&&season.equals("2026/27")&&!selectedCompetition.equals("Copa FAR");
+                boolean m14Legend=category.equals("M14")&&(season.equals("2026/27")||season.equals("2025/26"))&&!selectedCompetition.equals("Copa FAR");
                 int detectedPhase=m14Legend?m14StandingPhase(data,table):0;
                 if(m14Legend)body.addView(txt(detectedPhase==0?"Fase sin confirmar · colores de puestos desactivados":detectedPhase==1?"1.ª fase · puestos orientativos":"2.ª fase · puestos orientativos",12,detectedPhase==0?Color.LTGRAY:accent));
                 body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
@@ -630,7 +630,7 @@ public class MainActivity extends Activity {
                         body.addView(txt("● Gris (4.º–6.º): acceso previsto a Segunda División B.",12,0xff9db0c0));
                     }else if(detectedPhase==2){
                         if(selectedCompetition.equals("Primera División"))body.addView(txt("● Amarillo (6.º): promoción final frente al primero de Segunda A.",12,0xffffca65));
-                        else if(selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda a"))body.addView(txt("● Amarillo (1.º): promoción final frente al sexto de Primera.",12,0xffffca65));
+                        else if((selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda a")||selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda división a")))body.addView(txt("● Amarillo (1.º): promoción final frente al sexto de Primera.",12,0xffffca65));
                         else body.addView(txt("Sin colores de promoción para este grupo.",12,Color.LTGRAY));
                     }else{
                         body.addView(txt("No se puede confirmar la fase a partir de las etiquetas oficiales disponibles. Actualiza los datos para volver a comprobarlo.",12,Color.LTGRAY));
