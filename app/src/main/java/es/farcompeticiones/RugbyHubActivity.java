@@ -884,7 +884,7 @@ public final class RugbyHubActivity extends Activity {
         int[] score={0,0};
         int side=-1;
         java.util.regex.Pattern row=java.util.regex.Pattern.compile(
-            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*(.*?)(?:\\s*·\\s*Dorsal\\s+(\\d+)|\\s*·\\s*Dorsal no indicado)?\\s*$");
+            "^\\d+\\.\\s*Min\\s+(\\d+)\\s*·\\s*(.*?)\\s*·\\s*Dorsal\\s+(\\d+|no indicado)\\s*$");
         for(String line:(events==null?"":events).split("\\r?\\n")){
             String t=line.trim();
             if(t.toLowerCase(java.util.Locale.ROOT).startsWith("equipo local:"))side=0;
@@ -898,7 +898,7 @@ public final class RugbyHubActivity extends Activity {
                 if(!points.find())continue;
                 int value=Integer.parseInt(points.group(1));
                 score[side]+=value;
-                String dorsal=m.group(3)==null?"":m.group(3);
+                String dorsal=m.group(3)==null||"no indicado".equalsIgnoreCase(m.group(3))?"":m.group(3);
                 String playerName=dorsal.isEmpty()?"":players[side].get(dorsal);
                 items.add(new String[]{m.group(1),type.replaceAll("\\s*\\(\\d+\\s+puntos?\\)",""),
                     dorsal,playerName==null?"":playerName,String.valueOf(value),String.valueOf(side)});
@@ -1281,7 +1281,7 @@ return "TITULARES ("+starterCount+")\n"+starters+
             }
             // In changes and sanctions, do not shift numbers onto the wrong event.
             // Keep the event and mark an incomplete column as unknown.
-            for(String optional:new String[]{"dorsal entra","dorsal sale","dorsal"}){
+            for(String optional:("Cambios".equals(kind)?new String[]{"dorsal entra","dorsal sale"}:new String[]{"dorsal"})){
                 java.util.List<String> values=columns.get(optional);
                 if(values==null||values.size()!=n){
                     java.util.ArrayList<String> blanks=new java.util.ArrayList<>();
@@ -1298,9 +1298,9 @@ return "TITULARES ("+starterCount+")\n"+starters+
                 out.append(i+1).append(". ");
                 if(minutes!=null)out.append("Min ").append(minutes.get(i)).append(" · ");
                 if(types!=null)out.append(eventDescription(types.get(i),kind)).append(" · ");
-                if(columns.containsKey("dorsal"))out.append(columns.get("dorsal").get(i).isEmpty()?"Dorsal no indicado":"Dorsal "+columns.get("dorsal").get(i));
-                if(columns.containsKey("dorsal entra"))out.append(columns.get("dorsal entra").get(i).isEmpty()?"Entra sin dorsal":"Entra nº "+columns.get("dorsal entra").get(i));
-                if(columns.containsKey("dorsal sale"))out.append(columns.get("dorsal sale").get(i).isEmpty()?" · Sale sin dorsal":" · Sale nº "+columns.get("dorsal sale").get(i));
+                if(!"Cambios".equals(kind)&&columns.containsKey("dorsal"))out.append(columns.get("dorsal").get(i).isEmpty()?"Dorsal no indicado":"Dorsal "+columns.get("dorsal").get(i));
+                if("Cambios".equals(kind)&&columns.containsKey("dorsal entra"))out.append(columns.get("dorsal entra").get(i).isEmpty()?"Entra sin dorsal":"Entra nº "+columns.get("dorsal entra").get(i));
+                if("Cambios".equals(kind)&&columns.containsKey("dorsal sale"))out.append(columns.get("dorsal sale").get(i).isEmpty()?" · Sale sin dorsal":" · Sale nº "+columns.get("dorsal sale").get(i));
                 out.append("\n");
             }
             out.append("\n");any=true;
