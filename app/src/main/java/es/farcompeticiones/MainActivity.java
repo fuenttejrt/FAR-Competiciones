@@ -346,14 +346,6 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams noteLp=new LinearLayout.LayoutParams(-1,-2);
         noteLp.setMargins(0,dp(12),0,dp(6));
         competitionListContainer.addView(note,noteLp);
-        TextView back=competitionLabel("‹ INICIO",13,true);
-        back.setGravity(android.view.Gravity.CENTER);
-        back.setBackground(gradient(0xff294a49,0xff20383b,0xff578d7a));
-        LinearLayout.LayoutParams backLp=new LinearLayout.LayoutParams(dp(104),dp(44));
-        backLp.gravity=android.view.Gravity.RIGHT;
-        backLp.setMargins(0,dp(4),dp(4),dp(8));
-        competitionListContainer.addView(back,backLp);
-        back.setOnClickListener(v->home());
     }
     String officialCalendar(){
         if(!category.equals("M14"))return "";
