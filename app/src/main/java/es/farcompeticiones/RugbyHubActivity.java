@@ -440,18 +440,18 @@ public final class RugbyHubActivity extends Activity {
         root.addView(sections);
         scroll.setFillViewport(false);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
-        LinearLayout actions=new LinearLayout(this);root.addView(actions);
+        LinearLayout actions=new LinearLayout(this);actions.setOrientation(0);root.addView(actions);
         final String[] diagnostics={""};
-        Button debug=new Button(this);debug.setText("Diagnóstico");debug.setEnabled(false);actions.addView(debug);
+        Button debug=new Button(this);debug.setText("Diagnóstico");debug.setTextSize(10);debug.setAllCaps(false);debug.setSingleLine(true);debug.setEnabled(false);actions.addView(debug,new LinearLayout.LayoutParams(0,dp(46),1.1f));
         debug.setOnClickListener(v->{
             android.content.ClipboardManager clipboard=(android.content.ClipboardManager)
                 getSystemService(android.content.Context.CLIPBOARD_SERVICE);
             clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Diagnóstico acta",diagnostics[0]));
             android.widget.Toast.makeText(this,"Diagnóstico copiado. Pégalo en el chat.",android.widget.Toast.LENGTH_LONG).show();
         });
-        Button original=new Button(this);original.setText("PDF original");actions.addView(original);
+        Button original=new Button(this);original.setText("PDF original");original.setTextSize(10);original.setAllCaps(false);original.setSingleLine(true);actions.addView(original,new LinearLayout.LayoutParams(0,dp(46),1.1f));
         original.setOnClickListener(v->showActPdf(url));
-        Button close=new Button(this);close.setText("Cerrar");actions.addView(close);
+        Button close=new Button(this);close.setText("Cerrar");close.setTextSize(10);close.setAllCaps(false);close.setSingleLine(true);actions.addView(close,new LinearLayout.LayoutParams(0,dp(46),.75f));
         close.setOnClickListener(v->dialog.dismiss());
         // The reader was launched in a dedicated activity. Closing the dialog
         // must also close that activity; otherwise its empty background remains.
@@ -583,7 +583,7 @@ public final class RugbyHubActivity extends Activity {
                                 else if("Alineaciones".equals(entry.getKey()) && safeLineups!=null)
                                     showLineupCards(scroll,safeLineups,homeName,awayName);
                                 else {scroll.removeAllViews();scroll.addView(body);body.setText(entry.getValue());}
-                                scroll.post(()->scroll.scrollTo(0,0));
+                                scroll.post(()->scroll.smoothScrollTo(0,0));
                             });
                         }
                         String first=parsed.containsKey("Resumen")?"Resumen":parsed.keySet().iterator().next();
@@ -1324,7 +1324,7 @@ public final class RugbyHubActivity extends Activity {
     }
     private void showLineupCards(ScrollView scroll,String lineups,String homeName,String awayName){
         LinearLayout host=new LinearLayout(this);host.setOrientation(1);
-        host.setPadding(dp(2),dp(4),dp(2),dp(12));
+        host.setPadding(dp(2),dp(4),dp(2),dp(64));
         scroll.removeAllViews();scroll.addView(host);
         String[] teams=lineups.split("(?=EQUIPO VISITANTE)");
         LinearLayout teamTabs=new LinearLayout(this);teamTabs.setOrientation(0);
