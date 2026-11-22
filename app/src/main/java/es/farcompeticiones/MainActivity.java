@@ -963,7 +963,7 @@ public class MainActivity extends Activity {
                 if(visibleRows==0)continue;
                 boolean roundAlreadyInSelector=selectedMatchGroup>=0;
                 String roundTitle=number.isEmpty()?shortRoundLabel(full):"Jornada "+number;
-                String sectionTitle=roundAlreadyInSelector?phase:roundTitle+(phase.isEmpty()?"":" · "+phase);
+                String sectionTitle=roundTitle;
                 boolean redRound=(i%2==0);
                 int borderColor=redRound?0xffbc4458:0xff25a66b;
                 int headerColor=redRound?0xff4b0c19:0xff063c2d;
@@ -976,18 +976,30 @@ public class MainActivity extends Activity {
                 String firstDay="";
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject candidate=rows.optJSONObject(j);
-                    if(candidate!=null&&matchVisible(candidate)){firstDay=matchDayLabel(candidate.optString("when",""));break;}
+                    if(candidate!=null&&matchVisible(candidate)){
+                        java.util.regex.Matcher dm=java.util.regex.Pattern.compile("(\\d{2}/\\d{2}/\\d{4})").matcher(candidate.optString("when",""));
+                        firstDay=dm.find()?dm.group(1):matchDayLabel(candidate.optString("when",""));
+                        break;
+                    }
                 }
+                float density=getResources().getDisplayMetrics().density;
                 LinearLayout headingRow=new LinearLayout(this);headingRow.setOrientation(LinearLayout.HORIZONTAL);
                 headingRow.setGravity(android.view.Gravity.CENTER_VERTICAL);headingRow.setPadding(12,9,12,9);
                 headingRow.setBackgroundColor(headerColor);roundCard.addView(headingRow);
                 TextView headingText=txt("▦  "+sectionTitle,15,Color.WHITE);headingText.setTypeface(null,Typeface.BOLD);
                 headingRow.addView(headingText,new LinearLayout.LayoutParams(0,-2,1));
-                TextView dateText=txt(firstDay,12,Color.WHITE);dateText.setTypeface(null,Typeface.BOLD);
-                dateText.setGravity(android.view.Gravity.RIGHT|android.view.Gravity.CENTER_VERTICAL);headingRow.addView(dateText);
+                View separator=new View(this);
+                separator.setBackgroundColor(borderColor);
+                LinearLayout.LayoutParams separatorParams=new LinearLayout.LayoutParams(Math.max(1,(int)density),(int)(22*density));
+                separatorParams.setMargins((int)(5*density),0,(int)(12*density),0);
+                headingRow.addView(separator,separatorParams);
+                TextView dateText=txt("▦  "+firstDay,13,Color.WHITE);dateText.setTypeface(null,Typeface.BOLD);
+                dateText.setGravity(android.view.Gravity.RIGHT|android.view.Gravity.CENTER_VERTICAL);
+                headingRow.addView(dateText);
                 if(organizer>=0){
-                    TextView organizerView=txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY);
-                    organizerView.setPadding(12,9,10,7);roundCard.addView(organizerView);
+                    TextView organizerView=txt("♧  Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.WHITE);
+                    organizerView.setBackgroundColor(0xff062b27);
+                    organizerView.setPadding(12,10,10,10);roundCard.addView(organizerView);
                 }
                 String lastDate="";
                 for(int j=0;j<rows.length();j++){
