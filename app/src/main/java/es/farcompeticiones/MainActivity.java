@@ -190,6 +190,20 @@ public class MainActivity extends Activity {
         }
         return "–";
     }
+    // Indicadores orientativos: nunca equivalen a una clasificación definitiva ni a una plaza adjudicada.
+    int M14_RULE_HINT_COLOR(){return accent;}\n    String m14PositionGuide(int rank){
+        if(!category.equals("M14")||!season.equals("2026/27"))return "";
+        if(selectedCompetition.equals("Primera División")){
+            if(rank>=1&&rank<=5)return "Referencia 1.ª fase: permanencia en Primera";
+            if(rank==6)return "Referencia 1.ª fase: triangular de promoción";
+        }
+        if(selectedCompetition.startsWith("Segunda División · Grupo")){
+            if(rank==1)return "Referencia 1.ª fase: triangular de promoción";
+            if(rank==2||rank==3)return "Referencia 1.ª fase: Segunda A";
+            if(rank>=4&&rank<=6)return "Referencia 1.ª fase: Segunda B";
+        }
+        return "";
+    }
     boolean isScore(String value){return value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");}
     void addMatchCard(org.json.JSONArray raw){
         org.json.JSONArray cells=normalizedCells(raw);
@@ -461,6 +475,10 @@ public class MainActivity extends Activity {
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
             if(selectedTab.equals("Clasificación")){
                 if(!kind.equals("standing"))continue;
+                if(category.equals("M14")&&season.equals("2026/27")&&!selectedCompetition.equals("Copa FAR")){
+                    body.addView(txt("PUESTOS Y FASES · ORIENTATIVO",13,accent));
+                    body.addView(txt("Las indicaciones se basan en la posición mostrada por MatchReady y en las reglas de la primera fase. No confirman ascensos, descensos ni plazas definitivas: pueden existir partidos pendientes, sanciones, renuncias o cambios de fase.",12,Color.LTGRAY));
+                }
                 body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
                 String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
                 int unit=(int)(getResources().getDisplayMetrics().density*34);
@@ -501,6 +519,22 @@ public class MainActivity extends Activity {
                     for(int k=2;k<vals.length-1;k++)addStandingFixed(statsLine,vals[k],unit,Color.WHITE);
                     scroller.addView(statsLine);line.addView(scroller,new LinearLayout.LayoutParams(0,-2,1));
                     addStandingPoints(line,vals[vals.length-1],unit,accent,j%2==0?panel:bg);
+                    if(category.equals("M14")&&season.equals("2026/27")&&!selectedCompetition.equals("Copa FAR")){
+                        try{
+                            int rank=Integer.parseInt(row.optString("position","").replaceAll("[^0-9]",""));
+                            String guide=m14PositionGuide(rank);
+                            if(!guide.isEmpty()){
+                                TextView hint=txt(guide,10,M14_RULE_HINT_COLOR());
+                                hint.setPadding(8,2,8,4);
+                                // Añadir la leyenda en la propia fila, sin alterar las columnas de la clasificación.
+                                line.setContentDescription(row.optString("team","")+" · "+guide);
+                                line.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
+                                    .setTitle(row.optString("team",""))
+                                    .setMessage(guide+"\\n\\nSituación orientativa según el puesto actual. Consulta la Circular FAR n.º 10 y las resoluciones oficiales.")
+                                    .setPositiveButton("Entendido",null).show());
+                            }
+                        }catch(NumberFormatException ignored){}
+                    }
                     scrollRows.add(scroller);
                     if(false){
                         if(stats!=null){
