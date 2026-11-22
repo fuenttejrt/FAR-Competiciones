@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+concurrency:
+  group: far-apk-release
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -59,7 +62,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk FAR-Competiciones-v0.70.apk
-          gh release delete v0.70 --yes 2>/dev/null || true
           git tag -f v0.70
           git push origin refs/tags/v0.70 --force
-          gh release create v0.70 FAR-Competiciones-v0.70.apk --title "FAR Competiciones v0.70" --notes "APK con firma permanente." --prerelease
+          if gh release view v0.70 >/dev/null 2>&1; then
+            gh release upload v0.70 FAR-Competiciones-v0.70.apk --clobber
+          else
+            gh release create v0.70 FAR-Competiciones-v0.70.apk --title "FAR Competiciones v0.70" --notes "APK con firma permanente." --prerelease
+          fi
