@@ -23,7 +23,7 @@ public final class CircularsActivity extends Activity {
         category=getIntent().getStringExtra("category");
         if(season==null)season="2026/27";
         if(category==null)category="M14";
-        render();
+        renderSeasons();
     }
     private TextView label(String value,int size){
         TextView t=new TextView(this);t.setText(value);t.setTextSize(size);
@@ -32,6 +32,49 @@ public final class CircularsActivity extends Activity {
     private void action(String title,Runnable run){
         Button b=new Button(this);b.setText(title);b.setAllCaps(false);body.addView(b);b.setOnClickListener(v->run.run());
     }
+    private JSONArray seasons(){
+        try{return new JSONArray(getPreferences(0).getString("circular_seasons","[\\"2025/26\\",\\"2026/27\\"]"));}
+        catch(Exception e){return new JSONArray().put("2025/26").put("2026/27");}
+    }
+    private void renderSeasons(){
+        setup("Circulares y reglamentos");
+        body.addView(label("Selecciona una temporada para organizar sus circulares por categoría.",14));
+        JSONArray years=seasons();
+        for(int i=years.length()-1;i>=0;i--){
+            final String y=years.optString(i);
+            action("📁 "+y,()->{season=y;renderCategories();});
+        }
+        action("＋ Crear temporada",()->{
+            EditText input=new EditText(this);input.setSingleLine(true);input.setHint("2027/28");
+            new android.app.AlertDialog.Builder(this).setTitle("Nueva temporada").setView(input)
+                .setNegativeButton("Cancelar",null).setPositiveButton("Crear",(d,w)->{
+                    String y=input.getText().toString().trim();
+                    if(!y.matches("\\d{4}/\\d{2}")){Toast.makeText(this,"Formato: 2027/28",Toast.LENGTH_LONG).show();return;}
+                    int start=Integer.parseInt(y.substring(0,4)),end=Integer.parseInt(y.substring(5));
+                    if((start+1)%100!=end){Toast.makeText(this,"Los años deben ser consecutivos",Toast.LENGTH_LONG).show();return;}
+                    JSONArray existing=seasons();
+                    for(int j=0;j<existing.length();j++)if(y.equals(existing.optString(j))){season=y;renderCategories();return;}
+                    existing.put(y);getPreferences(0).edit().putString("circular_seasons",existing.toString()).apply();
+                    season=y;renderCategories();
+                }).show();
+        });
+        action("‹ Volver",()->finish());
+    }
+    private void renderCategories(){
+        setup("Circulares · "+season);
+        body.addView(label("Selecciona el ámbito. Las circulares generales se guardan por separado de las específicas.",13));
+        for(String c:new String[]{"Generales","M14","M16","M18","Sénior masculino","Sénior femenino","Otras categorías"}){
+            action("📁 "+c,()->{category=c;render();});
+        }
+        action("‹ Temporadas",()->renderSeasons());
+    }
+    private void setup(String heading){
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFitsSystemWindows(true);
+        body=new LinearLayout(this);body.setOrientation(1);body.setPadding(12,16,12,20);
+        body.setBackgroundColor(0xff0f1926);scroll.addView(body);setContentView(scroll);
+        TextView title=label(heading,21);title.setTextColor(green);body.addView(title);
+    }
     private String key(){return "circulars_"+season+"_"+category;}
     private JSONArray documents(){
         try{return new JSONArray(getPreferences(0).getString(key(),"[]"));}
@@ -39,10 +82,7 @@ public final class CircularsActivity extends Activity {
     }
     private void save(JSONArray docs){getPreferences(0).edit().putString(key(),docs.toString()).apply();}
     private void render(){
-        ScrollView scroll=new ScrollView(this);
-        body=new LinearLayout(this);body.setOrientation(1);body.setPadding(12,16,12,20);
-        body.setBackgroundColor(0xff0f1926);scroll.addView(body);setContentView(scroll);
-        TextView title=label("Circulares y reglamentos",21);title.setTextColor(green);body.addView(title);
+        setup("Circulares y reglamentos");
         body.addView(label(season+" · "+category,15));
         body.addView(label("Archivo de circulares oficiales. Los documentos quedan asociados a esta temporada y categoría. Añadir un PDF no cambia las reglas automáticamente.",13));
         action("＋ Añadir circular PDF",()->{
