@@ -1013,6 +1013,19 @@ public class MainActivity extends Activity {
                     if(!insight.isEmpty())body.addView(txt("ANÁLISIS · "+insight,11,0xffa5dbc6));
                     String scenarios=StandingIntelligence.remainingScenario(season,category,selectedCompetition,detectedPhase,rows,data);
                     if(!scenarios.isEmpty())body.addView(txt("PARTIDOS PENDIENTES · "+scenarios,11,0xffa5dbc6));
+                    String fixtureDetails=StandingIntelligence.pendingMatches(season,category,selectedCompetition,detectedPhase,rows,data);
+                    if(!fixtureDetails.isEmpty()){
+                        TextView toggle=txt("▸ Ver qué partidos se han contado",12,accent);
+                        body.addView(toggle);
+                        TextView details=txt(fixtureDetails.replace("\\\\n","\\n"),11,Color.LTGRAY);
+                        details.setVisibility(View.GONE);
+                        body.addView(details);
+                        toggle.setOnClickListener(v->{
+                            boolean open=details.getVisibility()!=View.VISIBLE;
+                            details.setVisibility(open?View.VISIBLE:View.GONE);
+                            toggle.setText(open?"▾ Ocultar partidos contados":"▸ Ver qué partidos se han contado");
+                        });
+                    }
                     body.addView(txt("Puestos orientativos, sujetos a sanciones, renuncias y resoluciones de la FAR.",11,Color.LTGRAY));
                 }
                 for(android.widget.HorizontalScrollView scroller:scrollRows){
