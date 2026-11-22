@@ -80,6 +80,8 @@ public class MainActivity extends Activity {
                 }else if(kind.equals("refresh")){
                     c.drawArc(4,4,20,20,215,260,false,p);c.drawLine(17,4,20,5,p);c.drawLine(20,5,20,9,p);
                     c.drawArc(4,4,20,20,35,135,false,p);c.drawLine(4,15,4,19,p);c.drawLine(4,19,8,19,p);
+                }else if(kind.equals("chevron")){
+                    c.drawLine(5,9,12,16,p);c.drawLine(12,16,19,9,p);
                 }else if(kind.equals("external")){
                     c.drawRoundRect(3,8,16,21,2,2,p);c.drawLine(11,13,21,3,p);c.drawLine(14,3,21,3,p);c.drawLine(21,3,21,10,p);
                 }
@@ -90,6 +92,13 @@ public class MainActivity extends Activity {
             @Override public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}
         };
         d.setBounds(0,0,dp(17),dp(17));return d;
+    }
+    CharSequence iconLabel(String kind,String label){
+        android.text.SpannableString span=new android.text.SpannableString("  "+label);
+        android.graphics.drawable.Drawable icon=lineIcon(kind);
+        icon.setBounds(0,0,dp(17),dp(17));
+        span.setSpan(new android.text.style.ImageSpan(icon,android.text.style.DynamicDrawableSpan.ALIGN_BASELINE),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return span;
     }
     void layout(String heading){
         if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
@@ -457,9 +466,8 @@ public class MainActivity extends Activity {
         int tabIndex=0;
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             final boolean active=item.equals(tab);
-            TextView b=txt(item,11,Color.WHITE);
-            b.setCompoundDrawables(lineIcon(tabIndex==0?"calendar":tabIndex==1?"results":"trophy"),null,null,null);
-            b.setCompoundDrawablePadding(dp(5));
+            TextView b=txt("",11,Color.WHITE);
+            b.setText(iconLabel(tabIndex==0?"calendar":tabIndex==1?"results":"trophy",item));
             b.setSingleLine(true);
             b.setEllipsize(android.text.TextUtils.TruncateAt.END);
             b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
@@ -477,9 +485,8 @@ public class MainActivity extends Activity {
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
             for(int action=0;action<2;action++){
                 final boolean update=action==0;
-                TextView control=txt(update?"Actualizar":"Web oficial",12,Color.WHITE);
-                control.setCompoundDrawables(lineIcon(update?"refresh":"external"),null,null,null);
-                control.setCompoundDrawablePadding(dp(7));
+                TextView control=txt("",12,Color.WHITE);
+                control.setText(iconLabel(update?"refresh":"external",update?"Actualizar":"Web oficial"));
                 control.setSingleLine(true);
                 control.setTypeface(null,Typeface.BOLD);control.setGravity(android.view.Gravity.CENTER);
                 android.graphics.drawable.GradientDrawable controlBg=new android.graphics.drawable.GradientDrawable();
@@ -912,9 +919,10 @@ public class MainActivity extends Activity {
                 pickerFrame.setBackground(pickerBg);
                 picker.setBackgroundColor(Color.TRANSPARENT);
                 pickerFrame.addView(picker,new android.widget.FrameLayout.LayoutParams(-1,-1));
-                TextView chevron=txt("⌄",19,Color.WHITE);
+                TextView chevron=txt("",19,Color.WHITE);
                 chevron.setGravity(android.view.Gravity.CENTER);
-                chevron.setPadding(0,0,0,dp(7));
+                chevron.setCompoundDrawables(null,null,lineIcon("chevron"),null);
+                chevron.setPadding(0,0,dp(12),0);
                 android.widget.FrameLayout.LayoutParams arrowLp=new android.widget.FrameLayout.LayoutParams(dp(43),-1,android.view.Gravity.RIGHT);
                 pickerFrame.addView(chevron,arrowLp);
                 chevron.setOnClickListener(v->picker.performClick());
