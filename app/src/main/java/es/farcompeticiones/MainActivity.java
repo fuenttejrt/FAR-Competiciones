@@ -265,39 +265,95 @@ public class MainActivity extends Activity {
             dashboardCard("↻  Última consulta","Continuar donde lo dejaste",()->openBrowser(last));
         button("‹ Inicio",()->home());
     }
+    LinearLayout competitionListContainer;
+    TextView competitionLabel(String value,int size,boolean bold){
+        TextView t=txt(value,size,Color.WHITE);
+        if(bold)t.setTypeface(null,Typeface.BOLD);
+        return t;
+    }
+    LinearLayout competitionTile(int top,int bottom,int outline,String icon,String name,Runnable action){
+        LinearLayout tile=new LinearLayout(this);tile.setOrientation(LinearLayout.HORIZONTAL);
+        tile.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        tile.setPadding(dp(12),dp(9),dp(12),dp(9));
+        tile.setBackground(gradient(top,bottom,outline));
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+        params.setMargins(dp(2),dp(4),dp(2),dp(4));
+        competitionListContainer.addView(tile,params);
+        TextView mark=competitionLabel(icon,22,false);mark.setPadding(dp(4),0,dp(10),0);tile.addView(mark);
+        TextView label=competitionLabel(name,15,true);label.setPadding(0,dp(4),0,dp(4));
+        tile.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+        TextView arrow=competitionLabel("›",25,false);arrow.setPadding(dp(6),0,dp(2),0);tile.addView(arrow);
+        tile.setOnClickListener(v->action.run());
+        return tile;
+    }
+    void competitionSelector(String caption,String chosen,String icon,boolean red,Runnable click){
+        int top=red?0xff550e19:0xff073e2b,bottom=red?0xff370a14:0xff082e23;
+        LinearLayout tile=competitionTile(top,bottom,red?0xffa94451:0xff428b67,icon,caption+"  ·  "+chosen,click);
+        tile.setMinimumHeight(dp(58));
+    }
     void competitionsHome(){
         page="home";layout("Competiciones");
-        body.addView(txt("Selecciona temporada y categoría",14,accent));
-        body.addView(txt("Temporada",17,Color.WHITE));
-        String[] seasons={"2026/27","2025/26"};
-        Spinner seasonSpinner=new Spinner(this);ArrayAdapter<String> seasonAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,seasons);seasonSpinner.setAdapter(seasonAdapter);body.addView(seasonSpinner);
-        seasonSpinner.setSelection(season.equals("2025/26")?1:0);
-        seasonSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
-            public void onNothingSelected(AdapterView<?> p){}
-            public void onItemSelected(AdapterView<?> p,View v,int pos,long id){season=seasons[pos];if(body!=null&&body.getChildCount()>=6)list();}
-        });
-        body.addView(txt("Selecciona una categoría",18,Color.WHITE));
-        String[] cats={"M14","M16","M18","Sénior masculino","Sénior femenino","Otras categorías"};
-        Spinner sp=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,cats);sp.setAdapter(adapter);body.addView(sp);
-        int index=0;for(int i=0;i<cats.length;i++)if(cats[i].equals(category))index=i;
-        sp.setSelection(index);
-        sp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
-            public void onNothingSelected(AdapterView<?> parent){}
-            public void onItemSelected(AdapterView<?> parent,View view,int pos,long id){category=cats[pos];list();}
-        });
-        button("‹ Inicio",()->home());
+        // Navegación discreta junto al título, sin ocupar una fila central.
+        TextView heading=(TextView)root.getChildAt(0);
+        heading.setText("‹   Competiciones");
+        heading.setOnClickListener(v->home());
+        body.addView(txt("Selecciona temporada y categoría",15,accent));
+        competitionListContainer=new LinearLayout(this);
+        competitionListContainer.setOrientation(LinearLayout.VERTICAL);
+        body.addView(competitionListContainer);
+        list();
     }
     void list(){
-        while(body.getChildCount()>6)body.removeViewAt(6);
-        body.addView(txt("Competiciones · "+category+" · "+season,19,accent));
+        if(competitionListContainer==null)return;
+        competitionListContainer.removeAllViews();
+        String[] seasons={"2026/27","2025/26"};
+        competitionSelector("Temporada",season,"▦",true,()->{
+            new android.app.AlertDialog.Builder(this).setTitle("Temporada")
+                .setSingleChoiceItems(seasons,season.equals("2025/26")?1:0,(dialog,which)->{
+                    season=seasons[which];dialog.dismiss();list();
+                }).setNegativeButton("Cancelar",null).show();
+        });
+        String[] cats={"M14","M16","M18","Sénior masculino","Sénior femenino","Otras categorías"};
+        competitionSelector("Categoría",category,"♟",false,()->{
+            int selected=0;for(int i=0;i<cats.length;i++)if(cats[i].equals(category))selected=i;
+            new android.app.AlertDialog.Builder(this).setTitle("Categoría")
+                .setSingleChoiceItems(cats,selected,(dialog,which)->{
+                    category=cats[which];dialog.dismiss();list();
+                }).setNegativeButton("Cancelar",null).show();
+        });
+        TextView section=txt("Competiciones · "+category+" · "+season,19,accent);
+        section.setTypeface(null,Typeface.BOLD);
+        LinearLayout.LayoutParams sectionLp=new LinearLayout.LayoutParams(-1,-2);
+        sectionLp.setMargins(0,dp(8),0,dp(5));
+        competitionListContainer.addView(section,sectionLp);
         String[] entries;
         if(category.equals("M14")&&season.equals("2026/27"))entries=new String[]{"Primera División","Segunda División · Grupo 1","Segunda División · Grupo 2","Segunda División A · 2.ª fase","Segunda División B · 2.ª fase","Copa FAR"};
         else if(category.equals("M14")&&season.equals("2025/26"))entries=new String[]{"Primera División","Segunda División A · 2.ª fase","Segunda División B · 2.ª fase"};
         else entries=category.equals("M14")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M16")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M18")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:new String[]{"Consultar competiciones oficiales"};
-        for(String entry:entries){TextView card=txt(entry+"  ›",17,Color.WHITE);card.setBackgroundColor(panel);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,5,0,5);body.addView(card,lp);card.setOnClickListener(v->details(entry));}
-        if(category.equals("M14")&&season.equals("2026/27"))button("Sistema de competición · M14 2026/27",()->M14RulesActivity.open(this));
-
-        body.addView(txt(category.equals("M14")&&season.equals("2026/27")?"Competiciones contrastadas con la web oficial FAR.":"Estructura orientativa: verificar divisiones y grupos para esta temporada.",12,Color.LTGRAY));
+        for(int i=0;i<entries.length;i++){
+            final String entry=entries[i];
+            boolean red=i%2==0;
+            competitionTile(red?0xff510b15:0xff063c29,red?0xff350912:0xff082d21,
+                red?0xff9e3d4a:0xff3c8860,"♜",entry,()->details(entry));
+        }
+        if(category.equals("M14")&&season.equals("2026/27")){
+            competitionTile(0xff0b4830,0xff092c23,0xff4b9a73,"▤",
+                "Sistema de competición · M14 2026/27",()->M14RulesActivity.open(this));
+        }
+        TextView note=txt(category.equals("M14")&&season.equals("2026/27")?
+            "ⓘ  Competiciones contrastadas con la web oficial FAR.":
+            "ⓘ  Estructura orientativa: verificar divisiones y grupos para esta temporada.",12,0xffa5c6b9);
+        LinearLayout.LayoutParams noteLp=new LinearLayout.LayoutParams(-1,-2);
+        noteLp.setMargins(0,dp(12),0,dp(6));
+        competitionListContainer.addView(note,noteLp);
+        TextView back=competitionLabel("‹ INICIO",13,true);
+        back.setGravity(android.view.Gravity.CENTER);
+        back.setBackground(gradient(0xff294a49,0xff20383b,0xff578d7a));
+        LinearLayout.LayoutParams backLp=new LinearLayout.LayoutParams(dp(104),dp(44));
+        backLp.gravity=android.view.Gravity.RIGHT;
+        backLp.setMargins(0,dp(4),dp(4),dp(8));
+        competitionListContainer.addView(back,backLp);
+        back.setOnClickListener(v->home());
     }
     String officialCalendar(){
         if(!category.equals("M14"))return "";
