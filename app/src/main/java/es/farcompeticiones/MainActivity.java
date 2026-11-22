@@ -42,16 +42,74 @@ public class MainActivity extends Activity {
     void button(String title,Runnable click){
         Button b=new Button(this);b.setText(title);body.addView(b);b.setOnClickListener(v->click.run());
     }
+    int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+0.5f);}
+    android.graphics.drawable.GradientDrawable gradient(int top,int bottom,int stroke){
+        android.graphics.drawable.GradientDrawable d=new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{top,bottom});
+        d.setCornerRadius(dp(18));d.setStroke(dp(2),stroke);return d;
+    }
     void home(){
-        page="landing";layout("FAR COMPETICIONES");
-        TextView subtitle=txt("Rugby andaluz · Tu centro de competiciones",14,accent);
-        body.addView(subtitle);
-        body.addView(txt("¿Qué quieres consultar?",18,Color.WHITE));
-        dashboardCard("🏉  COMPETICIONES","Calendarios, resultados, clasificaciones y actas",()->competitionsHome());
-        dashboardCard("📋  SISTEMAS DE COMPETICIÓN","Fases y normas oficiales de las competiciones",()->M14RulesActivity.open(this));
-        dashboardCard("🌐  PORTALES OFICIALES","MatchReady y Federación Andaluza de Rugby",()->officialPortals());
-        dashboardCard("⚙  AJUSTES","Temporadas, circulares y configuración",()->settingsHome());
-        body.addView(txt("Los resultados proceden de fuentes oficiales. Las reglas se revisan antes de aplicarse.",12,Color.LTGRAY));
+        page="landing";
+        if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
+        browser=null;
+        ScrollView scroll=new ScrollView(this);scroll.setFitsSystemWindows(true);
+        LinearLayout column=new LinearLayout(this);column.setOrientation(1);
+        column.setPadding(dp(12),dp(15),dp(12),dp(24));column.setBackgroundColor(bg);
+        scroll.addView(column);setContentView(scroll);
+        root=column;body=column;
+        LinearLayout heading=new LinearLayout(this);heading.setOrientation(0);
+        heading.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        LinearLayout words=new LinearLayout(this);words.setOrientation(1);
+        TextView name=txt("FAR COMPETICIONES",22,Color.WHITE);name.setTypeface(null,Typeface.BOLD);
+        words.addView(name);
+        TextView tagline=txt("Rugby andaluz",14,accent);words.addView(tagline);
+        heading.addView(words,new LinearLayout.LayoutParams(0,-2,1));
+        // El icono de la aplicación ya contiene el escudo FAR aprobado.
+        ImageView crest=new ImageView(this);
+        crest.setImageDrawable(getPackageManager().getApplicationIcon(getApplicationInfo()));
+        crest.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams crestParams=new LinearLayout.LayoutParams(dp(74),dp(74));
+        crestParams.setMargins(dp(6),0,dp(6),0);heading.addView(crest,crestParams);
+        column.addView(heading);
+        android.widget.FrameLayout hero=new android.widget.FrameLayout(this);
+        hero.setBackground(gradient(0xff064e3b,0xff102b3c,0xff176f51));
+        LinearLayout heroText=new LinearLayout(this);heroText.setOrientation(1);
+        heroText.setPadding(dp(17),dp(12),dp(12),dp(14));
+        TextView heroTitle=txt("RUGBY ANDALUZ",20,Color.WHITE);heroTitle.setTypeface(null,Typeface.BOLD);
+        heroText.addView(heroTitle);
+        heroText.addView(txt("Calendarios · Resultados · Clasificaciones",12,0xffc4e5d7));
+        hero.addView(heroText);
+        LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(94));
+        heroLp.setMargins(0,dp(12),0,dp(15));column.addView(hero,heroLp);
+        TextView prompt=txt("¿Qué quieres consultar?",20,Color.WHITE);prompt.setTypeface(null,Typeface.BOLD);
+        column.addView(prompt);
+        LinearLayout first=new LinearLayout(this);first.setOrientation(0);
+        first.addView(homeTile("🏆","Competiciones","Calendarios, resultados y actas",0xff07563d,0xff123c39,0xff2bc787,()->competitionsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
+        first.addView(homeTile("▤","Sistemas de competición","Fases y normas oficiales",0xff114a72,0xff142c48,0xff49aaf2,()->M14RulesActivity.open(this)),new LinearLayout.LayoutParams(0,dp(196),1));
+        column.addView(first);
+        LinearLayout second=new LinearLayout(this);second.setOrientation(0);
+        second.addView(homeTile("◎","Portales oficiales","MatchReady y FAR",0xff40316b,0xff24213e,0xffad83ed,()->officialPortals()),new LinearLayout.LayoutParams(0,dp(196),1));
+        second.addView(homeTile("⚙","Ajustes","Temporadas y circulares",0xff664124,0xff342820,0xfff59a48,()->settingsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
+        column.addView(second);
+        TextView note=txt("ⓘ  Datos oficiales · Normas revisadas antes de aplicarse",12,0xffb5c5d1);
+        note.setBackground(gradient(0xff173a35,0xff102a2e,0xff2d6457));
+        LinearLayout.LayoutParams noteLp=new LinearLayout.LayoutParams(-1,-2);
+        noteLp.setMargins(dp(4),dp(14),dp(4),0);column.addView(note,noteLp);
+    }
+    LinearLayout homeTile(String symbol,String heading,String detail,int top,int bottom,int outline,Runnable click){
+        LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);
+        tile.setPadding(dp(13),dp(12),dp(9),dp(8));tile.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        tile.setBackground(gradient(top,bottom,outline));
+        LinearLayout.LayoutParams outer=new LinearLayout.LayoutParams(-1,-1);
+        outer.setMargins(dp(4),dp(5),dp(4),dp(5));
+        LinearLayout content=new LinearLayout(this);content.setOrientation(1);
+        TextView pict=txt(symbol,31,Color.WHITE);content.addView(pict);
+        TextView title=txt(heading,17,Color.WHITE);title.setTypeface(null,Typeface.BOLD);content.addView(title);
+        content.addView(txt(detail,12,0xffe2e8f0));
+        tile.addView(content);
+        LinearLayout wrapper=new LinearLayout(this);wrapper.addView(tile,outer);
+        wrapper.setOnClickListener(v->click.run());tile.setOnClickListener(v->click.run());
+        return wrapper;
     }
     void dashboardCard(String heading,String description,Runnable click){
         LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(12,12,12,12);
