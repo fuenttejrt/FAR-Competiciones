@@ -191,7 +191,7 @@ public class MainActivity extends Activity {
         return "–";
     }
     // Indicadores orientativos: nunca equivalen a una clasificación definitiva ni a una plaza adjudicada.
-    int M14_RULE_HINT_COLOR(){return accent;}\n    String m14PositionGuide(int rank){
+    String m14PositionGuide(int rank){
         if(!category.equals("M14")||!season.equals("2026/27"))return "";
         if(selectedCompetition.equals("Primera División")){
             if(rank>=1&&rank<=5)return "Referencia 1.ª fase: permanencia en Primera";
@@ -524,9 +524,10 @@ public class MainActivity extends Activity {
                             int rank=Integer.parseInt(row.optString("position","").replaceAll("[^0-9]",""));
                             String guide=m14PositionGuide(rank);
                             if(!guide.isEmpty()){
-                                TextView hint=txt(guide,10,M14_RULE_HINT_COLOR());
-                                hint.setPadding(8,2,8,4);
-                                // Añadir la leyenda en la propia fila, sin alterar las columnas de la clasificación.
+                                TextView hint=txt("  ↳ "+guide,10,accent);
+                                hint.setPadding(8,1,8,5);
+                                body.addView(hint);
+                                // Indicador separado, sin alterar las columnas de la clasificación.
                                 line.setContentDescription(row.optString("team","")+" · "+guide);
                                 line.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
                                     .setTitle(row.optString("team",""))
