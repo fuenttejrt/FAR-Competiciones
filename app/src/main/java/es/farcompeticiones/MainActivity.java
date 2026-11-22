@@ -75,7 +75,10 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams crestParams=new LinearLayout.LayoutParams(dp(74),dp(74));
         crestParams.setMargins(dp(6),0,dp(6),0);heading.addView(crest,crestParams);
         column.addView(heading);
-        View hero=new RugbyHeader(this);
+        ImageView hero=new ImageView(this);
+        hero.setImageResource(R.drawable.cabecera_rugby);
+        hero.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        hero.setContentDescription("Cabecera de rugby");
         LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(145));
         heroLp.setMargins(0,dp(6),0,dp(10));column.addView(hero,heroLp);
         TextView prompt=txt("¿Qué quieres consultar?",20,Color.WHITE);prompt.setTypeface(null,Typeface.BOLD);
@@ -189,7 +192,11 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams outer=new LinearLayout.LayoutParams(-1,-1);
         outer.setMargins(dp(4),dp(5),dp(4),dp(5));
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
-        View pict=new TileIcon(this,symbol);content.addView(pict,new LinearLayout.LayoutParams(dp(66),dp(60)));
+        ImageView pict=new ImageView(this);
+        int iconRes=symbol.equals("trophy")?R.drawable.icono_copa:symbol.equals("book")?R.drawable.icono_libro:symbol.equals("globe")?R.drawable.icono_globo:R.drawable.icono_engranaje;
+        pict.setImageResource(iconRes);
+        pict.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        content.addView(pict,new LinearLayout.LayoutParams(dp(78),dp(70)));
         TextView title=txt(heading,17,Color.WHITE);title.setTypeface(null,Typeface.BOLD);title.setShadowLayer(dp(2),dp(1),dp(2),0xff000000);content.addView(title);
         content.addView(txt(detail,12,0xffe2e8f0));
         tile.addView(content);
