@@ -488,6 +488,13 @@ public final class RugbyHubActivity extends Activity {
                     disciplinaryColumns=extractDisciplinaryColumns(pdf);
                     scoreboardColumns=extractScoreboardColumns(pdf);
                     coordinateDiagnosis=diagnoseScoreCoordinates(pdf);
+                    String coordinateChanges=positionEventTable(pdf,"Cambios",true);
+                    String coordinateTemporary=positionEventTable(pdf,"Expulsiones temporales",false);
+                    String coordinateDefinitive=positionEventTable(pdf,"Expulsiones definitivas",false);
+                    if(coordinateTemporary!=null||coordinateDefinitive!=null)
+                        disciplinaryColumns="TEMPORALES\n"+(coordinateTemporary==null?"":coordinateTemporary)+
+                            "\nDEFINITIVAS\n"+(coordinateDefinitive==null?"":coordinateDefinitive);
+                    if(coordinateChanges!=null)extracted.append("CAMBIOS POR COORDENADAS\n").append(coordinateChanges).append("\n");
                     String coordinateScore=scoreFromCoordinates(coordinateDiagnosis);
                     if(coordinateScore!=null)scoreboardColumns=coordinateScore;
                     for(int page=1;page<=pdf.getNumberOfPages();page++){
@@ -694,6 +701,136 @@ public final class RugbyHubActivity extends Activity {
             i=end-1;
         }
         return teams==2?output.toString().trim():null;
+    }
+
+    // Reusable position-aware event extraction for substitutions and sanctions.
+    // The row label determines Y; event columns are anchored by the Tipo values.
+    private String positionEventTable(com.tom_roush.pdfbox.pdmodel.PDDocument pdf,
+        String heading,boolean changes){
+        StringBuilder output=new StringBuilder();
+        for(int pageIndex=0;pageIndex<pdf.getNumberOfPages();pageIndex++){
+            try{
+                java.util.ArrayList<float[]> positions=new java.util.ArrayList<>();
+                java.util.ArrayList<String> strings=new java.util.ArrayList<>();
+                com.tom_roush.pdfbox.text.PDFTextStripper stripper=
+                    new com.tom_roush.pdfbox.text.PDFTextStripper(){
+                        @Override protected void writeString(String text,
+                            java.util.List<com.tom_roush.pdfbox.text.TextPosition> glyphs)
+                            throws java.io.IOException{
+                            if(glyphs==null||glyphs.isEmpty()||text.trim().isEmpty())return;
+                            com.tom_roush.pdfbox.text.TextPosition first=glyphs.get(0);
+                            float x=first.getXDirAdj(),y=first.getYDirAdj();
+                            float end=glyphs.get(glyphs.size()-1).getXDirAdj()+
+                                glyphs.get(glyphs.size()-1).getWidthDirAdj();
+                            positions.add(new float[]{(x+end)/2f,y,x});
+                            strings.add(text.trim());
+                        }
+                    };
+                stripper.setSortByPosition(true);
+                stripper.setStartPage(pageIndex+1);stripper.setEndPage(pageIndex+1);
+                stripper.getText(pdf);
+                float headingY=-1;
+                for(int i=0;i<strings.size();i++)
+                    if(strings.get(i).equalsIgnoreCase(heading)){
+                        headingY=positions.get(i)[1];break;
+                    }
+                if(headingY<0)continue;
+                float nextY=Float.MAX_VALUE;
+                for(int i=0;i<strings.size();i++){
+                    float y=positions.get(i)[1];
+                    if(y>headingY+3&&
+                        (strings.get(i).equalsIgnoreCase("Cambios")||
+                         strings.get(i).equalsIgnoreCase("Expulsiones temporales")||
+                         strings.get(i).equalsIgnoreCase("Árbitro"))){
+                        nextY=Math.min(nextY,y);
+                    }
+                }
+                StringBuilder pageResult=new StringBuilder();
+                int validTeams=0;
+                for(int side=0;side<2;side++){
+                    int teamIndex=-1;
+                    for(int i=0;i<strings.size();i++){
+                        float y=positions.get(i)[1];
+                        if(y>headingY&&y<nextY&&strings.get(i).matches(
+                            side==0?"(?i)Equipo local:.*":"(?i)Equipo visitante:.*")){
+                            teamIndex=i;break;
+                        }
+                    }
+                    if(teamIndex<0)continue;
+                    float start=positions.get(teamIndex)[1];
+                    float end=nextY;
+                    for(int i=teamIndex+1;i<strings.size();i++){
+                        float y=positions.get(i)[1];
+                        if(y>start+3&&y<end&&strings.get(i).matches("(?i)Equipo (local|visitante):.*")){
+                            end=y;break;
+                        }
+                    }
+                    java.util.LinkedHashMap<String,Float> rowY=new java.util.LinkedHashMap<>();
+                    for(int i=teamIndex+1;i<strings.size();i++){
+                        float y=positions.get(i)[1];
+                        if(y<=start||y>=end)continue;
+                        String v=strings.get(i).toLowerCase(java.util.Locale.ROOT);
+                        if(v.equals("tipo *"))rowY.put("tipo",y);
+                        else if(v.equals("minuto"))rowY.put("minuto",y);
+                        else if(v.equals("dorsal"))rowY.put("dorsal",y);
+                        else if(v.equals("dorsal entra"))rowY.put("entra",y);
+                        else if(v.equals("dorsal sale"))rowY.put("sale",y);
+                    }
+                    if(!rowY.containsKey("tipo")||!rowY.containsKey("minuto"))continue;
+                    java.util.ArrayList<Integer> eventIndices=new java.util.ArrayList<>();
+                    for(int i=teamIndex+1;i<strings.size();i++){
+                        float[] pos=positions.get(i);
+                        if(pos[1]<=start||pos[1]>=end||pos[0]<65f)continue;
+                        if(Math.abs(pos[1]-rowY.get("tipo"))<2f&&strings.get(i).matches(
+                            changes?"(?i)CT|CL|CS|CC|C1|CJ|C20":"(?i)[A-E]"))
+                            eventIndices.add(i);
+                    }
+                    StringBuilder team=new StringBuilder(strings.get(teamIndex)).append("\n");
+                    for(int k=0;k<eventIndices.size();k++){
+                        int event=eventIndices.get(k);
+                        float x=positions.get(event)[0];
+                        String minute=positionCell(strings,positions,rowY.get("minuto"),x);
+                        if(!minute.matches("\\d+"))continue;
+                        team.append(k+1).append(". Min ").append(minute).append(" · ");
+                        if(changes){
+                            String enter=rowY.containsKey("entra")?
+                                positionCell(strings,positions,rowY.get("entra"),x):"";
+                            String leave=rowY.containsKey("sale")?
+                                positionCell(strings,positions,rowY.get("sale"),x):"";
+                            team.append("Cambio · ")
+                                .append(enter.matches("\\d+")?"Entra nº "+enter:"Entra sin dorsal")
+                                .append(" · ")
+                                .append(leave.matches("\\d+")?"Sale nº "+leave:"Sale sin dorsal");
+                        }else{
+                            String dorsal=rowY.containsKey("dorsal")?
+                                positionCell(strings,positions,rowY.get("dorsal"),x):"";
+                            team.append("Tipo ").append(strings.get(event)).append(" · ")
+                                .append(dorsal.matches("\\d+")?"Dorsal "+dorsal:"Dorsal no indicado");
+                        }
+                        team.append("\n");
+                    }
+                    pageResult.append(team).append("\n");validTeams++;
+                }
+                if(validTeams==2){
+                    output.append(pageResult);
+                    break;
+                }
+            }catch(Exception ignored){}
+        }
+        return output.length()==0?null:output.toString().trim();
+    }
+    private String positionCell(java.util.List<String> strings,
+        java.util.List<float[]> positions,float rowY,float x){
+        float best=12.5f;
+        String value="";
+        for(int i=0;i<strings.size();i++){
+            float[] p=positions.get(i);
+            float delta=Math.abs(p[0]-x);
+            if(Math.abs(p[1]-rowY)<2f&&delta<best&&strings.get(i).matches("\\d+")){
+                best=delta;value=strings.get(i);
+            }
+        }
+        return value;
     }
     // Extract scoring rows from the score-table region, separately from page text.
     private String extractScoreboardColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
