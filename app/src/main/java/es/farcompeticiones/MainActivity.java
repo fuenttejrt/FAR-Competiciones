@@ -407,7 +407,7 @@ public class MainActivity extends Activity {
             header.addView(back,new LinearLayout.LayoutParams(dp(30),dp(45)));
             header.addView(currentTitle,new LinearLayout.LayoutParams(0,-2,1));
             root.addView(header,0);
-            back.setOnClickListener(v->competitions());
+            back.setOnClickListener(v->competitionsHome());
         }
         LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);body.addView(tabs);
         int tabIndex=0;
