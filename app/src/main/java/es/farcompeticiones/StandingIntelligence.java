@@ -136,7 +136,7 @@ final class StandingIntelligence {
             JSONObject table=tables.optJSONObject(i);
             if(table==null||!"matches".equals(table.optString("kind")))continue;
             String phaseHeading=table.optString("heading","").toLowerCase(java.util.Locale.ROOT);
-            if(phaseHeading.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))continue;
+            // Sin etiqueta explicita de primera fase no podemos garantizar a que fase pertenece.\n            if(!phaseHeading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))continue;
             matchTables++;
             JSONArray games=table.optJSONArray("rows");
             if(games==null)continue;
@@ -151,16 +151,16 @@ final class StandingIntelligence {
                 pending.put(away,pending.containsKey(away)?pending.get(away)+1:1);
             }
         }
-        if(matchTables==0)return "";
-        Team inside=teams.get(cutoff-1),outside=teams.get(cutoff);
-        int a=pending.containsKey(key(inside.name))?pending.get(key(inside.name)):0;
-        int b=pending.containsKey(key(outside.name))?pending.get(key(outside.name)):0;
-        return "Escenario de puntos con partidos sin resultado en el calendario: "+
-                inside.name+" "+inside.points+"–"+(inside.points+5*a)+
-                " pts ("+a+" pendientes); "+outside.name+" "+outside.points+"–"+
-                (outside.points+5*b)+" pts ("+b+" pendientes). "+
-                "Máximo teórico de 5 puntos por partido. No certifica plazas: "+
-                "pueden faltar encuentros, desempates o resoluciones oficiales.";
+        if(matchTables==0)return "No se pueden verificar los partidos pendientes: el calendario no identifica expresamente la 1.ª fase.";
+        StringBuilder result=new StringBuilder("Partidos pendientes por equipo (solo jornadas identificadas como 1.ª fase): ");
+        for(int i=0;i<teams.size();i++){
+            Team team=teams.get(i);
+            int remaining=pending.containsKey(key(team.name))?pending.get(key(team.name)):0;
+            if(i>0)result.append(" · ");
+            result.append(team.name).append(": ").append(remaining);
+        }
+        result.append(". Conteo provisional: partidos sin marcador en el calendario importado; no incluye jornadas sin identificar.");
+        return result.toString();
     }
 
 }
