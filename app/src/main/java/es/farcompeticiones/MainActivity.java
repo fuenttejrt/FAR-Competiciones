@@ -932,6 +932,14 @@ public class MainActivity extends Activity {
                 boolean m14Legend=category.equals("M14")&&(season.equals("2026/27")||season.equals("2025/26"))&&!selectedCompetition.equals("Copa FAR");
                 int detectedPhase=m14Legend?m14StandingPhase(data,table):0;
                 if(m14Legend)body.addView(txt(detectedPhase==0?"Clasificación · fase sin confirmar":detectedPhase==1?"Clasificación · 1.ª fase":"Clasificación · 2.ª fase",14,detectedPhase==0?Color.LTGRAY:accent));
+                if(m14Legend){
+                    String insight=StandingIntelligence.summary(season,category,selectedCompetition,detectedPhase,rows);
+                    if(!insight.isEmpty()){
+                        TextView intelligence=txt("ANÁLISIS DE CLASIFICACIÓN · "+insight,11,0xffa5dbc6);
+                        intelligence.setPadding(dp(5),dp(5),dp(5),dp(8));
+                        body.addView(intelligence);
+                    }
+                }
                 body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
                 String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
                 int unit=(int)(getResources().getDisplayMetrics().density*34);
