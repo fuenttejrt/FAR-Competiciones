@@ -1012,7 +1012,22 @@ public class MainActivity extends Activity {
                     String insight=StandingIntelligence.summary(season,category,selectedCompetition,detectedPhase,rows);
                     if(!insight.isEmpty())body.addView(txt("ANÁLISIS · "+insight,11,0xffa5dbc6));
                     String scenarios=StandingIntelligence.remainingScenario(season,category,selectedCompetition,detectedPhase,rows,data);
-                    if(!scenarios.isEmpty())body.addView(txt("PARTIDOS PENDIENTES · "+scenarios,11,0xffa5dbc6));
+                    if(!scenarios.isEmpty()){
+                        body.addView(txt("ENCUENTROS SIN MARCADOR · "+scenarios,11,0xffa5dbc6));
+                        String detail=StandingIntelligence.pendingMatches(season,category,selectedCompetition,detectedPhase,rows,data);
+                        if(!detail.isEmpty()){
+                            TextView toggle=txt("▸ Ver encuentros contabilizados",12,accent);
+                            body.addView(toggle);
+                            TextView matches=txt(detail,11,Color.LTGRAY);
+                            matches.setVisibility(View.GONE);
+                            body.addView(matches);
+                            toggle.setOnClickListener(v->{
+                                boolean show=matches.getVisibility()!=View.VISIBLE;
+                                matches.setVisibility(show?View.VISIBLE:View.GONE);
+                                toggle.setText(show?"▾ Ocultar encuentros contabilizados":"▸ Ver encuentros contabilizados");
+                            });
+                        }
+                    }
                     String fixtureDetails=StandingIntelligence.pendingMatches(season,category,selectedCompetition,detectedPhase,rows,data);
                     if(!fixtureDetails.isEmpty()){
                         TextView toggle=txt("▸ Ver qué partidos se han contado",12,accent);
