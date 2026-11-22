@@ -1296,6 +1296,17 @@ public final class RugbyHubActivity extends Activity {
             String visitor=staffRows.group(3).trim();
             if(!local.isEmpty())found.put(role+" local",local);
             if(!visitor.isEmpty())found.put(role+" visitante",visitor);
+            // The next printed line contains each team's licence in the
+            // same left-to-right order as the names above.
+            String tail=pageOne.substring(staffRows.end());
+            java.util.regex.Matcher licences=java.util.regex.Pattern.compile(
+                "^\\s*\\r?\\n\\s*N[ºo]\\s*licencia:\\s*(\\d{7})"+
+                "\\s+N[ºo]\\s*licencia:\\s*(\\d{7})",
+                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(tail);
+            if(licences.find()){
+                found.put("Licencia "+role+" local",licences.group(1));
+                found.put("Licencia "+role+" visitante",licences.group(2));
+            }
         }
         // Some PDFs wrap each team's staff onto separate lines.
         for(String role:new String[]{"Entrenador","Delegado","Juez línea"}){
@@ -1344,6 +1355,19 @@ public final class RugbyHubActivity extends Activity {
                 found.put("Licencia árbitro",referee.group(2));
             }
         }
+        // Attach each licence to its own person's card, not a separate card.
+        for(String role:new String[]{"Entrenador","Delegado","Juez de línea"}){
+            for(String side:new String[]{"local","visitante"}){
+                String key=role+" "+side;
+                String licenceKey="Licencia "+(role.equals("Juez de línea")?"juez":role)+" "+side;
+                String licence=found.remove(licenceKey);
+                if(licence!=null&&found.containsKey(key))
+                    found.put(key,found.get(key)+"\\nLicencia: "+licence);
+            }
+        }
+        String refereeLicence=found.remove("Licencia árbitro");
+        if(refereeLicence!=null&&found.containsKey("Árbitro"))
+            found.put("Árbitro",found.get("Árbitro")+"\\nLicencia: "+refereeLicence);
         for(java.util.Map.Entry<String,String> field:found.entrySet()){
             LinearLayout card=new LinearLayout(this);card.setOrientation(1);
             card.setPadding(dp(12),dp(6),dp(12),dp(6));
