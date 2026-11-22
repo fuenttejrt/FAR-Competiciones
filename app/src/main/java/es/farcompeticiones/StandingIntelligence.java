@@ -70,6 +70,51 @@ final class StandingIntelligence {
         return value!=null && value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");
     }
 
+    /** Detalle auditable de encuentros sin marcador, tal como aparecen en MatchReady. */
+    static String pendingMatches(String season,String category,String competition,int phase,
+                                 JSONArray standings,JSONObject data) {
+        if(!CompetitionRules.hasM14Rules(season,category)||phase!=1)return "";
+        int cutoff="Primera División".equals(competition)?5:
+                competition.startsWith("Segunda División · Grupo")?3:0;
+        ArrayList<Team> all=teams(standings);
+        if(cutoff==0||all.size()<=cutoff)return "";
+        String[] targets={all.get(cutoff-1).name,all.get(cutoff).name};
+        JSONArray tables=data.optJSONArray("tables");
+        if(tables==null)return "";
+        StringBuilder result=new StringBuilder();
+        for(String target:targets){
+            java.util.HashSet<String> unique=new java.util.HashSet<>();
+            StringBuilder matches=new StringBuilder();
+            for(int i=0;i<tables.length();i++){
+                JSONObject table=tables.optJSONObject(i);
+                if(table==null||!"matches".equals(table.optString("kind")))continue;
+                String heading=table.optString("heading","");
+                String low=heading.toLowerCase(java.util.Locale.ROOT);
+                if(low.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))continue;
+                JSONArray games=table.optJSONArray("rows");
+                if(games==null)continue;
+                for(int j=0;j<games.length();j++){
+                    JSONObject game=games.optJSONObject(j);
+                    if(game==null||score(game.optString("score","")))continue;
+                    String home=game.optString("home",""),away=game.optString("away","");
+                    if(!key(target).equals(key(home))&&!key(target).equals(key(away)))continue;
+                    String id=key(home)+"|"+key(away)+"|"+game.optString("when","");
+                    if(!unique.add(id))continue;
+                    String opponent=key(target).equals(key(home))?away:home;
+                    if(matches.length()>0)matches.append("\\n");
+                    matches.append("• ").append(heading.isEmpty()?"Jornada no identificada":heading)
+                           .append(" · ").append(game.optString("when","Fecha sin confirmar"))
+                           .append(" · ").append(opponent)
+                           .append(key(target).equals(key(home))?" (local)":" (visitante)");
+                }
+            }
+            if(result.length()>0)result.append("\\n");
+            result.append(target).append(": ");
+            result.append(matches.length()==0?"ningún encuentro sin marcador identificado":matches);
+        }
+        return result.toString();
+    }
+
     /**
      * Escenarios de puntuación máxima usando solo encuentros aún sin resultado
      * en el calendario oficial descargado. No son pronósticos de puesto.
@@ -90,6 +135,8 @@ final class StandingIntelligence {
         for(int i=0;i<tables.length();i++){
             JSONObject table=tables.optJSONObject(i);
             if(table==null||!"matches".equals(table.optString("kind")))continue;
+            String phaseHeading=table.optString("heading","").toLowerCase(java.util.Locale.ROOT);
+            if(phaseHeading.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))continue;
             matchTables++;
             JSONArray games=table.optJSONArray("rows");
             if(games==null)continue;
