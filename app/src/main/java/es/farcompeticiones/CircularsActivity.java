@@ -116,7 +116,7 @@ public final class CircularsActivity extends Activity {
             });
         }
         body.addView(label("Las reglas se activarán únicamente después de extraerlas y confirmar su interpretación. Esta primera versión registra y permite consultar los documentos.",12));
-        action("‹ Volver",()->finish());
+        action("‹ Categorías",()->renderCategories());
     }
     private void addLink(){
         EditText input=new EditText(this);input.setSingleLine(true);input.setHint("https://farugby.com/...");
