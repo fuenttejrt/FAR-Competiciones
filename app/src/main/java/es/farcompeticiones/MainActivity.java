@@ -191,6 +191,27 @@ public class MainActivity extends Activity {
         return "–";
     }
     // Indicadores orientativos: nunca equivalen a una clasificación definitiva ni a una plaza adjudicada.
+    // Solo etiquetas oficiales explícitas: una mezcla de fases no permite deducir cuál representa la tabla.
+    int m14StandingPhase(org.json.JSONObject data,org.json.JSONObject standing){
+        String competition=selectedCompetition.toLowerCase(java.util.Locale.ROOT);
+        if(competition.contains("segunda división a")||competition.contains("segunda división b")||
+           competition.contains("segunda a")||competition.contains("segunda b"))return 2;
+        String heading=standing.optString("heading","").toLowerCase(java.util.Locale.ROOT);
+        if(heading.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))return 2;
+        if(heading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))return 1;
+        org.json.JSONArray all=data.optJSONArray("tables");
+        boolean first=false,second=false;
+        if(all!=null)for(int i=0;i<all.length();i++){
+            org.json.JSONObject t=all.optJSONObject(i);
+            if(t==null||!"matches".equals(t.optString("kind")))continue;
+            String h=t.optString("heading","").toLowerCase(java.util.Locale.ROOT);
+            if(h.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))first=true;
+            if(h.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))second=true;
+        }
+        if(first&&!second)return 1;
+        if(second&&!first)return 2;
+        return 0;
+    }
     String m14PositionGuide(int rank){
         if(!category.equals("M14")||!season.equals("2026/27"))return "";
         if(selectedCompetition.equals("Primera División")){
@@ -202,6 +223,12 @@ public class MainActivity extends Activity {
             if(rank==2||rank==3)return "Referencia 1.ª fase: Segunda A";
             if(rank>=4&&rank<=6)return "Referencia 1.ª fase: Segunda B";
         }
+        return "";
+    }
+    String m14SecondPhaseGuide(int rank){
+        String competition=selectedCompetition.toLowerCase(java.util.Locale.ROOT);
+        if(competition.contains("primera división")&&rank==6)return "promoción final";
+        if((competition.contains("segunda división a")||competition.contains("segunda a"))&&rank==1)return "promoción final";
         return "";
     }
     boolean isScore(String value){return value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");}
@@ -476,6 +503,8 @@ public class MainActivity extends Activity {
             if(selectedTab.equals("Clasificación")){
                 if(!kind.equals("standing"))continue;
                 boolean m14Legend=category.equals("M14")&&season.equals("2026/27")&&!selectedCompetition.equals("Copa FAR");
+                int detectedPhase=m14Legend?m14StandingPhase(data,table):0;
+                if(m14Legend)body.addView(txt(detectedPhase==0?"Fase sin confirmar · colores de puestos desactivados":detectedPhase==1?"1.ª fase · puestos orientativos":"2.ª fase · puestos orientativos",12,detectedPhase==0?Color.LTGRAY:accent));
                 body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
                 String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
                 int unit=(int)(getResources().getDisplayMetrics().density*34);
@@ -510,9 +539,9 @@ public class MainActivity extends Activity {
                     int rank=-1;
                     try{rank=Integer.parseInt(row.optString("position","").replaceAll("[^0-9]",""));}catch(NumberFormatException ignored){}
                     int positionColor=Color.WHITE;
-                    if(m14Legend){
-                        String positionGuide=m14PositionGuide(rank);
-                        if(!positionGuide.isEmpty())positionColor=positionGuide.contains("triangular")?0xffffca65:
+                    if(m14Legend&&detectedPhase!=0){
+                        String positionGuide=detectedPhase==1?m14PositionGuide(rank):m14SecondPhaseGuide(rank);
+                        if(!positionGuide.isEmpty())positionColor=(positionGuide.contains("triangular")||positionGuide.contains("promoción final"))?0xffffca65:
                             positionGuide.contains("Segunda B")?0xff9db0c0:0xff66e1a4;
                     }
                     addStandingFixed(line,vals[0],unit*3/5,positionColor);
@@ -537,15 +566,21 @@ public class MainActivity extends Activity {
                 }
                 if(m14Legend){
                     body.addView(txt("LEYENDA · PUESTOS ORIENTATIVOS",13,accent));
-                    if(selectedCompetition.equals("Primera División")){
-                        body.addView(txt("● Verde (1.º–5.º): referencia de acceso a Primera División en la segunda fase.",12,0xff66e1a4));
-                        body.addView(txt("● Amarillo (6.º): referencia de participación en el triangular de promoción.",12,0xffffca65));
-                    }else if(selectedCompetition.startsWith("Segunda División · Grupo")){
-                        body.addView(txt("● Amarillo (1.º): referencia de participación en el triangular de promoción.",12,0xffffca65));
-                        body.addView(txt("● Verde (2.º–3.º): referencia de acceso a Segunda División A.",12,0xff66e1a4));
-                        body.addView(txt("● Gris (4.º–6.º): referencia de acceso a Segunda División B.",12,0xff9db0c0));
+                    if(detectedPhase==1&&selectedCompetition.equals("Primera División")){
+                        body.addView(txt("● Verde (1.º–5.º): acceso previsto a Primera División en la segunda fase.",12,0xff66e1a4));
+                        body.addView(txt("● Amarillo (6.º): triangular de promoción.",12,0xffffca65));
+                    }else if(detectedPhase==1&&selectedCompetition.startsWith("Segunda División · Grupo")){
+                        body.addView(txt("● Amarillo (1.º): triangular de promoción.",12,0xffffca65));
+                        body.addView(txt("● Verde (2.º–3.º): acceso previsto a Segunda División A.",12,0xff66e1a4));
+                        body.addView(txt("● Gris (4.º–6.º): acceso previsto a Segunda División B.",12,0xff9db0c0));
+                    }else if(detectedPhase==2){
+                        if(selectedCompetition.equals("Primera División"))body.addView(txt("● Amarillo (6.º): promoción final frente al primero de Segunda A.",12,0xffffca65));
+                        else if(selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda a"))body.addView(txt("● Amarillo (1.º): promoción final frente al sexto de Primera.",12,0xffffca65));
+                        else body.addView(txt("Sin colores de promoción para este grupo.",12,Color.LTGRAY));
+                    }else{
+                        body.addView(txt("No se puede confirmar la fase a partir de las etiquetas oficiales disponibles. Actualiza los datos para volver a comprobarlo.",12,Color.LTGRAY));
                     }
-                    body.addView(txt("Referencias según las reglas de la primera fase. No son plazas definitivas: pueden influir partidos pendientes, sanciones, renuncias y cambios de fase. La clasificación oficial es la publicada por MatchReady.",11,Color.LTGRAY));
+                    body.addView(txt("Indicaciones provisionales. La FAR puede aplicar sanciones, renuncias y resoluciones que modifiquen los puestos.",11,Color.LTGRAY));
                 }
                 for(android.widget.HorizontalScrollView scroller:scrollRows){
                     scroller.setOnScrollChangeListener((View.OnScrollChangeListener)(v,x,y,oldX,oldY)->{
