@@ -1313,7 +1313,7 @@ public final class RugbyHubActivity extends Activity {
         // Only display a name when an adjacent seven-digit licence confirms it.
         java.util.regex.Matcher referee=java.util.regex.Pattern.compile(
             "(?is)Árbitro\\s+N[ºo]\\s*Licencia del árbitro.*?\\n"+
-            "\\s*([\\p{L}ÁÉÍÓÚÜÑáéíóúüñ, .'-]+?)\\s+(\\d{7})\\b")
+            "\\s*([\\p{L}ÁÉÍÓÚÜÑáéíóúüñ, .\\r\\n'-]+?)\\s+(\\d{7})\\b")
             .matcher(pageOne);
         if(referee.find()){
             String name=referee.group(1).replaceAll("\\s+"," ").trim();
