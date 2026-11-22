@@ -485,7 +485,10 @@ public final class RugbyHubActivity extends Activity {
                     com.tom_roush.pdfbox.text.PDFTextStripper stripper=
                         new com.tom_roush.pdfbox.text.PDFTextStripper();
                     stripper.setSortByPosition(true);
-                    if(pdf.getNumberOfPages()>0)lineupColumns=extractLineupColumns(pdf);
+                    if(pdf.getNumberOfPages()>0){
+                        lineupColumns=coordinateLineups(pdf);
+                        if(lineupColumns==null)lineupColumns=extractLineupColumns(pdf);
+                    }
                     disciplinaryColumns=extractDisciplinaryColumns(pdf);
                     scoreboardColumns=extractScoreboardColumns(pdf);
                     coordinateDiagnosis=diagnoseScoreCoordinates(pdf);
@@ -1405,6 +1408,93 @@ public final class RugbyHubActivity extends Activity {
             }
         }
         if(shown==0)rows.addView(text("No hay jugadores identificados en este grupo.",13,false));
+    }
+
+    // Read the roster as two independent physical columns. Each seven-digit
+    // licence anchors one row, so empty X/C/F cells cannot shift player data.
+    private String coordinateLineups(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
+        if(pdf.getNumberOfPages()==0)return null;
+        try{
+            java.util.ArrayList<float[]> positions=new java.util.ArrayList<>();
+            java.util.ArrayList<String> words=new java.util.ArrayList<>();
+            com.tom_roush.pdfbox.text.PDFTextStripper reader=
+                new com.tom_roush.pdfbox.text.PDFTextStripper(){
+                    @Override protected void writeString(String text,
+                        java.util.List<com.tom_roush.pdfbox.text.TextPosition> glyphs)
+                        throws java.io.IOException{
+                        if(glyphs==null||glyphs.isEmpty()||text.trim().isEmpty())return;
+                        // Split the PDFBox line into glyph groups by physical gaps.
+                        StringBuilder group=new StringBuilder();
+                        float start=-1,last=-1,y=-1;
+                        for(com.tom_roush.pdfbox.text.TextPosition g:glyphs){
+                            String ch=g.getUnicode();
+                            if(ch==null||ch.isEmpty())continue;
+                            float x=g.getXDirAdj();
+                            if(group.length()>0&&(x-last>5.5f||Math.abs(g.getYDirAdj()-y)>2f)){
+                                words.add(group.toString().trim());
+                                positions.add(new float[]{start,last,y});
+                                group.setLength(0);
+                            }
+                            if(group.length()==0){start=x;y=g.getYDirAdj();}
+                            group.append(ch);last=x+g.getWidthDirAdj();
+                        }
+                        if(group.length()>0){
+                            words.add(group.toString().trim());
+                            positions.add(new float[]{start,last,y});
+                        }
+                    }
+                };
+            reader.setSortByPosition(true);reader.setStartPage(1);reader.setEndPage(1);
+            reader.getText(pdf);
+            float middle=pdf.getPage(0).getCropBox().getWidth()/2f;
+            StringBuilder[] rosters={new StringBuilder(),new StringBuilder()};
+            int[] count={0,0};
+            for(int side=0;side<2;side++){
+                float minX=side==0?0:middle,maxX=side==0?middle:Float.MAX_VALUE;
+                java.util.ArrayList<Float> rowYs=new java.util.ArrayList<>();
+                for(int i=0;i<words.size();i++){
+                    float[] pos=positions.get(i);
+                    if(pos[0]<minX||pos[0]>=maxX)continue;
+                    if(words.get(i).matches("\\d{7}")&&!rowYs.contains(pos[2]))
+                        rowYs.add(pos[2]);
+                }
+                java.util.Collections.sort(rowYs);
+                for(float y:rowYs){
+                    java.util.ArrayList<Integer> row=new java.util.ArrayList<>();
+                    for(int i=0;i<words.size();i++){
+                        float[] pos=positions.get(i);
+                        if(pos[0]>=minX&&pos[0]<maxX&&Math.abs(pos[2]-y)<2f)
+                            row.add(i);
+                    }
+                    java.util.Collections.sort(row,(a,b)->Float.compare(
+                        positions.get(a)[0],positions.get(b)[0]));
+                    StringBuilder line=new StringBuilder();
+                    for(int index:row){
+                        String part=words.get(index);
+                        if(!part.isEmpty())line.append(part).append(' ');
+                    }
+                    java.util.regex.Matcher player=java.util.regex.Pattern.compile(
+                        "^\\s*(\\d{1,3})\\s+([XC]\\s+)?(.+?)\\s+(\\d{7})(?:\\s+(F))?\\s*$")
+                        .matcher(line.toString().trim());
+                    if(!player.matches())continue;
+                    String name=player.group(3).trim();
+                    if(name.length()<4||name.toLowerCase(java.util.Locale.ROOT).contains("licencia"))continue;
+                    rosters[side].append(player.group(1)).append("  ·  ")
+                        .append(name).append("  |  ").append(player.group(4));
+                    if(player.group(2)!=null){
+                        if(player.group(2).trim().equals("X"))rosters[side].append("  ·  Primera línea");
+                        if(player.group(2).trim().equals("C"))rosters[side].append("  ·  Capitán");
+                    }
+                    if(player.group(5)!=null)rosters[side].append("  ·  Formación");
+                    rosters[side].append('\n');count[side]++;
+                }
+            }
+            // Require both rosters to be substantial; otherwise use legacy extraction.
+            if(count[0]<8||count[1]<8)return null;
+            return "EQUIPO LOCAL\nTITULARES Y SUPLENTES ("+count[0]+")\n"+
+                rosters[0]+"\nEQUIPO VISITANTE\nTITULARES Y SUPLENTES ("+
+                count[1]+")\n"+rosters[1];
+        }catch(Exception ignored){return null;}
     }
     private String extractLineupColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
         try{
