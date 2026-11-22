@@ -397,11 +397,23 @@ public class MainActivity extends Activity {
     void showCompetitionTab(String tab){
         selectedTab=tab;page="detail";
         layout(category+" · "+selectedCompetition);
+        TextView back=txt("‹",25,Color.WHITE);
+        back.setGravity(android.view.Gravity.CENTER);
+        LinearLayout titleBar=(LinearLayout)root;
+        if(titleBar.getChildCount()>0&&titleBar.getChildAt(0) instanceof TextView){
+            TextView currentTitle=(TextView)titleBar.getChildAt(0);
+            titleBar.removeViewAt(0);
+            LinearLayout header=new LinearLayout(this);header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            header.addView(back,new LinearLayout.LayoutParams(dp(30),dp(45)));
+            header.addView(currentTitle,new LinearLayout.LayoutParams(0,-2,1));
+            root.addView(header,0);
+            back.setOnClickListener(v->competitions());
+        }
         LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);body.addView(tabs);
         int tabIndex=0;
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             final boolean active=item.equals(tab);
-            final String icon=tabIndex==0?"▦ ":tabIndex==1?"▥ ":"♜ ";
+            final String icon=tabIndex==0?"▦  ":tabIndex==1?"▥  ":"♕  ";
             TextView b=txt(icon+item,12,Color.WHITE);b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
             android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable();
             tabBg.setColor(active?0xff08643d:0xff052c25);tabBg.setCornerRadius(22*getResources().getDisplayMetrics().density);
@@ -830,8 +842,25 @@ public class MainActivity extends Activity {
                 options.add(selectedTab.equals("Calendario")&&calendarUpcomingOnly?"Próximas jornadas":selectedTab.equals("Resultados")?"Todos los resultados":"Todas las jornadas");
                 options.addAll(groupNames);
                 if(selectedTab.equals("Calendario"))options.add(calendarUpcomingOnly?"Ver calendario completo":"Ver próximos partidos");
-                ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options);
-                picker.setAdapter(adapter);picker.setSelection(selectedMatchGroup+1);LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,(int)(42*getResources().getDisplayMetrics().density));body.addView(picker,pickerParams);
+                ArrayAdapter<String> adapter=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options){
+                    @Override public View getView(int position,View convertView,android.view.ViewGroup parent){
+                        TextView selected=txt(options.get(position),15,Color.WHITE);
+                        selected.setTypeface(null,Typeface.BOLD);
+                        selected.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                        selected.setPadding(dp(18),0,dp(36),0);
+                        return selected;
+                    }
+                };
+                picker.setAdapter(adapter);picker.setSelection(selectedMatchGroup+1);
+                boolean resultPicker=selectedTab.equals("Resultados");
+                android.graphics.drawable.GradientDrawable pickerBg=new android.graphics.drawable.GradientDrawable();
+                pickerBg.setColor(resultPicker?0xff3b0b19:0xff053c2d);
+                pickerBg.setCornerRadius(dp(22));
+                pickerBg.setStroke(dp(1.4f),resultPicker?0xffb74459:0xff19a86b);
+                picker.setBackground(pickerBg);
+                LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,dp(47));
+                pickerParams.setMargins(0,dp(12),0,dp(10));
+                body.addView(picker,pickerParams);
                 picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
                     public void onNothingSelected(AdapterView<?> p){}
                     public void onItemSelected(AdapterView<?> p,View v,int position,long id){
@@ -997,7 +1026,7 @@ public class MainActivity extends Activity {
                 dateText.setGravity(android.view.Gravity.RIGHT|android.view.Gravity.CENTER_VERTICAL);
                 headingRow.addView(dateText);
                 if(organizer>=0){
-                    TextView organizerView=txt("♧  Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.WHITE);
+                    TextView organizerView=txt("♙  Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.WHITE);
                     organizerView.setBackgroundColor(0xff062b27);
                     organizerView.setPadding(12,10,10,10);roundCard.addView(organizerView);
                 }
