@@ -72,18 +72,27 @@ public class MainActivity extends Activity {
         while(body.getChildCount()>5)body.removeViewAt(5);
         body.addView(txt("Competiciones · "+category+" · "+season,19,accent));
         String[] entries;
-        if(category.equals("M14")&&season.equals("2026/27"))entries=new String[]{"Primera División","Segunda División · Grupo 1","Segunda División · Grupo 2","Copa FAR"};
+        if(category.equals("M14")&&season.equals("2026/27"))entries=new String[]{"Primera División","Segunda División · Grupo 1","Segunda División · Grupo 2","Segunda División A · 2.ª fase","Segunda División B · 2.ª fase","Copa FAR"};
+        else if(category.equals("M14")&&season.equals("2025/26"))entries=new String[]{"Primera División","Segunda División A · 2.ª fase","Segunda División B · 2.ª fase"};
         else entries=category.equals("M14")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M16")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M18")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:new String[]{"Consultar competiciones oficiales"};
         for(String entry:entries){TextView card=txt(entry+"  ›",17,Color.WHITE);card.setBackgroundColor(panel);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,5,0,5);body.addView(card,lp);card.setOnClickListener(v->details(entry));}
         if(category.equals("M14")&&season.equals("2026/27"))button("Sistema de competición · M14 2026/27",()->M14RulesActivity.open(this));
         body.addView(txt(category.equals("M14")&&season.equals("2026/27")?"Competiciones contrastadas con la web oficial FAR.":"Estructura orientativa: verificar divisiones y grupos para esta temporada.",12,Color.LTGRAY));
     }
     String officialCalendar(){
-        if(!season.equals("2026/27")||!category.equals("M14"))return "";
+        if(!category.equals("M14"))return "";
+        if(season.equals("2025/26")){
+            if(selectedCompetition.equals("Primera División"))return "https://farugby.matchready.es/es/public/calendar/33/11/combined/";
+            if(selectedCompetition.equals("Segunda División A · 2.ª fase"))return "https://farugby.matchready.es/es/public/calendar/34/147/combined/";
+            if(selectedCompetition.equals("Segunda División B · 2.ª fase"))return "https://farugby.matchready.es/es/public/calendar/34/148/combined/";
+            return "";
+        }
+        if(!season.equals("2026/27"))return "";
         if(selectedCompetition.equals("Primera División"))return "https://farugby.matchready.es/es/public/calendar/35/11/combined/";
         if(selectedCompetition.equals("Segunda División · Grupo 1"))return "https://farugby.matchready.es/es/public/calendar/35/12/combined/";
         if(selectedCompetition.equals("Segunda División · Grupo 2"))return "https://farugby.matchready.es/es/public/calendar/35/15/combined/";
         if(selectedCompetition.equals("Copa FAR"))return "https://farugby.matchready.es/es/public/calendar/35/83/combined/";
+        if(selectedCompetition.contains("2.ª fase"))return getPreferences(0).getString("url_"+season+"_"+category+"_"+selectedCompetition,"").trim();
         return "";
     }
     String farUrl(){return "https://farugby.com/";}
@@ -240,6 +249,7 @@ public class MainActivity extends Activity {
         String heading=standing.optString("heading","").toLowerCase(java.util.Locale.ROOT);
         if(heading.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))return 2;
         if(heading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))return 1;
+        // La clasificación acumulada de Primera no permite inferir la fase por fechas o partidos jugados.
         org.json.JSONArray all=data.optJSONArray("tables");
         boolean first=false,second=false;
         if(all!=null)for(int i=0;i<all.length();i++){
@@ -271,7 +281,7 @@ public class MainActivity extends Activity {
     String m14SecondPhaseGuide(int rank){
         String competition=selectedCompetition.toLowerCase(java.util.Locale.ROOT);
         if(competition.contains("primera división")&&rank==6)return "promoción final";
-        if((competition.contains("segunda división a")||competition.contains("segunda a"))&&rank==1)return "promoción final";
+        if((competition.contains("segunda división a")||competition.contains("segunda a")||competition.contains("segunda división a"))&&rank==1)return "promoción final";
         return "";
     }
     boolean isScore(String value){return value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");}
