@@ -48,12 +48,9 @@ public class MainActivity extends Activity {
         body.addView(subtitle);
         body.addView(txt("¿Qué quieres consultar?",18,Color.WHITE));
         dashboardCard("🏉  COMPETICIONES","Calendarios, resultados, clasificaciones y actas",()->competitionsHome());
-        dashboardCard("📁  CIRCULARES Y REGLAMENTOS","Temporadas, categorías y documentos oficiales",()->{
-            Intent i=new Intent(this,CircularsActivity.class);
-            i.putExtra("season",season);i.putExtra("category",category);startActivity(i);
-        });
-        dashboardCard("📋  SISTEMA DE COMPETICIÓN","Fases y normas M14 · 2026/27",()->M14RulesActivity.open(this));
+        dashboardCard("📋  SISTEMAS DE COMPETICIÓN","Fases y normas oficiales de las competiciones",()->M14RulesActivity.open(this));
         dashboardCard("🌐  PORTALES OFICIALES","MatchReady y Federación Andaluza de Rugby",()->officialPortals());
+        dashboardCard("⚙  AJUSTES","Temporadas, circulares y configuración",()->settingsHome());
         body.addView(txt("Los resultados proceden de fuentes oficiales. Las reglas se revisan antes de aplicarse.",12,Color.LTGRAY));
     }
     void dashboardCard(String heading,String description,Runnable click){
@@ -66,6 +63,18 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
         lp.setMargins(0,7,0,7);body.addView(card,lp);
         card.setOnClickListener(v->click.run());
+    }
+    void settingsHome(){
+        page="settings";layout("Ajustes");
+        body.addView(txt("Configuración de FAR Competiciones",14,accent));
+        dashboardCard("📅  GESTIÓN DE TEMPORADAS","Crear temporadas y organizar sus categorías",()->openCirculars());
+        dashboardCard("📁  CIRCULARES Y REGLAMENTOS","Añadir y consultar documentos oficiales por temporada",()->openCirculars());
+        body.addView(txt("Las circulares registradas no modifican las clasificaciones hasta revisar y aprobar sus reglas.",12,Color.LTGRAY));
+        button("‹ Inicio",()->home());
+    }
+    void openCirculars(){
+        Intent i=new Intent(this,CircularsActivity.class);
+        i.putExtra("season",season);i.putExtra("category",category);startActivity(i);
     }
     void officialPortals(){
         page="portals";layout("Portales oficiales");
