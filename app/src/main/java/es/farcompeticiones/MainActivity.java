@@ -77,9 +77,9 @@ public class MainActivity extends Activity {
         column.addView(heading);
         ImageView hero=new ImageView(this);
         hero.setImageResource(R.drawable.cabecera_rugby);
-        hero.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        hero.setScaleType(ImageView.ScaleType.FIT_XY);
         hero.setContentDescription("Cabecera de rugby");
-        LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(112));
+        LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(145));
         heroLp.setMargins(0,dp(2),0,dp(3));column.addView(hero,heroLp);
         TextView prompt=txt("¿Qué quieres consultar?",20,Color.WHITE);prompt.setTypeface(null,Typeface.BOLD);
         column.addView(prompt);
