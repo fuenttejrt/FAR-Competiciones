@@ -46,18 +46,16 @@ public class MainActivity extends Activity {
             if(alpha==0)continue;
             Color.colorToHSV(pixel,hsv);
             int r=Color.red(pixel),g=Color.green(pixel),b=Color.blue(pixel);
-            // Priorizar verdes oscuros antes de detectar el negro de las letras.
-            // El verde original es casi negro: no debe convertirse en blanco.
+            // Conservar los verdes del símbolo y aclararlos suavemente.
             boolean isGreen=(g>=r+9&&g>=b+5&&g>=19)
                 ||(hsv[0]>=95f&&hsv[0]<=175f&&hsv[1]>.26f);
             if(isGreen){
-                // Mantener los distintos verdes, con mayor luminosidad y saturación.
-                hsv[1]=Math.max(.56f,Math.min(.94f,hsv[1]));
+                hsv[1]=Math.max(.60f,Math.min(.96f,hsv[1]));
                 hsv[2]=Math.min(.75f,Math.max(.35f,hsv[2]*1.8f+.13f));
                 result.setPixel(x,y,Color.HSVToColor(alpha,hsv));
-            }else if(r<95&&g<95&&b<95){
-                // Solo los trazos negros/neutros de FAR se vuelven blancos.
-                result.setPixel(x,y,Color.argb(alpha,255,255,255));
+            }else if(x>result.getWidth()*.47f&&r<105&&g<105&&b<105){
+                // Letras FAR: verde luminoso, no blanco ni negro.
+                result.setPixel(x,y,Color.argb(alpha,76,207,132));
             }
         }
         original.recycle();
