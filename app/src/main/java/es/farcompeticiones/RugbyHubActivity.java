@@ -479,6 +479,7 @@ public final class RugbyHubActivity extends Activity {
                 String disciplinaryColumns=null;
                 String scoreboardColumns=null;
                 String coordinateDiagnosis="";
+                String coordinateChangesResult=null;
                 try(com.tom_roush.pdfbox.pdmodel.PDDocument pdf=
                     com.tom_roush.pdfbox.pdmodel.PDDocument.load(data)){
                     com.tom_roush.pdfbox.text.PDFTextStripper stripper=
@@ -494,7 +495,7 @@ public final class RugbyHubActivity extends Activity {
                     if(coordinateTemporary!=null||coordinateDefinitive!=null)
                         disciplinaryColumns="TEMPORALES\n"+(coordinateTemporary==null?"":coordinateTemporary)+
                             "\nDEFINITIVAS\n"+(coordinateDefinitive==null?"":coordinateDefinitive);
-                    if(coordinateChanges!=null)extracted.append("CAMBIOS POR COORDENADAS\n").append(coordinateChanges).append("\n");
+                    coordinateChangesResult=coordinateChanges;
                     String coordinateScore=scoreFromCoordinates(coordinateDiagnosis);
                     if(coordinateScore!=null)scoreboardColumns=coordinateScore;
                     for(int page=1;page<=pdf.getNumberOfPages();page++){
@@ -508,6 +509,7 @@ public final class RugbyHubActivity extends Activity {
                 final String safeDiscipline=disciplinaryColumns;
                 final String safeScoreboard=scoreboardColumns;
                 final String safeCoordinates=coordinateDiagnosis;
+                final String safeChanges=coordinateChangesResult;
                 final String rawDiagnosis="ACTA: "+url+"\\n"+
                     "EXTRACCION DE ZONA MARCADOR: "+(safeScoreboard==null?"NO DISPONIBLE":safeScoreboard)+"\\n"+
                     "PRUEBA DE COORDENADAS:\\n"+safeCoordinates+"\\n"+
@@ -525,6 +527,7 @@ public final class RugbyHubActivity extends Activity {
                         if(safeLineups!=null)parsed.put("Alineaciones",safeLineups);
                         if(safeDiscipline!=null)parsed.put("Expulsiones",safeDiscipline);
                         if(safeScoreboard!=null)parsed.put("Marcador",safeScoreboard);
+                        if(safeChanges!=null)parsed.put("Cambios",safeChanges);
                         sections.removeAllViews();
                         
                         LinearLayout tabStack=new LinearLayout(this);
