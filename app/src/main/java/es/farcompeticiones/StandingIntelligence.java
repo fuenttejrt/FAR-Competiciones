@@ -152,14 +152,18 @@ final class StandingIntelligence {
             }
         }
         if(matchTables==0)return "No se pueden verificar los partidos pendientes: el calendario no identifica expresamente la 1.ª fase.";
-        StringBuilder result=new StringBuilder("Partidos pendientes por equipo (solo jornadas identificadas como 1.ª fase): ");
+        StringBuilder result=new StringBuilder("Escenario de puntos al terminar la 1.ª fase: ");
         for(int i=0;i<teams.size();i++){
             Team team=teams.get(i);
             int remaining=pending.containsKey(key(team.name))?pending.get(key(team.name)):0;
             if(i>0)result.append(" · ");
-            result.append(team.name).append(": ").append(remaining);
+            result.append(team.name).append(": ").append(remaining)
+                  .append(" partidos, ").append(team.points).append("–")
+                  .append(team.points+5*remaining).append(" pts");
         }
-        result.append(". Conteo provisional: partidos sin marcador en el calendario importado; no incluye jornadas sin identificar.");
+        result.append(". Intervalos teóricos con hasta 5 puntos por encuentro. ")
+              .append("No determinan posiciones ni clasificación matemática: ")
+              .append("faltan verificar el calendario completo, los desempates y las resoluciones oficiales.");
         return result.toString();
     }
 
