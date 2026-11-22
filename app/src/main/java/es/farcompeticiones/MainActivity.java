@@ -70,8 +70,11 @@ public class MainActivity extends Activity {
         words.addView(name);
         TextView tagline=txt("Rugby andaluz",14,accent);words.addView(tagline);
         heading.addView(words,new LinearLayout.LayoutParams(0,-2,1));
-        // Identificador FAR dibujado sin recurrir al icono Android predeterminado.
-        View crest=new FarMark(this);
+        // Escudo FAR transparente sobre el fondo oscuro.
+        ImageView crest=new ImageView(this);
+        crest.setImageResource(R.drawable.logo_far);
+        crest.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        crest.setContentDescription("Escudo Federación Andaluza de Rugby");
         LinearLayout.LayoutParams crestParams=new LinearLayout.LayoutParams(dp(74),dp(74));
         crestParams.setMargins(dp(6),0,dp(6),0);heading.addView(crest,crestParams);
         column.addView(heading);
