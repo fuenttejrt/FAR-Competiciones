@@ -397,7 +397,7 @@ public class MainActivity extends Activity {
     void showCompetitionTab(String tab){
         selectedTab=tab;page="detail";
         layout(category+" · "+selectedCompetition);
-        TextView back=txt("‹",25,Color.WHITE);
+        TextView back=txt("←",25,Color.WHITE);
         back.setGravity(android.view.Gravity.CENTER);
         LinearLayout titleBar=(LinearLayout)root;
         if(titleBar.getChildCount()>0&&titleBar.getChildAt(0) instanceof TextView){
@@ -406,6 +406,20 @@ public class MainActivity extends Activity {
             LinearLayout header=new LinearLayout(this);header.setGravity(android.view.Gravity.CENTER_VERTICAL);
             header.addView(back,new LinearLayout.LayoutParams(dp(30),dp(45)));
             header.addView(currentTitle,new LinearLayout.LayoutParams(0,-2,1));
+            View stripes=new View(this){
+                Paint p=new Paint(3);
+                @Override protected void onDraw(Canvas c){
+                    super.onDraw(c);
+                    float w=getWidth(),h=getHeight();
+                    Path red=new Path();red.moveTo(0,h*.68f);red.quadTo(w*.54f,h*.12f,w,h*.23f);
+                    red.quadTo(w*.58f,h*.24f,0,h*.86f);red.close();
+                    p.setColor(0xffdf314b);c.drawPath(red,p);
+                    Path green=new Path();green.moveTo(w*.13f,h*.95f);green.quadTo(w*.60f,h*.39f,w,h*.49f);
+                    green.quadTo(w*.65f,h*.50f,w*.13f,h);green.close();
+                    p.setColor(0xff169e62);c.drawPath(green,p);
+                }
+            };
+            header.addView(stripes,new LinearLayout.LayoutParams(dp(65),dp(35)));
             root.addView(header,0);
             back.setOnClickListener(v->competitionsHome());
         }
@@ -413,8 +427,11 @@ public class MainActivity extends Activity {
         int tabIndex=0;
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             final boolean active=item.equals(tab);
-            final String icon=tabIndex==0?"▦  ":tabIndex==1?"▥  ":"♕  ";
-            TextView b=txt(icon+item,12,Color.WHITE);b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
+            int iconId=tabIndex==0?android.R.drawable.ic_menu_my_calendar:tabIndex==1?android.R.drawable.ic_menu_sort_by_size:android.R.drawable.btn_star_big_on;
+            TextView b=txt(item,12,Color.WHITE);
+            b.setCompoundDrawablesWithIntrinsicBounds(iconId,0,0,0);
+            b.setCompoundDrawablePadding(dp(5));
+            if(b.getCompoundDrawables()[0]!=null)b.getCompoundDrawables()[0].setTint(Color.WHITE);b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
             android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable();
             tabBg.setColor(active?0xff08643d:0xff052c25);tabBg.setCornerRadius(22*getResources().getDisplayMetrics().density);
             tabBg.setStroke((int)(1.3f*getResources().getDisplayMetrics().density),0xff178e5a);b.setBackground(tabBg);
@@ -429,7 +446,10 @@ public class MainActivity extends Activity {
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
             for(int action=0;action<2;action++){
                 final boolean update=action==0;
-                TextView control=txt(update?"⟳  Actualizar":"↗  Web oficial",12,Color.WHITE);
+                TextView control=txt(update?"Actualizar":"Web oficial",12,Color.WHITE);
+                control.setCompoundDrawablesWithIntrinsicBounds(update?android.R.drawable.ic_popup_sync:android.R.drawable.ic_menu_view,0,0,0);
+                control.setCompoundDrawablePadding(dp(7));
+                if(control.getCompoundDrawables()[0]!=null)control.getCompoundDrawables()[0].setTint(Color.WHITE);
                 control.setTypeface(null,Typeface.BOLD);control.setGravity(android.view.Gravity.CENTER);
                 android.graphics.drawable.GradientDrawable controlBg=new android.graphics.drawable.GradientDrawable();
                 controlBg.setColor(0xff173c3b);controlBg.setCornerRadius(20*getResources().getDisplayMetrics().density);
@@ -857,10 +877,19 @@ public class MainActivity extends Activity {
                 pickerBg.setColor(resultPicker?0xff3b0b19:0xff053c2d);
                 pickerBg.setCornerRadius(dp(22));
                 pickerBg.setStroke(dp(1.4f),resultPicker?0xffb74459:0xff19a86b);
-                picker.setBackground(pickerBg);
+                android.widget.FrameLayout pickerFrame=new android.widget.FrameLayout(this);
+                pickerFrame.setBackground(pickerBg);
+                picker.setBackgroundColor(Color.TRANSPARENT);
+                pickerFrame.addView(picker,new android.widget.FrameLayout.LayoutParams(-1,-1));
+                TextView chevron=txt("⌄",30,Color.WHITE);
+                chevron.setGravity(android.view.Gravity.CENTER);
+                chevron.setPadding(0,0,0,dp(9));
+                android.widget.FrameLayout.LayoutParams arrowLp=new android.widget.FrameLayout.LayoutParams(dp(43),-1,android.view.Gravity.RIGHT);
+                pickerFrame.addView(chevron,arrowLp);
+                chevron.setOnClickListener(v->picker.performClick());
                 LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,dp(47));
                 pickerParams.setMargins(0,dp(12),0,dp(10));
-                body.addView(picker,pickerParams);
+                body.addView(pickerFrame,pickerParams);
                 picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
                     public void onNothingSelected(AdapterView<?> p){}
                     public void onItemSelected(AdapterView<?> p,View v,int position,long id){
@@ -1026,7 +1055,7 @@ public class MainActivity extends Activity {
                 dateText.setGravity(android.view.Gravity.RIGHT|android.view.Gravity.CENTER_VERTICAL);
                 headingRow.addView(dateText);
                 if(organizer>=0){
-                    TextView organizerView=txt("♙  Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.WHITE);
+                    TextView organizerView=txt("♧  Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.WHITE);
                     organizerView.setBackgroundColor(0xff062b27);
                     organizerView.setPadding(12,10,10,10);roundCard.addView(organizerView);
                 }
