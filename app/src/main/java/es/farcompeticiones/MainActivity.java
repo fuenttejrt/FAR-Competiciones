@@ -148,6 +148,36 @@ public class MainActivity extends Activity {
         }
         return cells;
     }
+    String normalizedTeamKey(String name){
+        return java.text.Normalizer.normalize(name==null?"":name.toLowerCase(java.util.Locale.ROOT),
+            java.text.Normalizer.Form.NFD).replaceAll("[\\u0300-\\u036f]","")
+            .replaceAll("[^a-z0-9]","").trim();
+    }
+    String crestFromMatches(org.json.JSONObject data,String team){
+        String key=normalizedTeamKey(team);
+        if(key.isEmpty())return "";
+        org.json.JSONArray tables=data.optJSONArray("tables");
+        if(tables==null)return "";
+        for(int i=0;i<tables.length();i++){
+            org.json.JSONObject table=tables.optJSONObject(i);
+            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            org.json.JSONArray rows=table.optJSONArray("rows");
+            if(rows==null)continue;
+            for(int j=0;j<rows.length();j++){
+                org.json.JSONObject row=rows.optJSONObject(j);
+                if(row==null)continue;
+                if(key.equals(normalizedTeamKey(row.optString("home","")))){
+                    String crest=row.optString("homeCrest","");
+                    if(crest.startsWith("https://"))return crest;
+                }
+                if(key.equals(normalizedTeamKey(row.optString("away","")))){
+                    String crest=row.optString("awayCrest","");
+                    if(crest.startsWith("https://"))return crest;
+                }
+            }
+        }
+        return "";
+    }
     void addStandingTeam(LinearLayout parent,String team,String crest,int width){
         LinearLayout fixed=new LinearLayout(this);
         fixed.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -558,7 +588,9 @@ public class MainActivity extends Activity {
                             positionGuide.contains("Segunda B")?0xff9db0c0:0xff66e1a4;
                     }
                     addStandingFixed(line,vals[0],unit*3/5,positionColor);
-                    addStandingTeam(line,vals[1],row.optString("crest",""),(int)(getResources().getDisplayMetrics().density*168));
+                    String crest=row.optString("crest","");
+                    if(!crest.startsWith("https://"))crest=crestFromMatches(data,vals[1]);
+                    addStandingTeam(line,vals[1],crest,(int)(getResources().getDisplayMetrics().density*168));
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
                     scroller.setHorizontalScrollBarEnabled(false);
                     scroller.setClipToPadding(true);
