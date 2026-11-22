@@ -49,7 +49,7 @@ public final class CircularsActivity extends Activity {
             new android.app.AlertDialog.Builder(this).setTitle("Nueva temporada").setView(input)
                 .setNegativeButton("Cancelar",null).setPositiveButton("Crear",(d,w)->{
                     String y=input.getText().toString().trim();
-                    if(!y.matches("\\d{4}/\\d{2}")){Toast.makeText(this,"Formato: 2027/28",Toast.LENGTH_LONG).show();return;}
+                    if(!y.matches("[0-9]{4}/[0-9]{2}")){Toast.makeText(this,"Formato: 2027/28",Toast.LENGTH_LONG).show();return;}
                     int start=Integer.parseInt(y.substring(0,4)),end=Integer.parseInt(y.substring(5));
                     if((start+1)%100!=end){Toast.makeText(this,"Los años deben ser consecutivos",Toast.LENGTH_LONG).show();return;}
                     JSONArray existing=seasons();
