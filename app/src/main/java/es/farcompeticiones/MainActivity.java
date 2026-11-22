@@ -85,7 +85,7 @@ public class MainActivity extends Activity {
         seasonSpinner.setSelection(season.equals("2025/26")?1:0);
         seasonSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
             public void onNothingSelected(AdapterView<?> p){}
-            public void onItemSelected(AdapterView<?> p,View v,int pos,long id){season=seasons[pos];if(body!=null&&body.getChildCount()>5)list();}
+            public void onItemSelected(AdapterView<?> p,View v,int pos,long id){season=seasons[pos];if(body!=null&&body.getChildCount()>=6)list();}
         });
         body.addView(txt("Selecciona una categoría",18,Color.WHITE));
         String[] cats={"M14","M16","M18","Sénior masculino","Sénior femenino","Otras categorías"};
@@ -99,7 +99,7 @@ public class MainActivity extends Activity {
         button("‹ Inicio",()->home());
     }
     void list(){
-        while(body.getChildCount()>5)body.removeViewAt(5);
+        while(body.getChildCount()>6)body.removeViewAt(6);
         body.addView(txt("Competiciones · "+category+" · "+season,19,accent));
         String[] entries;
         if(category.equals("M14")&&season.equals("2026/27"))entries=new String[]{"Primera División","Segunda División · Grupo 1","Segunda División · Grupo 2","Segunda División A · 2.ª fase","Segunda División B · 2.ª fase","Copa FAR"};
