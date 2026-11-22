@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -35,6 +37,29 @@ public class MainActivity extends Activity {
     long lastAutomaticRefreshAttempt=0L;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(bg));home();}
+    Bitmap farLogoHighContrast(){
+        Bitmap original=BitmapFactory.decodeResource(getResources(),R.drawable.logo_far);
+        Bitmap result=original.copy(Bitmap.Config.ARGB_8888,true);
+        float[] hsv=new float[3];
+        for(int y=0;y<result.getHeight();y++)for(int x=0;x<result.getWidth();x++){
+            int pixel=result.getPixel(x,y),alpha=Color.alpha(pixel);
+            if(alpha==0)continue;
+            Color.colorToHSV(pixel,hsv);
+            int r=Color.red(pixel),g=Color.green(pixel),b=Color.blue(pixel);
+            // Negro del texto FAR: blanco, conservando el canal alfa y los bordes.
+            if(r<95&&g<95&&b<95){
+                result.setPixel(x,y,Color.argb(alpha,255,255,255));
+            }else if(g>r*1.20f&&g>b*1.12f&&hsv[1]>.22f){
+                // Aclarar cada verde conservando su matiz y diferencia tonal.
+                hsv[1]=Math.max(0f,hsv[1]*.92f);
+                hsv[2]=Math.min(1f,hsv[2]*1.34f+.065f);
+                int recolored=Color.HSVToColor(alpha,hsv);
+                result.setPixel(x,y,recolored);
+            }
+        }
+        original.recycle();
+        return result;
+    }
     void layout(String heading){
         if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
         browser=null;
@@ -72,7 +97,7 @@ public class MainActivity extends Activity {
         heading.addView(words,new LinearLayout.LayoutParams(0,-2,1));
         // Escudo FAR transparente sobre el fondo oscuro.
         ImageView crest=new ImageView(this);
-        crest.setImageResource(R.drawable.logo_far);
+        crest.setImageBitmap(farLogoHighContrast());
         crest.setScaleType(ImageView.ScaleType.FIT_CENTER);
         crest.setContentDescription("Escudo Federación Andaluza de Rugby");
         LinearLayout.LayoutParams crestParams=new LinearLayout.LayoutParams(dp(74),dp(74));
