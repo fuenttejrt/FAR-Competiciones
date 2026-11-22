@@ -964,7 +964,7 @@ public class MainActivity extends Activity {
                 if(!kind.equals("standing"))continue;
                 boolean m14Legend=category.equals("M14")&&(season.equals("2026/27")||season.equals("2025/26"))&&!selectedCompetition.equals("Copa FAR");
                 int detectedPhase=m14Legend?m14StandingPhase(data,table):0;
-                if(m14Legend)body.addView(txt(detectedPhase==0?"Fase sin confirmar · colores de puestos desactivados":detectedPhase==1?"1.ª fase · puestos orientativos":"2.ª fase · puestos orientativos",12,detectedPhase==0?Color.LTGRAY:accent));
+                if(m14Legend)body.addView(txt(detectedPhase==0?"Clasificación · fase sin confirmar":detectedPhase==1?"Clasificación · 1.ª fase":"Clasificación · 2.ª fase",14,detectedPhase==0?Color.LTGRAY:accent));
                 body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
                 String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
                 int unit=(int)(getResources().getDisplayMetrics().density*34);
@@ -1027,22 +1027,22 @@ public class MainActivity extends Activity {
                     count++;
                 }
                 if(m14Legend){
-                    body.addView(txt("LEYENDA · PUESTOS ORIENTATIVOS",13,accent));
+                    body.addView(txt("LEYENDA · PUESTOS ORIENTATIVOS",12,accent));
                     if(detectedPhase==1&&selectedCompetition.equals("Primera División")){
-                        body.addView(txt("● Verde (1.º–5.º): acceso previsto a Primera División en la segunda fase.",12,0xff66e1a4));
-                        body.addView(txt("● Amarillo (6.º): triangular de promoción.",12,0xffffca65));
+                        body.addView(txt("● Verde (1.º–5.º): acceso previsto a Primera en 2.ª fase.",11,0xff66e1a4));
+                        body.addView(txt("● Amarillo (6.º): triangular de promoción.",11,0xffffca65));
                     }else if(detectedPhase==1&&selectedCompetition.startsWith("Segunda División · Grupo")){
-                        body.addView(txt("● Amarillo (1.º): triangular de promoción.",12,0xffffca65));
-                        body.addView(txt("● Verde (2.º–3.º): acceso previsto a Segunda División A.",12,0xff66e1a4));
-                        body.addView(txt("● Gris (4.º–6.º): acceso previsto a Segunda División B.",12,0xff9db0c0));
+                        body.addView(txt("● Amarillo (1.º): triangular de promoción.",11,0xffffca65));
+                        body.addView(txt("● Verde (2.º–3.º): acceso previsto a Segunda A.",11,0xff66e1a4));
+                        body.addView(txt("● Gris (4.º–6.º): acceso previsto a Segunda B.",11,0xff9db0c0));
                     }else if(detectedPhase==2){
-                        if(selectedCompetition.equals("Primera División"))body.addView(txt("● Amarillo (6.º): promoción final frente al primero de Segunda A.",12,0xffffca65));
-                        else if((selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda a")||selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda división a")))body.addView(txt("● Amarillo (1.º): promoción final frente al sexto de Primera.",12,0xffffca65));
+                        if(selectedCompetition.equals("Primera División"))body.addView(txt("● Amarillo (6.º): promoción final frente al primero de Segunda A.",11,0xffffca65));
+                        else if((selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda a")||selectedCompetition.toLowerCase(java.util.Locale.ROOT).contains("segunda división a")))body.addView(txt("● Amarillo (1.º): promoción final frente al sexto de Primera.",11,0xffffca65));
                         else body.addView(txt("Sin colores de promoción para este grupo.",12,Color.LTGRAY));
                     }else{
                         body.addView(txt("No se puede confirmar la fase a partir de las etiquetas oficiales disponibles. Actualiza los datos para volver a comprobarlo.",12,Color.LTGRAY));
                     }
-                    body.addView(txt("Indicaciones provisionales. La FAR puede aplicar sanciones, renuncias y resoluciones que modifiquen los puestos.",11,Color.LTGRAY));
+                    body.addView(txt("Puestos orientativos, sujetos a sanciones, renuncias y resoluciones de la FAR.",11,Color.LTGRAY));
                 }
                 for(android.widget.HorizontalScrollView scroller:scrollRows){
                     scroller.setOnScrollChangeListener((View.OnScrollChangeListener)(v,x,y,oldX,oldY)->{
