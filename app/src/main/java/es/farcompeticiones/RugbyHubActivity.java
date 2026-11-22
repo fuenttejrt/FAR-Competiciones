@@ -1282,6 +1282,46 @@ public final class RugbyHubActivity extends Activity {
                     found.remove("Jornada");
             }
         }
+        // Staff is printed in two side-by-side cells, not among the match
+        // header fields. Parse the first page only to avoid annex duplicates.
+        String pageOne=clean.split("(?m)^\\s*PÁGINA\\s+2\\s*$",2)[0];
+        java.util.regex.Pattern staff=java.util.regex.Pattern.compile(
+            "(?im)^\\s*(Entrenador|Delegado):\\s*(.+?)\\s+"+
+            "\\1:\\s*(.+?)\\s*$");
+        java.util.regex.Matcher staffRows=staff.matcher(pageOne);
+        while(staffRows.find()){
+            String role=staffRows.group(1);
+            String local=staffRows.group(2).trim();
+            String visitor=staffRows.group(3).trim();
+            if(!local.isEmpty())found.put(role+" local",local);
+            if(!visitor.isEmpty())found.put(role+" visitante",visitor);
+        }
+        // Some PDFs wrap each team's staff onto separate lines.
+        for(String role:new String[]{"Entrenador","Delegado"}){
+            if(found.containsKey(role+" local"))continue;
+            java.util.regex.Matcher row=java.util.regex.Pattern.compile(
+                "(?im)^\\s*"+role+":\\s*([^\\r\\n]+)").matcher(pageOne);
+            if(row.find()){
+                String[] both=row.group(1).split("(?i)\\s+"+role+":\\s*",2);
+                if(both.length==2){
+                    found.put(role+" local",both[0].trim());
+                    found.put(role+" visitante",both[1].trim());
+                }
+            }
+        }
+        // The referee appears in a three-column row below the final score.
+        // Only display a name when an adjacent seven-digit licence confirms it.
+        java.util.regex.Matcher referee=java.util.regex.Pattern.compile(
+            "(?is)Árbitro\\s+N[ºo]\\s*Licencia del árbitro.*?\\n"+
+            "\\s*([\\p{L}ÁÉÍÓÚÜÑáéíóúüñ, .'-]+?)\\s+(\\d{7})\\b")
+            .matcher(pageOne);
+        if(referee.find()){
+            String name=referee.group(1).replaceAll("\\s+"," ").trim();
+            if(name.length()>5){
+                found.put("Árbitro",name);
+                found.put("Licencia árbitro",referee.group(2));
+            }
+        }
         for(java.util.Map.Entry<String,String> field:found.entrySet()){
             LinearLayout card=new LinearLayout(this);card.setOrientation(1);
             card.setPadding(dp(12),dp(6),dp(12),dp(6));
