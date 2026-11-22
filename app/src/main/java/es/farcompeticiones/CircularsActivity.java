@@ -33,7 +33,7 @@ public final class CircularsActivity extends Activity {
         Button b=new Button(this);b.setText(title);b.setAllCaps(false);body.addView(b);b.setOnClickListener(v->run.run());
     }
     private JSONArray seasons(){
-        try{return new JSONArray(getPreferences(0).getString("circular_seasons","[\\"2025/26\\",\\"2026/27\\"]"));}
+        try{return new JSONArray(getPreferences(0).getString("circular_seasons",new JSONArray().put("2025/26").put("2026/27").toString()));}
         catch(Exception e){return new JSONArray().put("2025/26").put("2026/27");}
     }
     private void renderSeasons(){
