@@ -398,19 +398,35 @@ public class MainActivity extends Activity {
         selectedTab=tab;page="detail";
         layout(category+" · "+selectedCompetition);
         LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);body.addView(tabs);
+        int tabIndex=0;
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
-            Button b=new Button(this);b.setText(item);b.setTextSize(11);b.setAllCaps(false);
-            b.setTextColor(item.equals(tab)?accent:Color.WHITE);
-            tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));b.setOnClickListener(v->{if(!item.equals(selectedTab)){selectedMatchGroup=item.equals("Resultados")?0:-1;}showCompetitionTab(item);});
+            final boolean active=item.equals(tab);
+            final String icon=tabIndex==0?"▦ ":tabIndex==1?"▥ ":"♜ ";
+            TextView b=txt(icon+item,12,Color.WHITE);b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
+            android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable();
+            tabBg.setColor(active?0xff08643d:0xff052c25);tabBg.setCornerRadius(22*getResources().getDisplayMetrics().density);
+            tabBg.setStroke((int)(1.3f*getResources().getDisplayMetrics().density),0xff178e5a);b.setBackground(tabBg);
+            LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(0,(int)(46*getResources().getDisplayMetrics().density),1);
+            tp.setMargins(2,2,2,8);tabs.addView(b,tp);
+            b.setOnClickListener(v->{if(!item.equals(selectedTab)){selectedMatchGroup=item.equals("Resultados")?0:-1;}showCompetitionTab(item);});
+            tabIndex++;
         }
         String official=officialCalendar();
         if(!official.isEmpty()){
 
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
-            Button refresh=new Button(this);refresh.setText("↻ Actualizar");refresh.setTextSize(12);refresh.setAllCaps(false);
-            actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1));refresh.setOnClickListener(v->refreshNative(official));
-            Button source=new Button(this);source.setText("Web oficial");source.setTextSize(12);source.setAllCaps(false);
-            actions.addView(source,new LinearLayout.LayoutParams(0,-2,1));source.setOnClickListener(v->openBrowser(official));
+            for(int action=0;action<2;action++){
+                final boolean update=action==0;
+                TextView control=txt(update?"⟳  Actualizar":"↗  Web oficial",12,Color.WHITE);
+                control.setTypeface(null,Typeface.BOLD);control.setGravity(android.view.Gravity.CENTER);
+                android.graphics.drawable.GradientDrawable controlBg=new android.graphics.drawable.GradientDrawable();
+                controlBg.setColor(0xff173c3b);controlBg.setCornerRadius(20*getResources().getDisplayMetrics().density);
+                controlBg.setStroke((int)(getResources().getDisplayMetrics().density),0xff396a60);
+                control.setBackground(controlBg);
+                LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(0,(int)(39*getResources().getDisplayMetrics().density),1);
+                ap.setMargins(8,0,8,10);actions.addView(control,ap);
+                control.setOnClickListener(v->{if(update)refreshNative(official);else openBrowser(official);});
+            }
             showCachedNative();
             // Al abrir la clasificación M14, comprobar periódicamente si MatchReady ha publicado una fase nueva.
             // El intervalo evita descargas continuas al cambiar de pestaña y al terminar una importación.
@@ -589,7 +605,7 @@ public class MainActivity extends Activity {
         String field=away.contains("Campo:")?away.substring(away.indexOf("Campo:")):"";
         home=clean(home,"Árbitro:");away=clean(away,"Campo:");
         if(away.isEmpty())return;
-        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(10,7,10,7);card.setBackgroundColor(panel);
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(10,7,10,7);card.setBackgroundColor(0xff162e3c);
         LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,3,0,3);body.addView(card,cp);
         card.addView(txt(when,12,accent));
         LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
@@ -948,13 +964,31 @@ public class MainActivity extends Activity {
                 boolean roundAlreadyInSelector=selectedMatchGroup>=0;
                 String roundTitle=number.isEmpty()?shortRoundLabel(full):"Jornada "+number;
                 String sectionTitle=roundAlreadyInSelector?phase:roundTitle+(phase.isEmpty()?"":" · "+phase);
-                if(!sectionTitle.isEmpty()){
-                    TextView head=txt(sectionTitle,roundAlreadyInSelector?12:15,accent);
-                    head.setTypeface(null,Typeface.BOLD);
-                    head.setPadding(0,2,0,0);
-                    body.addView(head);
+                boolean redRound=(i%2==0);
+                int borderColor=redRound?0xffbc4458:0xff25a66b;
+                int headerColor=redRound?0xff4b0c19:0xff063c2d;
+                LinearLayout roundCard=new LinearLayout(this);roundCard.setOrientation(LinearLayout.VERTICAL);
+                android.graphics.drawable.GradientDrawable roundBg=new android.graphics.drawable.GradientDrawable();
+                roundBg.setColor(0xff08221f);roundBg.setCornerRadius(17*getResources().getDisplayMetrics().density);
+                roundBg.setStroke((int)(1.3f*getResources().getDisplayMetrics().density),borderColor);
+                roundCard.setBackground(roundBg);roundCard.setClipToOutline(true);
+                LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.setMargins(0,8,0,10);body.addView(roundCard,rp);
+                String firstDay="";
+                for(int j=0;j<rows.length();j++){
+                    org.json.JSONObject candidate=rows.optJSONObject(j);
+                    if(candidate!=null&&matchVisible(candidate)){firstDay=matchDayLabel(candidate.optString("when",""));break;}
                 }
-                if(organizer>=0)body.addView(txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY));
+                LinearLayout headingRow=new LinearLayout(this);headingRow.setOrientation(LinearLayout.HORIZONTAL);
+                headingRow.setGravity(android.view.Gravity.CENTER_VERTICAL);headingRow.setPadding(12,9,12,9);
+                headingRow.setBackgroundColor(headerColor);roundCard.addView(headingRow);
+                TextView headingText=txt("▦  "+sectionTitle,15,Color.WHITE);headingText.setTypeface(null,Typeface.BOLD);
+                headingRow.addView(headingText,new LinearLayout.LayoutParams(0,-2,1));
+                TextView dateText=txt(firstDay,12,Color.WHITE);dateText.setTypeface(null,Typeface.BOLD);
+                dateText.setGravity(android.view.Gravity.RIGHT|android.view.Gravity.CENTER_VERTICAL);headingRow.addView(dateText);
+                if(organizer>=0){
+                    TextView organizerView=txt("Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.LTGRAY);
+                    organizerView.setPadding(12,9,10,7);roundCard.addView(organizerView);
+                }
                 String lastDate="";
                 for(int j=0;j<rows.length();j++){
                     org.json.JSONObject row=rows.optJSONObject(j);if(row==null)continue;
@@ -962,14 +996,14 @@ public class MainActivity extends Activity {
                     if(!matchVisible(row))continue;
                     String dateLabel=matchDayLabel(row.optString("when",""));
                     if(!dateLabel.equals(lastDate)){
-                        TextView dateView=txt(dateLabel,12,accent);
-                        dateView.setTypeface(null,Typeface.BOLD);
-                        dateView.setPadding(5,2,0,2);
-                        body.addView(dateView);
+                        if(!lastDate.isEmpty()){
+                            TextView dateView=txt(dateLabel,11,accent);
+                            dateView.setPadding(12,7,0,4);roundCard.addView(dateView);
+                        }
                         lastDate=dateLabel;
                     }
                     LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(8,5,8,5);card.setBackgroundColor(panel);
-                    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,1,0,2);body.addView(card,cp);
+                    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(8,1,8,2);roundCard.addView(card,cp);
                     LinearLayout line=new LinearLayout(this);line.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(line);
                     LinearLayout left=matchTeam(row.optString("home",""),matchCrest(tables,row.optString("home",""),row.optString("homeCrest","")),false);
                     boolean finished=selectedTab.equals("Resultados")&&isScore(score);
