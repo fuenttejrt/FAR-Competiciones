@@ -514,7 +514,7 @@ public class MainActivity extends Activity {
             EditText url=new EditText(this);url.setSingleLine(true);url.setHint("Enlace público MatchReady");url.setText(getPreferences(0).getString(key,""));body.addView(url);
             button("Guardar y abrir",()->{String link=url.getText().toString().trim();if(link.startsWith("https://farugby.matchready.es/")){getPreferences(0).edit().putString(key,link).apply();openBrowser(link);}else Toast.makeText(this,"Enlace MatchReady no válido",Toast.LENGTH_LONG).show();});
         }
-        button("‹ Competiciones",()->competitionsHome());
+        // La flecha de la cabecera ya permite volver a Competiciones.
     }
     String cacheKey(){return "native_"+season+"_"+category+"_"+selectedCompetition;}
     void showCachedNative(){
@@ -926,7 +926,7 @@ public class MainActivity extends Activity {
                 android.widget.FrameLayout.LayoutParams arrowLp=new android.widget.FrameLayout.LayoutParams(dp(43),-1,android.view.Gravity.RIGHT);
                 pickerFrame.addView(chevron,arrowLp);
                 chevron.setOnClickListener(v->picker.performClick());
-                LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,dp(39));
+                LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,dp(resultPicker?35:39));
                 pickerParams.setMargins(0,dp(8),0,dp(8));
                 body.addView(pickerFrame,pickerParams);
                 picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
@@ -1118,13 +1118,13 @@ public class MainActivity extends Activity {
                     boolean finished=selectedTab.equals("Resultados")&&isScore(score);
                     TextView mid=txt(selectedTab.equals("Calendario")&&isUpcomingMatch(row)?"VS":isScore(score)?score:"VS",finished?20:19,finished?Color.WHITE:selectedTab.equals("Calendario")&&!isUpcomingMatch(row)?Color.LTGRAY:accent);
                     mid.setTypeface(null,Typeface.BOLD);mid.setGravity(android.view.Gravity.CENTER);
-                    mid.setMinWidth((int)(getResources().getDisplayMetrics().density*(finished?66:52)));
+                    mid.setMinWidth((int)(getResources().getDisplayMetrics().density*(finished?72:52)));
                     if(finished){
                         android.graphics.drawable.GradientDrawable scoreBg=new android.graphics.drawable.GradientDrawable();
-                        scoreBg.setColor(Color.rgb(35,75,71));
+                        scoreBg.setColor(Color.rgb(30,83,77));
                         scoreBg.setCornerRadius(9*getResources().getDisplayMetrics().density);
                         mid.setBackground(scoreBg);
-                        mid.setPadding(5,7,5,7);
+                        mid.setPadding(dp(7),dp(5),dp(7),dp(5));
                     }
                     LinearLayout right=matchTeam(row.optString("away",""),matchCrest(tables,row.optString("away",""),row.optString("awayCrest","")),true);
                     line.addView(left,new LinearLayout.LayoutParams(0,-2,1));
@@ -1135,7 +1135,7 @@ public class MainActivity extends Activity {
                     if(selectedTab.equals("Resultados")){
                         String hour=matchHour(row.optString("when",""));
                         if(!hour.isEmpty()){
-                            TextView time=txt(hour+" h",10,Color.LTGRAY);
+                            TextView time=txt(hour+" h",9,Color.LTGRAY);
                             time.setGravity(android.view.Gravity.CENTER);
                             center.addView(time);
                         }
@@ -1162,7 +1162,7 @@ public class MainActivity extends Activity {
             }
         }
         if(count==0)body.addView(txt(selectedTab.equals("Resultados")?"No hay resultados finalizados disponibles en los datos importados.":selectedTab.equals("Calendario")&&calendarUpcomingOnly?"No hay próximos partidos en los datos guardados. Pulsa «Ver todas las jornadas» o «Actualizar» para consultar novedades.":"No hay datos estructurados para esta pestaña. Pulsa Actualizar para volver a importar desde MatchReady.",13,Color.LTGRAY));
-        else body.addView(txt("MatchReady · Datos guardados en el móvil",11,Color.LTGRAY));
+        else {TextView source=txt("MatchReady · Datos guardados en el móvil",10,0xff8ca6a2);source.setPadding(dp(8),dp(9),0,dp(4));body.addView(source);}
     }
     void refreshNative(String url){
         if(dataBrowser!=null){dataBrowser.destroy();dataBrowser=null;}
