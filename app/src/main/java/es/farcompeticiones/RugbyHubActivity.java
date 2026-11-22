@@ -1374,6 +1374,14 @@ public final class RugbyHubActivity extends Activity {
         String refereeLicence=found.remove("Licencia árbitro");
         if(refereeLicence!=null&&found.containsKey("Árbitro"))
             found.put("Árbitro",found.get("Árbitro")+"\nLicencia: "+refereeLicence);
+        // All licence cards have already been merged into the person's card.
+        // Discard any remaining aliases produced by the PDF column extractor.
+        java.util.ArrayList<String> obsoleteLicences=new java.util.ArrayList<>();
+        for(String key:found.keySet()){
+            if(key.toLowerCase(java.util.Locale.ROOT).startsWith("licencia "))
+                obsoleteLicences.add(key);
+        }
+        for(String key:obsoleteLicences)found.remove(key);
         for(java.util.Map.Entry<String,String> field:found.entrySet()){
             LinearLayout card=new LinearLayout(this);card.setOrientation(1);
             card.setPadding(dp(12),dp(6),dp(12),dp(6));
@@ -1381,7 +1389,17 @@ public final class RugbyHubActivity extends Activity {
             bg.setColor(0xff1b2a39);bg.setCornerRadius(dp(9));card.setBackground(bg);
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
             lp.setMargins(0,dp(3),0,dp(2));host.addView(card,lp);
-            TextView label=text(field.getKey().toUpperCase(java.util.Locale.ROOT),11,true);
+            String labelText=field.getKey();
+            for(String side:new String[]{"local","visitante"}){
+                if(labelText.endsWith(" "+side)){
+                    String team="local".equals(side)?home:away;
+                    if(team!=null&&!team.trim().isEmpty())
+                        labelText=labelText.substring(0,labelText.length()-side.length()-1)
+                            +" · "+team.trim();
+                    break;
+                }
+            }
+            TextView label=text(labelText.toUpperCase(java.util.Locale.ROOT),11,true);
             label.setTextColor(0xffaab9c9);card.addView(label);
             String display=field.getValue().replace("\\n","\n");
             int licenceBreak=display.indexOf("\nLicencia:");
