@@ -623,46 +623,13 @@ public class MainActivity extends Activity {
     // Indicadores orientativos: nunca equivalen a una clasificación definitiva ni a una plaza adjudicada.
     // Solo etiquetas oficiales explícitas: una mezcla de fases no permite deducir cuál representa la tabla.
     int m14StandingPhase(org.json.JSONObject data,org.json.JSONObject standing){
-        String competition=selectedCompetition.toLowerCase(java.util.Locale.ROOT);
-        if(competition.contains("segunda división a")||competition.contains("segunda división b")||
-           competition.contains("segunda a")||competition.contains("segunda b"))return 2;
-        String heading=standing.optString("heading","").toLowerCase(java.util.Locale.ROOT);
-        if(heading.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))return 2;
-        if(heading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))return 1;
-        // La clasificación acumulada de Primera no permite inferir la fase por fechas o partidos jugados.
-        org.json.JSONArray all=data.optJSONArray("tables");
-        boolean first=false,second=false;
-        if(all!=null)for(int i=0;i<all.length();i++){
-            org.json.JSONObject t=all.optJSONObject(i);
-            if(t==null||!"matches".equals(t.optString("kind")))continue;
-            String h=t.optString("heading","").toLowerCase(java.util.Locale.ROOT);
-            if(h.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))first=true;
-            if(h.matches("(?s).*(?:2[.ªº ]*fase|segunda fase).*"))second=true;
-        }
-        if(first&&!second)return 1;
-        if(second&&!first)return 2;
-        // Si ambas fases están presentes y la tabla no identifica su fase,
-        // no atribuir los puestos a ninguna de ellas.
-        return 0;
+        return CompetitionRules.phase(season,category,selectedCompetition,data,standing);
     }
     String m14PositionGuide(int rank){
-        if(!category.equals("M14")||!(season.equals("2026/27")||season.equals("2025/26")))return "";
-        if(selectedCompetition.equals("Primera División")){
-            if(rank>=1&&rank<=5)return "Referencia 1.ª fase: permanencia en Primera";
-            if(rank==6)return "Referencia 1.ª fase: triangular de promoción";
-        }
-        if(selectedCompetition.startsWith("Segunda División · Grupo")){
-            if(rank==1)return "Referencia 1.ª fase: triangular de promoción";
-            if(rank==2||rank==3)return "Referencia 1.ª fase: Segunda A";
-            if(rank>=4&&rank<=6)return "Referencia 1.ª fase: Segunda B";
-        }
-        return "";
+        return CompetitionRules.positionGuide(season,category,selectedCompetition,1,rank);
     }
     String m14SecondPhaseGuide(int rank){
-        String competition=selectedCompetition.toLowerCase(java.util.Locale.ROOT);
-        if(competition.contains("primera división")&&rank==6)return "promoción final";
-        if((competition.contains("segunda división a")||competition.contains("segunda a")||competition.contains("segunda división a"))&&rank==1)return "promoción final";
-        return "";
+        return CompetitionRules.positionGuide(season,category,selectedCompetition,2,rank);
     }
     boolean isScore(String value){return value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");}
     void addMatchCard(org.json.JSONArray raw){
