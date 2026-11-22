@@ -11,6 +11,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.LinearGradient;
 import android.graphics.Shader;
+import android.graphics.RectF;
 import android.view.View;
 import android.widget.*;
 import android.webkit.WebView;
@@ -80,12 +81,12 @@ public class MainActivity extends Activity {
         TextView prompt=txt("¿Qué quieres consultar?",20,Color.WHITE);prompt.setTypeface(null,Typeface.BOLD);
         column.addView(prompt);
         LinearLayout first=new LinearLayout(this);first.setOrientation(0);
-        first.addView(homeTile("♜","Competiciones","Calendarios, resultados y actas",0xff40101b,0xff270d18,0xffff3d55,()->competitionsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
-        first.addView(homeTile("▣","Sistemas de competición","Fases y normas oficiales",0xff063c30,0xff09271f,0xff23df89,()->M14RulesActivity.open(this)),new LinearLayout.LayoutParams(0,dp(196),1));
+        first.addView(homeTile("trophy","Competiciones","Calendarios, resultados y actas",0xff40101b,0xff270d18,0xffff3d55,()->competitionsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
+        first.addView(homeTile("book","Sistemas de competición","Fases y normas oficiales",0xff063c30,0xff09271f,0xff23df89,()->M14RulesActivity.open(this)),new LinearLayout.LayoutParams(0,dp(196),1));
         column.addView(first);
         LinearLayout second=new LinearLayout(this);second.setOrientation(0);
-        second.addView(homeTile("◎","Portales oficiales","MatchReady y FAR",0xff063c30,0xff09271f,0xff23df89,()->officialPortals()),new LinearLayout.LayoutParams(0,dp(196),1));
-        second.addView(homeTile("⚙","Ajustes","Temporadas y circulares",0xff40101b,0xff270d18,0xffff3d55,()->settingsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
+        second.addView(homeTile("globe","Portales oficiales","MatchReady y FAR",0xff063c30,0xff09271f,0xff23df89,()->officialPortals()),new LinearLayout.LayoutParams(0,dp(196),1));
+        second.addView(homeTile("gear","Ajustes","Temporadas y circulares",0xff40101b,0xff270d18,0xffff3d55,()->settingsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
         column.addView(second);
         TextView note=txt("ⓘ  Datos oficiales · Normas revisadas antes de aplicarse",12,0xffb5c5d1);
         note.setBackground(gradient(0xff173a35,0xff102a2e,0xff2d6457));
@@ -136,6 +137,40 @@ public class MainActivity extends Activity {
             c.drawOval(w*.72f,h*.40f,w*.93f,h*.72f,p);p.setStyle(Paint.Style.FILL);c.restore();
         }
     }
+    final class TileIcon extends View {
+        final String kind;final Paint p=new Paint(3);
+        TileIcon(android.content.Context c,String k){super(c);kind=k;setLayerType(View.LAYER_TYPE_SOFTWARE,null);}
+        @Override protected void onDraw(Canvas canvas){
+            super.onDraw(canvas);Canvas c=canvas;float w=getWidth(),h=getHeight();
+            c.save();c.translate(w*.5f,h*.48f);float z=Math.min(w,h)/100f;c.scale(z,z);
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(6);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
+            p.setColor(0xff18382f);p.setShadowLayer(5,3,5,0xff020609);
+            drawIcon(c,p,kind);
+            p.clearShadowLayer();c.translate(-2,-3);p.setColor(0xfff4fffc);p.setStrokeWidth(5);drawIcon(c,p,kind);
+            p.setColor(0xff8de8d0);p.setStrokeWidth(1.6f);c.translate(-1,-1);drawIcon(c,p,kind);
+            c.restore();p.setStyle(Paint.Style.FILL);
+        }
+        void drawIcon(Canvas c,Paint p,String kind){
+            if(kind.equals("trophy")){
+                c.drawRoundRect(new RectF(-25,-35,25,9),4,4,p);
+                c.drawArc(new RectF(-43,-30,-14,5),70,230,false,p);
+                c.drawArc(new RectF(14,-30,43,5),-120,230,false,p);
+                c.drawLine(0,9,0,31,p);c.drawLine(-17,32,17,32,p);c.drawLine(-24,39,24,39,p);
+            }else if(kind.equals("book")){
+                Path a=new Path();a.moveTo(0,-27);a.cubicTo(-13,-37,-29,-33,-39,-26);
+                a.lineTo(-39,31);a.cubicTo(-22,24,-12,26,0,34);
+                a.cubicTo(12,26,22,24,39,31);a.lineTo(39,-26);
+                a.cubicTo(29,-33,13,-37,0,-27);a.lineTo(0,34);c.drawPath(a,p);
+            }else if(kind.equals("globe")){
+                c.drawCircle(0,0,36,p);c.drawOval(new RectF(-17,-36,17,36),p);
+                c.drawLine(-35,0,35,0,p);c.drawArc(new RectF(-32,-19,32,19),0,180,false,p);
+                c.drawArc(new RectF(-32,-19,32,19),180,180,false,p);
+            }else{
+                c.drawCircle(0,0,27,p);c.drawCircle(0,0,10,p);
+                for(int i=0;i<8;i++){double a=i*Math.PI/4;c.drawLine((float)(Math.cos(a)*30),(float)(Math.sin(a)*30),(float)(Math.cos(a)*42),(float)(Math.sin(a)*42),p);}
+            }
+        }
+    }
     LinearLayout homeTile(String symbol,String heading,String detail,int top,int bottom,int outline,Runnable click){
         LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);
         tile.setPadding(dp(13),dp(12),dp(9),dp(8));tile.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -143,7 +178,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams outer=new LinearLayout.LayoutParams(-1,-1);
         outer.setMargins(dp(4),dp(5),dp(4),dp(5));
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
-        TextView pict=txt(symbol,31,Color.WHITE);content.addView(pict);
+        View pict=new TileIcon(this,symbol);content.addView(pict,new LinearLayout.LayoutParams(dp(66),dp(60)));
         TextView title=txt(heading,17,Color.WHITE);title.setTypeface(null,Typeface.BOLD);content.addView(title);
         content.addView(txt(detail,12,0xffe2e8f0));
         tile.addView(content);
