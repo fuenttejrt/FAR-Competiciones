@@ -978,20 +978,7 @@ public final class RugbyHubActivity extends Activity {
                 if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3)==null?"":m.group(3),String.valueOf(category)});
             }
         }
-        // If the PDF's two-column table could not be isolated, retain the
-        // raw records but never guess whether they were temporary or definitive.
-        if(incidents.isEmpty()){
-            side=-1;
-            for(String line:(changes==null?"":changes).split("\\r?\\n")){
-                String t=line.trim().toLowerCase(java.util.Locale.ROOT);
-                if(t.startsWith("equipo local:"))side=0;
-                else if(t.startsWith("equipo visitante:"))side=1;
-                else if(side>=0){
-                    java.util.regex.Matcher m=record.matcher(line.trim());
-                    if(m.matches())incidents.add(new String[]{String.valueOf(side),m.group(1),m.group(2),m.group(3)==null?"":m.group(3),"-1"});
-                }
-            }
-        }
+        // Never infer expulsions from substitutions: they are different sections.
         TextView heading=text("EXPULSIONES",16,true);
         host.addView(heading);
         TextView note=text("Temporales y definitivas con los motivos indicados en la leyenda oficial del acta.",12,false);
