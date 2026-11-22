@@ -475,10 +475,7 @@ public class MainActivity extends Activity {
             org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
             if(selectedTab.equals("Clasificación")){
                 if(!kind.equals("standing"))continue;
-                if(category.equals("M14")&&season.equals("2026/27")&&!selectedCompetition.equals("Copa FAR")){
-                    body.addView(txt("PUESTOS Y FASES · ORIENTATIVO",13,accent));
-                    body.addView(txt("Las indicaciones se basan en la posición mostrada por MatchReady y en las reglas de la primera fase. No confirman ascensos, descensos ni plazas definitivas: pueden existir partidos pendientes, sanciones, renuncias o cambios de fase.",12,Color.LTGRAY));
-                }
+                boolean m14Legend=category.equals("M14")&&season.equals("2026/27")&&!selectedCompetition.equals("Copa FAR");
                 body.addView(txt("Desliza las estadísticas horizontalmente",11,Color.LTGRAY));
                 String[] labels={"#","Equipo","J","G","E","P","TF","TC","DT","EF","EC","BO","BD"};
                 int unit=(int)(getResources().getDisplayMetrics().density*34);
@@ -510,7 +507,15 @@ public class MainActivity extends Activity {
                         standingStat(stats,"bo","bonus ofensivo"),
                         standingStat(stats,"bd","bonus defensivo"),
                         row.optString("points","—")};
-                    addStandingFixed(line,vals[0],unit*3/5,Color.WHITE);
+                    int rank=-1;
+                    try{rank=Integer.parseInt(row.optString("position","").replaceAll("[^0-9]",""));}catch(NumberFormatException ignored){}
+                    int positionColor=Color.WHITE;
+                    if(m14Legend){
+                        String positionGuide=m14PositionGuide(rank);
+                        if(!positionGuide.isEmpty())positionColor=positionGuide.contains("triangular")?0xffffca65:
+                            positionGuide.contains("Segunda B")?0xff9db0c0:0xff66e1a4;
+                    }
+                    addStandingFixed(line,vals[0],unit*3/5,positionColor);
                     addStandingTeam(line,vals[1],row.optString("crest",""),(int)(getResources().getDisplayMetrics().density*168));
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
                     scroller.setHorizontalScrollBarEnabled(false);
@@ -519,23 +524,6 @@ public class MainActivity extends Activity {
                     for(int k=2;k<vals.length-1;k++)addStandingFixed(statsLine,vals[k],unit,Color.WHITE);
                     scroller.addView(statsLine);line.addView(scroller,new LinearLayout.LayoutParams(0,-2,1));
                     addStandingPoints(line,vals[vals.length-1],unit,accent,j%2==0?panel:bg);
-                    if(category.equals("M14")&&season.equals("2026/27")&&!selectedCompetition.equals("Copa FAR")){
-                        try{
-                            int rank=Integer.parseInt(row.optString("position","").replaceAll("[^0-9]",""));
-                            String guide=m14PositionGuide(rank);
-                            if(!guide.isEmpty()){
-                                TextView hint=txt("  ↳ "+guide,10,accent);
-                                hint.setPadding(8,1,8,5);
-                                body.addView(hint);
-                                // Indicador separado, sin alterar las columnas de la clasificación.
-                                line.setContentDescription(row.optString("team","")+" · "+guide);
-                                line.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
-                                    .setTitle(row.optString("team",""))
-                                    .setMessage(guide+"\\n\\nSituación orientativa según el puesto actual. Consulta la Circular FAR n.º 10 y las resoluciones oficiales.")
-                                    .setPositiveButton("Entendido",null).show());
-                            }
-                        }catch(NumberFormatException ignored){}
-                    }
                     scrollRows.add(scroller);
                     if(false){
                         if(stats!=null){
@@ -546,6 +534,18 @@ public class MainActivity extends Activity {
                         }
                     }
                     count++;
+                }
+                if(m14Legend){
+                    body.addView(txt("LEYENDA · PUESTOS ORIENTATIVOS",13,accent));
+                    if(selectedCompetition.equals("Primera División")){
+                        body.addView(txt("● Verde (1.º–5.º): referencia de acceso a Primera División en la segunda fase.",12,0xff66e1a4));
+                        body.addView(txt("● Amarillo (6.º): referencia de participación en el triangular de promoción.",12,0xffffca65));
+                    }else if(selectedCompetition.startsWith("Segunda División · Grupo")){
+                        body.addView(txt("● Amarillo (1.º): referencia de participación en el triangular de promoción.",12,0xffffca65));
+                        body.addView(txt("● Verde (2.º–3.º): referencia de acceso a Segunda División A.",12,0xff66e1a4));
+                        body.addView(txt("● Gris (4.º–6.º): referencia de acceso a Segunda División B.",12,0xff9db0c0));
+                    }
+                    body.addView(txt("Referencias según las reglas de la primera fase. No son plazas definitivas: pueden influir partidos pendientes, sanciones, renuncias y cambios de fase. La clasificación oficial es la publicada por MatchReady.",11,Color.LTGRAY));
                 }
                 for(android.widget.HorizontalScrollView scroller:scrollRows){
                     scroller.setOnScrollChangeListener((View.OnScrollChangeListener)(v,x,y,oldX,oldY)->{
