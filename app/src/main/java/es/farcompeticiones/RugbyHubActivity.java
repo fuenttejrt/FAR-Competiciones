@@ -488,6 +488,8 @@ public final class RugbyHubActivity extends Activity {
                     disciplinaryColumns=extractDisciplinaryColumns(pdf);
                     scoreboardColumns=extractScoreboardColumns(pdf);
                     coordinateDiagnosis=diagnoseScoreCoordinates(pdf);
+                    String coordinateScore=scoreFromCoordinates(coordinateDiagnosis);
+                    if(coordinateScore!=null)scoreboardColumns=coordinateScore;
                     for(int page=1;page<=pdf.getNumberOfPages();page++){
                         stripper.setStartPage(page);stripper.setEndPage(page);
                         extracted.append("PÁGINA ").append(page).append("\n\n")
@@ -625,6 +627,73 @@ public final class RugbyHubActivity extends Activity {
             }
         }
         return report.length()==0?"No se encontró la zona Marcador":report.toString();
+    }
+
+    // Coordinate-based score reader: associate each cell with its X column.
+    // Missing dorsals remain blank instead of shifting subsequent entries.
+    private String scoreFromCoordinates(String diagnosis){
+        if(diagnosis==null||!diagnosis.contains("POSICIONES DEL MARCADOR"))return null;
+        java.util.regex.Pattern glyph=java.util.regex.Pattern.compile(
+            "^x=([0-9.]+)\\.\\.([0-9.]+) y=([0-9.]+) (.+)$");
+        java.util.ArrayList<float[]> coords=new java.util.ArrayList<>();
+        java.util.ArrayList<String> values=new java.util.ArrayList<>();
+        for(String line:diagnosis.split("\\n")){
+            java.util.regex.Matcher m=glyph.matcher(line.trim());
+            if(!m.matches())continue;
+            try{
+                coords.add(new float[]{(Float.parseFloat(m.group(1))+Float.parseFloat(m.group(2)))/2f,
+                    Float.parseFloat(m.group(3))});
+                values.add(m.group(4).trim());
+            }catch(NumberFormatException ignored){}
+        }
+        StringBuilder output=new StringBuilder();
+        int teams=0;
+        for(int i=0;i<values.size();i++){
+            String name=values.get(i);
+            if(!name.matches("(?i)^Equipo (local|visitante):.*"))continue;
+            int end=i+1;
+            while(end<values.size()&&!values.get(end).matches("(?i)^Equipo (local|visitante):.*"))end++;
+            float typeY=-1,dorsalY=-1,minuteY=-1;
+            for(int j=i+1;j<end;j++){
+                String label=values.get(j);
+                if(label.equalsIgnoreCase("Tipo *"))typeY=coords.get(j)[1];
+                else if(label.equalsIgnoreCase("Dorsal"))dorsalY=coords.get(j)[1];
+                else if(label.equalsIgnoreCase("Minuto"))minuteY=coords.get(j)[1];
+            }
+            if(typeY<0||minuteY<0||dorsalY<0)continue;
+            java.util.ArrayList<Integer> types=new java.util.ArrayList<>();
+            for(int j=i+1;j<end;j++){
+                String v=values.get(j);
+                if(Math.abs(coords.get(j)[1]-typeY)<2f&&coords.get(j)[0]>65f&&
+                    v.matches("(?i)E|T|EC|D|PC"))types.add(j);
+            }
+            if(types.isEmpty())continue;
+            StringBuilder block=new StringBuilder(name).append("\n");
+            boolean complete=true;
+            for(int n=0;n<types.size();n++){
+                int ti=types.get(n);
+                float x=coords.get(ti)[0];
+                float tolerance=12.5f;
+                String minute="",dorsal="";
+                for(int j=i+1;j<end;j++){
+                    float[] pos=coords.get(j);
+                    if(Math.abs(pos[0]-x)>tolerance)continue;
+                    if(Math.abs(pos[1]-minuteY)<2f&&values.get(j).matches("\\d+"))
+                        minute=values.get(j);
+                    if(Math.abs(pos[1]-dorsalY)<2f&&values.get(j).matches("\\d+"))
+                        dorsal=values.get(j);
+                }
+                if(minute.isEmpty()){complete=false;break;}
+                block.append(n+1).append(". Min ").append(minute).append(" · ")
+                    .append(eventDescription(values.get(ti),"Marcador")).append(" · ")
+                    .append(dorsal.isEmpty()?"Dorsal no indicado":"Dorsal "+dorsal)
+                    .append("\n");
+            }
+            if(!complete)continue;
+            output.append(block).append("\n");teams++;
+            i=end-1;
+        }
+        return teams==2?output.toString().trim():null;
     }
     // Extract scoring rows from the score-table region, separately from page text.
     private String extractScoreboardColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
