@@ -1506,11 +1506,28 @@ public final class RugbyHubActivity extends Activity {
                     StringBuilder target=reserve?reserves[side]:starters[side];
                     target.append(player.group(1)).append("  ·  ")
                         .append(name).append("  |  ").append(player.group(4));
-                    if(player.group(2)!=null){
-                        if(player.group(2).trim().equals("X"))target.append("  ·  Primera línea");
-                        if(player.group(2).trim().equals("C"))target.append("  ·  Capitán");
+                    // Only accept role marks located in the narrow flag cell
+                    // immediately after the dorsal, never a letter in the name.
+                    float dorsalRight=-1f;
+                    for(int index:row){
+                        if(words.get(index).equals(player.group(1))){
+                            dorsalRight=positions.get(index)[1];break;
+                        }
                     }
-                    if(player.group(5)!=null)target.append("  ·  Formación");
+                    boolean firstLine=false,captain=false,formation=false;
+                    for(int index:row){
+                        String mark=words.get(index).trim();
+                        float x=positions.get(index)[0];
+                        if(dorsalRight>=0&&x>=dorsalRight&&x-dorsalRight<19f){
+                            if("X".equals(mark))firstLine=true;
+                            if("C".equals(mark))captain=true;
+                        }
+                        if("F".equals(mark)&&x>minX+(maxX==Float.MAX_VALUE?150f:(maxX-minX)*.70f))
+                            formation=true;
+                    }
+                    if(firstLine)target.append("  ·  Primera línea");
+                    if(captain)target.append("  ·  Capitán");
+                    if(formation)target.append("  ·  Formación");
                     target.append('\n');
                     if(reserve)reserveCount[side]++;else starterCount[side]++;
                     ordinal++;
