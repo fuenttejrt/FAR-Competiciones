@@ -453,6 +453,13 @@ public final class RugbyHubActivity extends Activity {
         original.setOnClickListener(v->showActPdf(url));
         Button close=new Button(this);close.setText("Cerrar");actions.addView(close);
         close.setOnClickListener(v->dialog.dismiss());
+        // The reader was launched in a dedicated activity. Closing the dialog
+        // must also close that activity; otherwise its empty background remains.
+        if(getIntent().hasExtra("far_act_url")){
+            dialog.setOnDismissListener(d->{
+                if(!isFinishing())finish();
+            });
+        }
         dialog.setContentView(root);dialog.show();dialog.getWindow().setLayout(-1,-1);
         new Thread(()->{
             java.net.HttpURLConnection conn=null;
