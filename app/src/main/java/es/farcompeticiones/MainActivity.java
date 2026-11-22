@@ -61,6 +61,36 @@ public class MainActivity extends Activity {
         original.recycle();
         return result;
     }
+    android.graphics.drawable.Drawable lineIcon(String kind){
+        android.graphics.drawable.Drawable d=new android.graphics.drawable.Drawable(){
+            final Paint p=new Paint(3);
+            @Override public void draw(Canvas original){
+                android.graphics.Rect bounds=getBounds();
+                Canvas c=original;int save=c.save();c.translate(bounds.left,bounds.top);
+                c.scale(bounds.width()/24f,bounds.height()/24f);
+                p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.9f);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
+                if(kind.equals("calendar")){
+                    c.drawRoundRect(3,5,21,21,2,2,p);c.drawLine(3,10,21,10,p);c.drawLine(8,3,8,7,p);c.drawLine(16,3,16,7,p);
+                    for(int x=7;x<=17;x+=5)for(int y=14;y<=18;y+=4)c.drawCircle(x,y,.65f,p);
+                }else if(kind.equals("results")){
+                    c.drawRect(4,12,8,20,p);c.drawRect(10,7,14,20,p);c.drawRect(16,3,20,20,p);
+                }else if(kind.equals("trophy")){
+                    c.drawRect(8,4,16,13,p);c.drawArc(3,5,11,14,90,180,false,p);c.drawArc(13,5,21,14,270,180,false,p);
+                    c.drawLine(12,13,12,19,p);c.drawLine(8,20,16,20,p);
+                }else if(kind.equals("refresh")){
+                    c.drawArc(4,4,20,20,215,260,false,p);c.drawLine(17,4,20,5,p);c.drawLine(20,5,20,9,p);
+                    c.drawArc(4,4,20,20,35,135,false,p);c.drawLine(4,15,4,19,p);c.drawLine(4,19,8,19,p);
+                }else if(kind.equals("external")){
+                    c.drawRoundRect(3,8,16,21,2,2,p);c.drawLine(11,13,21,3,p);c.drawLine(14,3,21,3,p);c.drawLine(21,3,21,10,p);
+                }
+                c.restoreToCount(save);
+            }
+            @Override public void setAlpha(int alpha){}
+            @Override public void setColorFilter(android.graphics.ColorFilter filter){}
+            @Override public int getOpacity(){return android.graphics.PixelFormat.TRANSLUCENT;}
+        };
+        d.setBounds(0,0,dp(17),dp(17));return d;
+    }
     void layout(String heading){
         if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
         browser=null;
@@ -427,8 +457,9 @@ public class MainActivity extends Activity {
         int tabIndex=0;
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             final boolean active=item.equals(tab);
-            String symbol=tabIndex==0?"▦":tabIndex==1?"▥":"♜";
-            TextView b=txt(symbol+"  "+item,11,Color.WHITE);
+            TextView b=txt(item,11,Color.WHITE);
+            b.setCompoundDrawables(lineIcon(tabIndex==0?"calendar":tabIndex==1?"results":"trophy"),null,null,null);
+            b.setCompoundDrawablePadding(dp(5));
             b.setSingleLine(true);
             b.setEllipsize(android.text.TextUtils.TruncateAt.END);
             b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
@@ -446,7 +477,9 @@ public class MainActivity extends Activity {
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
             for(int action=0;action<2;action++){
                 final boolean update=action==0;
-                TextView control=txt(update?"⟳  Actualizar":"↗  Web oficial",12,Color.WHITE);
+                TextView control=txt(update?"Actualizar":"Web oficial",12,Color.WHITE);
+                control.setCompoundDrawables(lineIcon(update?"refresh":"external"),null,null,null);
+                control.setCompoundDrawablePadding(dp(7));
                 control.setSingleLine(true);
                 control.setTypeface(null,Typeface.BOLD);control.setGravity(android.view.Gravity.CENTER);
                 android.graphics.drawable.GradientDrawable controlBg=new android.graphics.drawable.GradientDrawable();
@@ -879,14 +912,14 @@ public class MainActivity extends Activity {
                 pickerFrame.setBackground(pickerBg);
                 picker.setBackgroundColor(Color.TRANSPARENT);
                 pickerFrame.addView(picker,new android.widget.FrameLayout.LayoutParams(-1,-1));
-                TextView chevron=txt("⌄",22,Color.WHITE);
+                TextView chevron=txt("⌄",19,Color.WHITE);
                 chevron.setGravity(android.view.Gravity.CENTER);
                 chevron.setPadding(0,0,0,dp(7));
                 android.widget.FrameLayout.LayoutParams arrowLp=new android.widget.FrameLayout.LayoutParams(dp(43),-1,android.view.Gravity.RIGHT);
                 pickerFrame.addView(chevron,arrowLp);
                 chevron.setOnClickListener(v->picker.performClick());
-                LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,dp(47));
-                pickerParams.setMargins(0,dp(12),0,dp(10));
+                LinearLayout.LayoutParams pickerParams=new LinearLayout.LayoutParams(-1,dp(39));
+                pickerParams.setMargins(0,dp(8),0,dp(8));
                 body.addView(pickerFrame,pickerParams);
                 picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
                     public void onNothingSelected(AdapterView<?> p){}
