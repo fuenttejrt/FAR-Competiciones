@@ -77,7 +77,7 @@ public class MainActivity extends Activity {
         column.addView(heading);
         ImageView hero=new ImageView(this);
         hero.setImageResource(R.drawable.cabecera_rugby);
-        hero.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        hero.setScaleType(ImageView.ScaleType.FIT_CENTER);
         hero.setContentDescription("Cabecera de rugby");
         LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(145));
         heroLp.setMargins(0,dp(6),0,dp(10));column.addView(hero,heroLp);
@@ -186,22 +186,22 @@ public class MainActivity extends Activity {
         }
     }
     LinearLayout homeTile(String symbol,String heading,String detail,int top,int bottom,int outline,Runnable click){
-        LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);
-        tile.setPadding(dp(13),dp(12),dp(9),dp(8));tile.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        tile.setBackground(gradient(top,bottom,outline));tile.setElevation(dp(5));
-        LinearLayout.LayoutParams outer=new LinearLayout.LayoutParams(-1,-1);
-        outer.setMargins(dp(4),dp(5),dp(4),dp(5));
-        LinearLayout content=new LinearLayout(this);content.setOrientation(1);
-        ImageView pict=new ImageView(this);
-        int iconRes=symbol.equals("trophy")?R.drawable.icono_copa:symbol.equals("book")?R.drawable.icono_libro:symbol.equals("globe")?R.drawable.icono_globo:R.drawable.icono_engranaje;
-        pict.setImageResource(iconRes);
-        pict.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        content.addView(pict,new LinearLayout.LayoutParams(dp(78),dp(70)));
-        TextView title=txt(heading,17,Color.WHITE);title.setTypeface(null,Typeface.BOLD);title.setShadowLayer(dp(2),dp(1),dp(2),0xff000000);content.addView(title);
-        content.addView(txt(detail,12,0xffe2e8f0));
-        tile.addView(content);
-        LinearLayout wrapper=new LinearLayout(this);wrapper.addView(tile,outer);
-        wrapper.setOnClickListener(v->click.run());tile.setOnClickListener(v->click.run());
+        // Tarjetas originales de la maqueta: incluyen brillos, iconos 3D y tipografia.
+        int imageRes=symbol.equals("trophy")?R.drawable.tarjeta_competiciones:
+            symbol.equals("book")?R.drawable.tarjeta_sistemas:
+            symbol.equals("globe")?R.drawable.tarjeta_portales:R.drawable.tarjeta_ajustes;
+        ImageView artwork=new ImageView(this);
+        artwork.setImageResource(imageRes);
+        artwork.setScaleType(ImageView.ScaleType.FIT_XY);
+        artwork.setAdjustViewBounds(false);
+        artwork.setContentDescription(heading+": "+detail);
+        LinearLayout wrapper=new LinearLayout(this);
+        wrapper.setOrientation(1);
+        LinearLayout.LayoutParams artLp=new LinearLayout.LayoutParams(-1,-1);
+        artLp.setMargins(dp(3),dp(3),dp(3),dp(3));
+        wrapper.addView(artwork,artLp);
+        wrapper.setOnClickListener(v->click.run());
+        artwork.setOnClickListener(v->click.run());
         return wrapper;
     }
     void dashboardCard(String heading,String description,Runnable click){
