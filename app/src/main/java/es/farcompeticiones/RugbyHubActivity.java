@@ -1286,7 +1286,7 @@ public final class RugbyHubActivity extends Activity {
         // header fields. Parse the first page only to avoid annex duplicates.
         String pageOne=clean.split("(?m)^\\s*PÁGINA\\s+2\\s*$",2)[0];
         java.util.regex.Pattern staff=java.util.regex.Pattern.compile(
-            "(?im)^\\s*(Entrenador|Delegado):\\s*(.+?)\\s+"+
+            "(?im)^\\s*(Entrenador|Delegado|Juez línea):\\s*(.+?)\\s+"+
             "\\1:\\s*(.+?)\\s*$");
         java.util.regex.Matcher staffRows=staff.matcher(pageOne);
         while(staffRows.find()){
@@ -1297,7 +1297,7 @@ public final class RugbyHubActivity extends Activity {
             if(!visitor.isEmpty())found.put(role+" visitante",visitor);
         }
         // Some PDFs wrap each team's staff onto separate lines.
-        for(String role:new String[]{"Entrenador","Delegado"}){
+        for(String role:new String[]{"Entrenador","Delegado","Juez línea"}){
             if(found.containsKey(role+" local"))continue;
             java.util.regex.Matcher row=java.util.regex.Pattern.compile(
                 "(?im)^\\s*"+role+":\\s*([^\\r\\n]+)").matcher(pageOne);
@@ -1307,6 +1307,26 @@ public final class RugbyHubActivity extends Activity {
                     found.put(role+" local",both[0].trim());
                     found.put(role+" visitante",both[1].trim());
                 }
+            }
+        }
+        // The two line judges and their licence numbers share the same rows.
+        java.util.regex.Matcher judges=java.util.regex.Pattern.compile(
+            "(?im)^\\s*Juez línea:\\s*(.*?)\\s+Juez línea:\\s*(.*?)\\s*$"+
+            "(?:\\r?\\n\\s*N[ºo]\\s*licencia:\\s*(\\d{7})\\s+"+
+            "N[ºo]\\s*licencia:\\s*(\\d{7}))?")
+            .matcher(pageOne);
+        if(judges.find()){
+            String local=judges.group(1).trim(),visitor=judges.group(2).trim();
+            if(!local.isEmpty())found.put("Juez de línea local",local);
+            if(!visitor.isEmpty())found.put("Juez de línea visitante",visitor);
+            if(judges.group(3)!=null)found.put("Licencia juez local",judges.group(3));
+            if(judges.group(4)!=null)found.put("Licencia juez visitante",judges.group(4));
+        }else{
+            for(String role:new String[]{"Juez línea"}){
+                if(found.containsKey(role+" local"))
+                    found.put("Juez de línea local",found.remove(role+" local"));
+                if(found.containsKey(role+" visitante"))
+                    found.put("Juez de línea visitante",found.remove(role+" visitante"));
             }
         }
         // The referee appears in a three-column row below the final score.
