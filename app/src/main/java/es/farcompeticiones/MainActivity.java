@@ -336,16 +336,21 @@ public class MainActivity extends Activity {
             @Override protected void onDraw(Canvas canvas){
                 super.onDraw(canvas);
                 float w=getWidth(),h=getHeight();
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeCap(Paint.Cap.ROUND);
-                paint.setStrokeWidth(dp(2.3f));
-                path.reset();path.moveTo(w*.07f,h*.65f);
-                path.cubicTo(w*.34f,h*.30f,w*.62f,h*.20f,w*.94f,h*.18f);
-                paint.setColor(0xffcf263d);canvas.drawPath(path,paint);
-                paint.setStrokeWidth(dp(1.8f));
-                path.reset();path.moveTo(w*.17f,h*.88f);
-                path.cubicTo(w*.46f,h*.55f,w*.73f,h*.47f,w*.97f,h*.46f);
-                paint.setColor(0xff168a52);canvas.drawPath(path,paint);
+                paint.setStyle(Paint.Style.FILL);
+                path.reset();
+                path.moveTo(w*.02f,h*.73f);
+                path.cubicTo(w*.28f,h*.28f,w*.64f,h*.08f,w*.99f,h*.13f);
+                path.cubicTo(w*.62f,h*.20f,w*.38f,h*.48f,w*.16f,h*.73f);
+                path.close();
+                paint.setColor(0xffcf263d);
+                canvas.drawPath(path,paint);
+                path.reset();
+                path.moveTo(w*.18f,h*.97f);
+                path.cubicTo(w*.45f,h*.55f,w*.75f,h*.36f,w*.99f,h*.41f);
+                path.cubicTo(w*.71f,h*.50f,w*.52f,h*.71f,w*.32f,h*.97f);
+                path.close();
+                paint.setColor(0xff168a52);
+                canvas.drawPath(path,paint);
             }
         };
         sectionRow.addView(stripes,new LinearLayout.LayoutParams(dp(61),dp(27)));
