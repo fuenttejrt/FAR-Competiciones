@@ -364,10 +364,6 @@ public class MainActivity extends Activity {
             competitionTile(red?0xff510b15:0xff063c29,red?0xff350912:0xff082d21,
                 red?0xff9e3d4a:0xff3c8860,"♜",entry,()->details(entry));
         }
-        if(category.equals("M14")&&season.equals("2026/27")){
-            competitionTile(0xff0b4830,0xff092c23,0xff4b9a73,"▤",
-                "Sistema de competición · M14 2026/27",()->M14RulesActivity.open(this));
-        }
         TextView note=txt(category.equals("M14")&&season.equals("2026/27")?
             "ⓘ  Competiciones contrastadas con la web oficial FAR.":
             "ⓘ  Estructura orientativa: verificar divisiones y grupos para esta temporada.",12,0xffa5c6b9);
