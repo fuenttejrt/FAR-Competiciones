@@ -427,11 +427,11 @@ public class MainActivity extends Activity {
         int tabIndex=0;
         for(String item:new String[]{"Calendario","Resultados","Clasificación"}){
             final boolean active=item.equals(tab);
-            int iconId=tabIndex==0?android.R.drawable.ic_menu_my_calendar:tabIndex==1?android.R.drawable.ic_menu_sort_by_size:android.R.drawable.btn_star_big_on;
-            TextView b=txt(item,12,Color.WHITE);
-            b.setCompoundDrawablesWithIntrinsicBounds(iconId,0,0,0);
-            b.setCompoundDrawablePadding(dp(5));
-            if(b.getCompoundDrawables()[0]!=null)b.getCompoundDrawables()[0].setTint(Color.WHITE);b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
+            String symbol=tabIndex==0?"▦":tabIndex==1?"▥":"♜";
+            TextView b=txt(symbol+"  "+item,11,Color.WHITE);
+            b.setSingleLine(true);
+            b.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            b.setTypeface(null,Typeface.BOLD);b.setGravity(android.view.Gravity.CENTER);
             android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable();
             tabBg.setColor(active?0xff08643d:0xff052c25);tabBg.setCornerRadius(22*getResources().getDisplayMetrics().density);
             tabBg.setStroke((int)(1.3f*getResources().getDisplayMetrics().density),0xff178e5a);b.setBackground(tabBg);
@@ -446,10 +446,8 @@ public class MainActivity extends Activity {
             LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);body.addView(actions);
             for(int action=0;action<2;action++){
                 final boolean update=action==0;
-                TextView control=txt(update?"Actualizar":"Web oficial",12,Color.WHITE);
-                control.setCompoundDrawablesWithIntrinsicBounds(update?android.R.drawable.ic_popup_sync:android.R.drawable.ic_menu_view,0,0,0);
-                control.setCompoundDrawablePadding(dp(7));
-                if(control.getCompoundDrawables()[0]!=null)control.getCompoundDrawables()[0].setTint(Color.WHITE);
+                TextView control=txt(update?"⟳  Actualizar":"↗  Web oficial",12,Color.WHITE);
+                control.setSingleLine(true);
                 control.setTypeface(null,Typeface.BOLD);control.setGravity(android.view.Gravity.CENTER);
                 android.graphics.drawable.GradientDrawable controlBg=new android.graphics.drawable.GradientDrawable();
                 controlBg.setColor(0xff173c3b);controlBg.setCornerRadius(20*getResources().getDisplayMetrics().density);
@@ -881,9 +879,9 @@ public class MainActivity extends Activity {
                 pickerFrame.setBackground(pickerBg);
                 picker.setBackgroundColor(Color.TRANSPARENT);
                 pickerFrame.addView(picker,new android.widget.FrameLayout.LayoutParams(-1,-1));
-                TextView chevron=txt("⌄",30,Color.WHITE);
+                TextView chevron=txt("⌄",22,Color.WHITE);
                 chevron.setGravity(android.view.Gravity.CENTER);
-                chevron.setPadding(0,0,0,dp(9));
+                chevron.setPadding(0,0,0,dp(7));
                 android.widget.FrameLayout.LayoutParams arrowLp=new android.widget.FrameLayout.LayoutParams(dp(43),-1,android.view.Gravity.RIGHT);
                 pickerFrame.addView(chevron,arrowLp);
                 chevron.setOnClickListener(v->picker.performClick());
