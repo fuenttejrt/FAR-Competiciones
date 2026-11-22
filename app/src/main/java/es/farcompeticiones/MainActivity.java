@@ -54,8 +54,8 @@ public class MainActivity extends Activity {
                 hsv[2]=Math.min(.75f,Math.max(.35f,hsv[2]*1.8f+.13f));
                 result.setPixel(x,y,Color.HSVToColor(alpha,hsv));
             }else if(x>result.getWidth()*.47f&&r<105&&g<105&&b<105){
-                // Letras FAR: verde luminoso, no blanco ni negro.
-                result.setPixel(x,y,Color.argb(alpha,76,207,132));
+                // Letras FAR blancas para contrastar con el fondo oscuro.
+                result.setPixel(x,y,Color.argb(alpha,255,255,255));
             }
         }
         original.recycle();
