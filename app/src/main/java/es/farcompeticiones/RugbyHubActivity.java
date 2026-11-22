@@ -478,6 +478,7 @@ public final class RugbyHubActivity extends Activity {
                 String lineupColumns=null;
                 String disciplinaryColumns=null;
                 String scoreboardColumns=null;
+                String coordinateDiagnosis="";
                 try(com.tom_roush.pdfbox.pdmodel.PDDocument pdf=
                     com.tom_roush.pdfbox.pdmodel.PDDocument.load(data)){
                     com.tom_roush.pdfbox.text.PDFTextStripper stripper=
@@ -486,6 +487,7 @@ public final class RugbyHubActivity extends Activity {
                     if(pdf.getNumberOfPages()>0)lineupColumns=extractLineupColumns(pdf);
                     disciplinaryColumns=extractDisciplinaryColumns(pdf);
                     scoreboardColumns=extractScoreboardColumns(pdf);
+                    coordinateDiagnosis=diagnoseScoreCoordinates(pdf);
                     for(int page=1;page<=pdf.getNumberOfPages();page++){
                         stripper.setStartPage(page);stripper.setEndPage(page);
                         extracted.append("PÁGINA ").append(page).append("\n\n")
@@ -496,8 +498,10 @@ public final class RugbyHubActivity extends Activity {
                 final String safeLineups=lineupColumns;
                 final String safeDiscipline=disciplinaryColumns;
                 final String safeScoreboard=scoreboardColumns;
+                final String safeCoordinates=coordinateDiagnosis;
                 final String rawDiagnosis="ACTA: "+url+"\\n"+
                     "EXTRACCION DE ZONA MARCADOR: "+(safeScoreboard==null?"NO DISPONIBLE":safeScoreboard)+"\\n"+
+                    "PRUEBA DE COORDENADAS:\\n"+safeCoordinates+"\\n"+
                     "TEXTO COMPLETO DEL PDF:\\n"+content;
                 runOnUiThread(()->{
                     if(!dialog.isShowing())return;
@@ -577,6 +581,50 @@ public final class RugbyHubActivity extends Activity {
                     "No se pudo leer el acta. Puedes abrir el PDF original.");});
             }finally{if(conn!=null)conn.disconnect();}
         }).start();
+    }
+    // Prototype: inspect PDF glyph coordinates without altering the production parser.
+    // A text stream cannot represent empty cells; coordinates can reveal their gaps.
+    private String diagnoseScoreCoordinates(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
+        StringBuilder report=new StringBuilder();
+        for(int pageIndex=0;pageIndex<pdf.getNumberOfPages();pageIndex++){
+            try{
+                final java.util.ArrayList<String> tokens=new java.util.ArrayList<>();
+                com.tom_roush.pdfbox.text.PDFTextStripper positional=
+                    new com.tom_roush.pdfbox.text.PDFTextStripper(){
+                        @Override protected void writeString(String str,
+                            java.util.List<com.tom_roush.pdfbox.text.TextPosition> positions)
+                            throws java.io.IOException{
+                            if(positions==null||positions.isEmpty()||str.trim().isEmpty())return;
+                            com.tom_roush.pdfbox.text.TextPosition first=positions.get(0);
+                            float x=first.getXDirAdj(),y=first.getYDirAdj();
+                            float last=positions.get(positions.size()-1).getXDirAdj()+
+                                positions.get(positions.size()-1).getWidthDirAdj();
+                            tokens.add(String.format(java.util.Locale.ROOT,
+                                "x=%.1f..%.1f y=%.1f %s",x,last,y,str.trim()));
+                        }
+                    };
+                positional.setSortByPosition(true);
+                positional.setStartPage(pageIndex+1);
+                positional.setEndPage(pageIndex+1);
+                positional.getText(pdf);
+                int heading=-1;
+                for(int i=0;i<tokens.size();i++)
+                    if(tokens.get(i).matches("(?i).*\\bMarcador\\s*$")){heading=i;break;}
+                if(heading<0)continue;
+                report.append("PÁGINA ").append(pageIndex+1)
+                    .append(" — POSICIONES DEL MARCADOR\\n");
+                int lines=0;
+                for(int i=heading;i<tokens.size()&&lines<130;i++){
+                    String t=tokens.get(i);
+                    if(i>heading&&t.matches("(?i).*\\bCambios\\s*$"))break;
+                    report.append(t).append('\\n');lines++;
+                }
+            }catch(Exception ex){
+                report.append("No se pudieron obtener coordenadas: ")
+                    .append(ex.getClass().getSimpleName()).append('\\n');
+            }
+        }
+        return report.length()==0?"No se encontró la zona Marcador":report.toString();
     }
     // Extract scoring rows from the score-table region, separately from page text.
     private String extractScoreboardColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
