@@ -6,6 +6,11 @@ import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.LinearGradient;
+import android.graphics.Shader;
 import android.view.View;
 import android.widget.*;
 import android.webkit.WebView;
@@ -28,7 +33,7 @@ public class MainActivity extends Activity {
     boolean calendarUpcomingOnly=true;
     long lastAutomaticRefreshAttempt=0L;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
-    @Override public void onCreate(Bundle state){super.onCreate(state);home();}
+    @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(bg));home();}
     void layout(String heading){
         if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
         browser=null;
@@ -52,7 +57,7 @@ public class MainActivity extends Activity {
         page="landing";
         if(dataBrowser!=null){dataBrowser.stopLoading();dataBrowser.destroy();dataBrowser=null;}
         browser=null;
-        ScrollView scroll=new ScrollView(this);scroll.setFitsSystemWindows(true);
+        ScrollView scroll=new ScrollView(this);scroll.setFitsSystemWindows(true);scroll.setFillViewport(true);scroll.setBackgroundColor(bg);
         LinearLayout column=new LinearLayout(this);column.setOrientation(1);
         column.setPadding(dp(12),dp(15),dp(12),dp(24));column.setBackgroundColor(bg);
         scroll.addView(column);setContentView(scroll);
@@ -64,37 +69,72 @@ public class MainActivity extends Activity {
         words.addView(name);
         TextView tagline=txt("Rugby andaluz",14,accent);words.addView(tagline);
         heading.addView(words,new LinearLayout.LayoutParams(0,-2,1));
-        // El icono de la aplicación ya contiene el escudo FAR aprobado.
-        ImageView crest=new ImageView(this);
-        crest.setImageDrawable(getPackageManager().getApplicationIcon(getApplicationInfo()));
-        crest.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        // Identificador FAR dibujado sin recurrir al icono Android predeterminado.
+        View crest=new FarMark(this);
         LinearLayout.LayoutParams crestParams=new LinearLayout.LayoutParams(dp(74),dp(74));
         crestParams.setMargins(dp(6),0,dp(6),0);heading.addView(crest,crestParams);
         column.addView(heading);
-        android.widget.FrameLayout hero=new android.widget.FrameLayout(this);
-        hero.setBackground(gradient(0xff064e3b,0xff102b3c,0xff176f51));
-        LinearLayout heroText=new LinearLayout(this);heroText.setOrientation(1);
-        heroText.setPadding(dp(17),dp(12),dp(12),dp(14));
-        TextView heroTitle=txt("RUGBY ANDALUZ",20,Color.WHITE);heroTitle.setTypeface(null,Typeface.BOLD);
-        heroText.addView(heroTitle);
-        heroText.addView(txt("Calendarios · Resultados · Clasificaciones",12,0xffc4e5d7));
-        hero.addView(heroText);
-        LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(94));
-        heroLp.setMargins(0,dp(12),0,dp(15));column.addView(hero,heroLp);
+        View hero=new RugbyHeader(this);
+        LinearLayout.LayoutParams heroLp=new LinearLayout.LayoutParams(-1,dp(145));
+        heroLp.setMargins(0,dp(6),0,dp(10));column.addView(hero,heroLp);
         TextView prompt=txt("¿Qué quieres consultar?",20,Color.WHITE);prompt.setTypeface(null,Typeface.BOLD);
         column.addView(prompt);
         LinearLayout first=new LinearLayout(this);first.setOrientation(0);
-        first.addView(homeTile("🏆","Competiciones","Calendarios, resultados y actas",0xff07563d,0xff123c39,0xff2bc787,()->competitionsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
-        first.addView(homeTile("▤","Sistemas de competición","Fases y normas oficiales",0xff114a72,0xff142c48,0xff49aaf2,()->M14RulesActivity.open(this)),new LinearLayout.LayoutParams(0,dp(196),1));
+        first.addView(homeTile("♜","Competiciones","Calendarios, resultados y actas",0xff40101b,0xff270d18,0xffff3d55,()->competitionsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
+        first.addView(homeTile("▣","Sistemas de competición","Fases y normas oficiales",0xff063c30,0xff09271f,0xff23df89,()->M14RulesActivity.open(this)),new LinearLayout.LayoutParams(0,dp(196),1));
         column.addView(first);
         LinearLayout second=new LinearLayout(this);second.setOrientation(0);
-        second.addView(homeTile("◎","Portales oficiales","MatchReady y FAR",0xff40316b,0xff24213e,0xffad83ed,()->officialPortals()),new LinearLayout.LayoutParams(0,dp(196),1));
-        second.addView(homeTile("⚙","Ajustes","Temporadas y circulares",0xff664124,0xff342820,0xfff59a48,()->settingsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
+        second.addView(homeTile("◎","Portales oficiales","MatchReady y FAR",0xff063c30,0xff09271f,0xff23df89,()->officialPortals()),new LinearLayout.LayoutParams(0,dp(196),1));
+        second.addView(homeTile("⚙","Ajustes","Temporadas y circulares",0xff40101b,0xff270d18,0xffff3d55,()->settingsHome()),new LinearLayout.LayoutParams(0,dp(196),1));
         column.addView(second);
         TextView note=txt("ⓘ  Datos oficiales · Normas revisadas antes de aplicarse",12,0xffb5c5d1);
         note.setBackground(gradient(0xff173a35,0xff102a2e,0xff2d6457));
         LinearLayout.LayoutParams noteLp=new LinearLayout.LayoutParams(-1,-2);
         noteLp.setMargins(dp(4),dp(14),dp(4),0);column.addView(note,noteLp);
+    }
+    final class FarMark extends View {
+        final Paint p=new Paint(3);
+        FarMark(android.content.Context context){super(context);}
+        @Override protected void onDraw(Canvas c){
+            super.onDraw(c);float w=getWidth(),h=getHeight();
+            p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(3));p.setColor(0xff00bc6c);
+            c.drawOval(w*.08f,h*.20f,w*.92f,h*.78f,p);
+            p.setStyle(Paint.Style.FILL);p.setColor(Color.WHITE);p.setTypeface(Typeface.create("sans-serif-black",Typeface.BOLD));
+            p.setTextSize(h*.38f);p.setTextAlign(Paint.Align.CENTER);
+            c.drawText("FAR",w*.5f,h*.60f,p);
+            p.setTextSize(h*.10f);c.drawText("RUGBY ANDALUZ",w*.5f,h*.92f,p);
+        }
+    }
+    final class RugbyHeader extends View {
+        final Paint p=new Paint(3);
+        RugbyHeader(android.content.Context context){super(context);}
+        @Override protected void onDraw(Canvas c){
+            super.onDraw(c);float w=getWidth(),h=getHeight();
+            p.setShader(new LinearGradient(0,0,w,h,new int[]{0xff0b1829,0xff123e3e,0xff091725},null,Shader.TileMode.CLAMP));
+            c.drawRect(0,0,w,h,p);p.setShader(null);
+            Path red=new Path();red.moveTo(0,h*.35f);red.cubicTo(w*.24f,h*.04f,w*.45f,h*.05f,w*.66f,h*.15f);
+            red.lineTo(w*.66f,h*.24f);red.cubicTo(w*.43f,h*.16f,w*.23f,h*.16f,0,h*.55f);red.close();
+            p.setColor(0xffb3122c);c.drawPath(red,p);
+            Path green=new Path();green.moveTo(0,h*.55f);green.cubicTo(w*.24f,h*.16f,w*.43f,h*.16f,w*.66f,h*.24f);
+            green.lineTo(w*.66f,h*.30f);green.cubicTo(w*.43f,h*.25f,w*.22f,h*.27f,0,h*.69f);green.close();
+            p.setColor(0xff00684c);c.drawPath(green,p);
+            p.setColor(0xff0a2630);
+            // Siluetas estilizadas de una melé, independientes del contenido de la aplicación.
+            for(int i=0;i<7;i++){
+                float x=w*(.25f+i*.065f),y=h*(.58f+(i%2)*.025f);
+                c.drawCircle(x,y-h*.15f,h*.048f,p);
+                c.drawOval(x-w*.052f,y-h*.11f,x+w*.058f,y+h*.035f,p);
+                p.setStrokeWidth(dp(5));c.drawLine(x-w*.01f,y,x-w*.055f,y+h*.12f,p);
+                c.drawLine(x+w*.01f,y,x+w*.065f,y+h*.11f,p);
+            }
+            p.setColor(0xff258d3f);c.drawRect(0,h*.78f,w,h,p);
+            p.setColor(0xff0d512b);
+            for(int i=0;i<36;i++){float x=i*w/35f;c.drawLine(x,h*.82f,x+dp(2),h*.72f+(i%4)*dp(2),p);}
+            c.save();c.rotate(-23,w*.82f,h*.56f);
+            p.setColor(0xffd8e3df);c.drawOval(w*.70f,h*.38f,w*.95f,h*.74f,p);
+            p.setColor(0xff11684a);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(dp(2));
+            c.drawOval(w*.72f,h*.40f,w*.93f,h*.72f,p);p.setStyle(Paint.Style.FILL);c.restore();
+        }
     }
     LinearLayout homeTile(String symbol,String heading,String detail,int top,int bottom,int outline,Runnable click){
         LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);
