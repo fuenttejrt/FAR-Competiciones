@@ -80,6 +80,8 @@ public class MainActivity extends Activity {
                 }else if(kind.equals("refresh")){
                     c.drawArc(4,4,20,20,215,260,false,p);c.drawLine(17,4,20,5,p);c.drawLine(20,5,20,9,p);
                     c.drawArc(4,4,20,20,35,135,false,p);c.drawLine(4,15,4,19,p);c.drawLine(4,19,8,19,p);
+                }else if(kind.equals("organizer")){
+                    c.drawCircle(12,7,3,p);c.drawArc(5,12,19,22,185,170,false,p);
                 }else if(kind.equals("chevron")){
                     c.drawLine(5,9,12,16,p);c.drawLine(12,16,19,9,p);
                 }else if(kind.equals("external")){
@@ -697,7 +699,7 @@ public class MainActivity extends Activity {
             logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
             int px=(int)(getResources().getDisplayMetrics().density*27);
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(px,px);
-            lp.setMargins(3,0,5,0);layout.addView(logo,lp);
+            lp.setMargins(right?dp(10):dp(3),0,right?dp(4):dp(5),0);layout.addView(logo,lp);
             new Thread(()->{
                 try{
                     java.net.HttpURLConnection connection=(java.net.HttpURLConnection)new java.net.URL(crest).openConnection();
@@ -1083,18 +1085,18 @@ public class MainActivity extends Activity {
                 LinearLayout headingRow=new LinearLayout(this);headingRow.setOrientation(LinearLayout.HORIZONTAL);
                 headingRow.setGravity(android.view.Gravity.CENTER_VERTICAL);headingRow.setPadding(12,9,12,9);
                 headingRow.setBackgroundColor(headerColor);roundCard.addView(headingRow);
-                TextView headingText=txt("▦  "+sectionTitle,15,Color.WHITE);headingText.setTypeface(null,Typeface.BOLD);
+                TextView headingText=txt("",15,Color.WHITE);headingText.setText(iconLabel("calendar",sectionTitle));headingText.setTypeface(null,Typeface.BOLD);
                 headingRow.addView(headingText,new LinearLayout.LayoutParams(0,-2,1));
                 View separator=new View(this);
                 separator.setBackgroundColor(borderColor);
                 LinearLayout.LayoutParams separatorParams=new LinearLayout.LayoutParams(Math.max(1,(int)density),(int)(22*density));
                 separatorParams.setMargins((int)(5*density),0,(int)(12*density),0);
                 headingRow.addView(separator,separatorParams);
-                TextView dateText=txt("▦  "+firstDay,13,Color.WHITE);dateText.setTypeface(null,Typeface.BOLD);
+                TextView dateText=txt("",13,Color.WHITE);dateText.setText(iconLabel("calendar",firstDay));dateText.setTypeface(null,Typeface.BOLD);
                 dateText.setGravity(android.view.Gravity.RIGHT|android.view.Gravity.CENTER_VERTICAL);
                 headingRow.addView(dateText);
                 if(organizer>=0){
-                    TextView organizerView=txt("♧  Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim(),12,Color.WHITE);
+                    TextView organizerView=txt("",12,Color.WHITE);organizerView.setText(iconLabel("organizer","Organiza: "+full.substring(organizer+"organizador:".length()).replaceFirst("^\\s*[:\\-]\\s*","").trim()));
                     organizerView.setBackgroundColor(0xff062b27);
                     organizerView.setPadding(12,10,10,10);roundCard.addView(organizerView);
                 }
