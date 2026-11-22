@@ -573,7 +573,7 @@ public final class RugbyHubActivity extends Activity {
                                     other.setTypeface(null,selected?android.graphics.Typeface.BOLD:android.graphics.Typeface.NORMAL);
                                 }
                                 if("Resumen".equals(entry.getKey()))
-                                    showActSummary(scroll,entry.getValue(),homeName,awayName);
+                                    showActSummary(scroll,content,homeName,awayName);
                                 else if("Marcador".equals(entry.getKey()))
                                     showActScoreboard(scroll,entry.getValue(),safeLineups,homeName,awayName);
                                 else if("Cambios".equals(entry.getKey()))
@@ -587,7 +587,7 @@ public final class RugbyHubActivity extends Activity {
                             });
                         }
                         String first=parsed.containsKey("Resumen")?"Resumen":parsed.keySet().iterator().next();
-                        if("Resumen".equals(first))showActSummary(scroll,parsed.get(first),homeName,awayName);
+                        if("Resumen".equals(first))showActSummary(scroll,content,homeName,awayName);
                         else body.setText(parsed.get(first));
                     }
                 });
@@ -1241,9 +1241,10 @@ public final class RugbyHubActivity extends Activity {
         header.setColor(0xff1b2a39);header.setCornerRadius(dp(12));
         matchup.setBackground(header);host.addView(matchup);
         String clean=raw==null?"":raw.replaceAll("(?im)^\\s*PÁGINA\\s+\\d+\\s*$","").trim();
+        String headerOnly=clean.split("(?im)^\\s*Alineaciones\\s*$",2)[0];
         java.util.regex.Pattern fields=java.util.regex.Pattern.compile(
             "(?i)(Celebrado en:|Categoría:|Jornada:|Organizador:|El día:|A la hora:|En el campo:|Equipo local:|Equipo visitante:)");
-        java.util.regex.Matcher matcher=fields.matcher(clean);
+        java.util.regex.Matcher matcher=fields.matcher(headerOnly);
         java.util.ArrayList<String> keys=new java.util.ArrayList<>();
         java.util.ArrayList<Integer> starts=new java.util.ArrayList<>();
         java.util.ArrayList<Integer> ends=new java.util.ArrayList<>();
@@ -1251,7 +1252,7 @@ public final class RugbyHubActivity extends Activity {
         java.util.LinkedHashMap<String,String> found=new java.util.LinkedHashMap<>();
         for(int i=0;i<keys.size();i++){
             String key=keys.get(i).toLowerCase(java.util.Locale.ROOT);
-            String value=clean.substring(ends.get(i),i+1<keys.size()?starts.get(i+1):clean.length()).trim();
+            String value=headerOnly.substring(ends.get(i),i+1<keys.size()?starts.get(i+1):headerOnly.length()).trim();
             if(value.isEmpty())continue;
             if(key.startsWith("celebrado"))found.put("Localidad",value);
             else if(key.startsWith("categor"))found.put("Competición",value);
