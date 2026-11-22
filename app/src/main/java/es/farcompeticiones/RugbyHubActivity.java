@@ -1285,7 +1285,7 @@ public final class RugbyHubActivity extends Activity {
         }
         // Staff is printed in two side-by-side cells, not among the match
         // header fields. Parse the first page only to avoid annex duplicates.
-        String pageOne=clean.split("(?m)^\\s*PÁGINA\\s+2\\s*$",2)[0];
+        String pageOne=(raw==null?"":raw).split("(?m)^\\s*PÁGINA\\s+2\\s*$",2)[0];
         java.util.regex.Pattern staff=java.util.regex.Pattern.compile(
             "(?im)^\\s*(Entrenador|Delegado|Juez línea):\\s*(.+?)\\s+"+
             "\\1:\\s*(.+?)\\s*$");
