@@ -1316,6 +1316,7 @@ public final class RugbyHubActivity extends Activity {
             "N[ºo]\\s*licencia:\\s*(\\d{7}))?")
             .matcher(pageOne);
         if(judges.find()){
+            found.remove("Juez línea local");found.remove("Juez línea visitante");
             String local=judges.group(1).trim(),visitor=judges.group(2).trim();
             if(!local.isEmpty())found.put("Juez de línea local",local);
             if(!visitor.isEmpty())found.put("Juez de línea visitante",visitor);
