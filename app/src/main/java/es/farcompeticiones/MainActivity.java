@@ -26,6 +26,7 @@ public class MainActivity extends Activity {
     int selectedMatchGroup=-1;
     boolean showStandingDetails=false;
     boolean calendarUpcomingOnly=true;
+    long lastAutomaticRefreshAttempt=0L;
     TextView txt(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(15,12,15,12);return t;}
     @Override public void onCreate(Bundle state){super.onCreate(state);home();}
     void layout(String heading){
@@ -110,6 +111,16 @@ public class MainActivity extends Activity {
             Button source=new Button(this);source.setText("Web oficial");source.setTextSize(12);source.setAllCaps(false);
             actions.addView(source,new LinearLayout.LayoutParams(0,-2,1));source.setOnClickListener(v->openBrowser(official));
             showCachedNative();
+            // Al abrir la clasificación M14, comprobar periódicamente si MatchReady ha publicado una fase nueva.
+            // El intervalo evita descargas continuas al cambiar de pestaña y al terminar una importación.
+            if(tab.equals("Clasificación")&&category.equals("M14")&&season.equals("2026/27")){
+                long now=System.currentTimeMillis();
+                long last=getPreferences(0).getLong("checked_"+cacheKey(),0L);
+                if(now-last>=6L*60L*60L*1000L&&now-lastAutomaticRefreshAttempt>=60L*1000L){
+                    lastAutomaticRefreshAttempt=now;
+                    refreshNative(official);
+                }
+            }
         }else{
             body.addView(txt("Todavía no hay un calendario oficial configurado para esta competición.",14,Color.LTGRAY));
             String key="url_"+season+"_"+category+"_"+selectedCompetition;
@@ -210,6 +221,8 @@ public class MainActivity extends Activity {
         }
         if(first&&!second)return 1;
         if(second&&!first)return 2;
+        // Si ambas fases están presentes y la tabla no identifica su fase,
+        // no atribuir los puestos a ninguna de ellas.
         return 0;
     }
     String m14PositionGuide(int rank){
@@ -698,7 +711,7 @@ public class MainActivity extends Activity {
                             int matchTables=0,standingTables=0;
                             for(int z=0;z<tables.length();z++){org.json.JSONObject t=tables.optJSONObject(z);if(t!=null){if("matches".equals(t.optString("kind")))matchTables++;if("standing".equals(t.optString("kind")))standingTables++;}}
                             if(matchTables==0&&standingTables==0){Toast.makeText(MainActivity.this,"No se han identificado tablas de partidos ni clasificación.",Toast.LENGTH_LONG).show();return;}
-                            getPreferences(0).edit().putString(key,obj.toString()).apply();
+                            getPreferences(0).edit().putString(key,obj.toString()).putLong("checked_"+key,System.currentTimeMillis()).apply();
                             Toast.makeText(MainActivity.this,"Importación: "+matchTables+" jornadas y "+standingTables+" clasificaciones",Toast.LENGTH_LONG).show();
                             showCompetitionTab(selectedTab);
                         }catch(Exception ex){android.util.Log.e("FAR_IMPORT","Respuesta: "+result,ex);new android.app.AlertDialog.Builder(MainActivity.this).setTitle("Error del lector").setMessage("Detalle: "+ex.getMessage()+"\nRespuesta: "+String.valueOf(result).substring(0,Math.min(250,String.valueOf(result).length()))).setPositiveButton("Cerrar",null).show();}
