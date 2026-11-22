@@ -59,4 +59,61 @@ final class StandingIntelligence {
                 "Diferencia actual: "+gap+" punto"+(gap==1?"":"s")+
                 ". No implica clasificación matemática.";
     }
+    private static String key(String name) {
+        if (name==null) return "";
+        String normalized=java.text.Normalizer.normalize(name,java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+","");
+        return normalized.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]","");
+    }
+
+    private static boolean score(String value) {
+        return value!=null && value.matches("(?s).*\\d+\\s*[-–:]\\s*\\d+.*");
+    }
+
+    /**
+     * Escenarios de puntuación máxima usando solo encuentros aún sin resultado
+     * en el calendario oficial descargado. No son pronósticos de puesto.
+     */
+    static String remainingScenario(String season,String category,String competition,int phase,
+                                    JSONArray standings,JSONObject data) {
+        if (!CompetitionRules.hasM14Rules(season,category) || phase!=1) return "";
+        int cutoff="Primera División".equals(competition)?5:
+                competition.startsWith("Segunda División · Grupo")?3:0;
+        if(cutoff==0)return "";
+        ArrayList<Team> teams=teams(standings);
+        if(teams.size()<=cutoff)return "";
+        JSONArray tables=data.optJSONArray("tables");
+        if(tables==null)return "";
+        java.util.HashMap<String,Integer> pending=new java.util.HashMap<>();
+        java.util.HashSet<String> unique=new java.util.HashSet<>();
+        int matchTables=0;
+        for(int i=0;i<tables.length();i++){
+            JSONObject table=tables.optJSONObject(i);
+            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            matchTables++;
+            JSONArray games=table.optJSONArray("rows");
+            if(games==null)continue;
+            for(int j=0;j<games.length();j++){
+                JSONObject game=games.optJSONObject(j);
+                if(game==null||score(game.optString("score","")))continue;
+                String home=key(game.optString("home","")),away=key(game.optString("away",""));
+                if(home.isEmpty()||away.isEmpty()||home.equals(away))continue;
+                String id=home+"|"+away+"|"+game.optString("when","");
+                if(!unique.add(id))continue;
+                pending.put(home,pending.containsKey(home)?pending.get(home)+1:1);
+                pending.put(away,pending.containsKey(away)?pending.get(away)+1:1);
+            }
+        }
+        if(matchTables==0)return "";
+        Team inside=teams.get(cutoff-1),outside=teams.get(cutoff);
+        int a=pending.containsKey(key(inside.name))?pending.get(key(inside.name)):0;
+        int b=pending.containsKey(key(outside.name))?pending.get(key(outside.name)):0;
+        return "Escenario de puntos con partidos sin resultado en el calendario: "+
+                inside.name+" "+inside.points+"–"+(inside.points+5*a)+
+                " pts ("+a+" pendientes); "+outside.name+" "+outside.points+"–"+
+                (outside.points+5*b)+" pts ("+b+" pendientes). "+
+                "Máximo teórico de 5 puntos por partido. No certifica plazas: "+
+                "pueden faltar encuentros, desempates o resoluciones oficiales.";
+    }
+
 }
