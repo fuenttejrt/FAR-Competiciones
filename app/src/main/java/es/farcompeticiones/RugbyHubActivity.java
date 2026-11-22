@@ -612,16 +612,16 @@ public final class RugbyHubActivity extends Activity {
                     if(tokens.get(i).matches("(?i).*\\bMarcador\\s*$")){heading=i;break;}
                 if(heading<0)continue;
                 report.append("PÁGINA ").append(pageIndex+1)
-                    .append(" — POSICIONES DEL MARCADOR\\n");
+                    .append(" — POSICIONES DEL MARCADOR\n");
                 int lines=0;
                 for(int i=heading;i<tokens.size()&&lines<130;i++){
                     String t=tokens.get(i);
                     if(i>heading&&t.matches("(?i).*\\bCambios\\s*$"))break;
-                    report.append(t).append('\\n');lines++;
+                    report.append(t).append('\n');lines++;
                 }
             }catch(Exception ex){
                 report.append("No se pudieron obtener coordenadas: ")
-                    .append(ex.getClass().getSimpleName()).append('\\n');
+                    .append(ex.getClass().getSimpleName()).append('\n');
             }
         }
         return report.length()==0?"No se encontró la zona Marcador":report.toString();
