@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -22,7 +23,7 @@ public final class M14RulesActivity extends Activity {
     private TextView text(String value,int size,int color,boolean bold){
         TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);
         if(bold)t.setTypeface(null,Typeface.BOLD);
-        t.setPadding(dp(12),dp(10),dp(12),dp(10));return t;
+        t.setPadding(dp(12),dp(7),dp(12),dp(7));return t;
     }
     private GradientDrawable panel(){
         GradientDrawable d=new GradientDrawable();d.setColor(PANEL);d.setCornerRadius(dp(10));return d;
@@ -30,12 +31,12 @@ public final class M14RulesActivity extends Activity {
     private void accordion(String title,String details,boolean expanded){
         LinearLayout wrapper=new LinearLayout(this);wrapper.setOrientation(LinearLayout.VERTICAL);
         wrapper.setBackground(panel());
-        LinearLayout.LayoutParams margin=new LinearLayout.LayoutParams(-1,-2);margin.setMargins(0,0,0,dp(9));
+        LinearLayout.LayoutParams margin=new LinearLayout.LayoutParams(-1,-2);margin.setMargins(0,0,0,dp(6));
         content.addView(wrapper,margin);
         TextView header=text((expanded?"▾  ":"▸  ")+title,15,GREEN,true);
         wrapper.addView(header);
         TextView description=text(details,14,Color.WHITE,false);
-        description.setPadding(dp(16),dp(2),dp(16),dp(14));
+        description.setPadding(dp(16),dp(2),dp(16),dp(10));
         description.setVisibility(expanded?View.VISIBLE:View.GONE);
         wrapper.addView(description);
         header.setOnClickListener(v->{
@@ -47,13 +48,15 @@ public final class M14RulesActivity extends Activity {
     private void phase(String name,String subtitle){
         TextView t=text(name+"\n"+subtitle,13,Color.WHITE,false);
         t.setBackground(panel());
-        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,0,0,dp(5));
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,0,0,dp(4));
         content.addView(t,p);
     }
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
-        LinearLayout screen=new LinearLayout(this);screen.setOrientation(LinearLayout.VERTICAL);screen.setBackgroundColor(BG);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS | WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+        LinearLayout screen=new LinearLayout(this);screen.setOrientation(LinearLayout.VERTICAL);screen.setBackgroundColor(BG);screen.setFitsSystemWindows(true);
         setContentView(screen);
         LinearLayout top=new LinearLayout(this);top.setOrientation(LinearLayout.HORIZONTAL);top.setGravity(android.view.Gravity.CENTER_VERTICAL);
         TextView back=text("‹",30,Color.WHITE,true);top.addView(back);back.setOnClickListener(v->finish());
@@ -64,10 +67,10 @@ public final class M14RulesActivity extends Activity {
         screen.addView(top);
         View line=new View(this);line.setBackgroundColor(PANEL);screen.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);screen.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(12),dp(8),dp(12),dp(20));scroll.addView(content);
+        content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(12),dp(5),dp(12),dp(28));scroll.addView(content);
 
         TextView intro=text("Campeonato Andaluz M14 XV · Circular FAR n.º 10",13,MUTED,false);
-        intro.setPadding(dp(3),dp(4),dp(3),dp(12));content.addView(intro);
+        intro.setPadding(dp(3),dp(3),dp(3),dp(7));content.addView(intro);
         content.addView(text("ESQUEMA DE FASES",14,GREEN,true));
         phase("1.ª FASE","Primera División · 6 equipos   |   Segunda División · 2 grupos de 6");
         content.addView(text("↓  Promoción: 6.º de Primera + 1.º de cada grupo de Segunda",12,GREEN,true));
@@ -94,7 +97,7 @@ public final class M14RulesActivity extends Activity {
         accordion("Fuentes y alcance",
             "Circular FAR n.º 10: Campeonato Andaluz M14 XV, temporada 2026/27.\nCircular FAR n.º 2: Normas generales de las competiciones, temporada 2026/27.\nLas normas específicas prevalecen cuando corresponda. Esta es una guía informativa; prevalecen las circulares y resoluciones oficiales.",false);
         Button source=new Button(this);source.setText("Consultar documentos oficiales FAR");source.setAllCaps(false);
-        content.addView(source);
+        content.addView(source,new LinearLayout.LayoutParams(-1,dp(52)));
         source.setOnClickListener(v->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://farugby.matchready.es/es/public/documentation/1/index/"))));
     }
 }
