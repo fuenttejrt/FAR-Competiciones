@@ -1011,6 +1011,8 @@ public class MainActivity extends Activity {
                     }
                     String insight=StandingIntelligence.summary(season,category,selectedCompetition,detectedPhase,rows);
                     if(!insight.isEmpty())body.addView(txt("ANÁLISIS · "+insight,11,0xffa5dbc6));
+                    String scenarios=StandingIntelligence.remainingScenario(season,category,selectedCompetition,detectedPhase,rows,data);
+                    if(!scenarios.isEmpty())body.addView(txt("PARTIDOS PENDIENTES · "+scenarios,11,0xffa5dbc6));
                     body.addView(txt("Puestos orientativos, sujetos a sanciones, renuncias y resoluciones de la FAR.",11,Color.LTGRAY));
                 }
                 for(android.widget.HorizontalScrollView scroller:scrollRows){
