@@ -1355,19 +1355,25 @@ public final class RugbyHubActivity extends Activity {
                 found.put("Licencia árbitro",referee.group(2));
             }
         }
-        // Attach each licence to its own person's card, not a separate card.
+        // Normalize alternative licence labels before merging cards.
+        for(String side:new String[]{"local","visitante"}){
+            String licence=found.remove("Licencia Juez línea "+side);
+            if(licence==null)licence=found.remove("Licencia juez línea "+side);
+            if(licence==null)licence=found.remove("Licencia juez "+side);
+            if(licence!=null)found.put("Licencia juez de línea "+side,licence);
+        }
         for(String role:new String[]{"Entrenador","Delegado","Juez de línea"}){
             for(String side:new String[]{"local","visitante"}){
                 String key=role+" "+side;
-                String licenceKey="Licencia "+(role.equals("Juez de línea")?"juez":role)+" "+side;
+                String licenceKey="Licencia "+(role.equals("Juez de línea")?"juez de línea":role)+" "+side;
                 String licence=found.remove(licenceKey);
                 if(licence!=null&&found.containsKey(key))
-                    found.put(key,found.get(key)+"\\nLicencia: "+licence);
+                    found.put(key,found.get(key)+"\nLicencia: "+licence);
             }
         }
         String refereeLicence=found.remove("Licencia árbitro");
         if(refereeLicence!=null&&found.containsKey("Árbitro"))
-            found.put("Árbitro",found.get("Árbitro")+"\\nLicencia: "+refereeLicence);
+            found.put("Árbitro",found.get("Árbitro")+"\nLicencia: "+refereeLicence);
         for(java.util.Map.Entry<String,String> field:found.entrySet()){
             LinearLayout card=new LinearLayout(this);card.setOrientation(1);
             card.setPadding(dp(12),dp(6),dp(12),dp(6));
@@ -1377,7 +1383,14 @@ public final class RugbyHubActivity extends Activity {
             lp.setMargins(0,dp(3),0,dp(2));host.addView(card,lp);
             TextView label=text(field.getKey().toUpperCase(java.util.Locale.ROOT),11,true);
             label.setTextColor(0xffaab9c9);card.addView(label);
-            card.addView(text(field.getValue(),14,false));
+            String display=field.getValue().replace("\\n","\n");
+            int licenceBreak=display.indexOf("\nLicencia:");
+            if(licenceBreak>=0){
+                card.addView(text(display.substring(0,licenceBreak),14,false));
+                TextView licenceText=text(display.substring(licenceBreak+1),12,false);
+                licenceText.setTextColor(0xffaab9c9);
+                card.addView(licenceText);
+            }else card.addView(text(display,14,false));
             if("Campo".equals(field.getKey())){
                 TextView mapHint=text("📍  Abrir en Google Maps",11,true);
                 mapHint.setTextColor(0xff82c7ff);mapHint.setPadding(0,dp(2),0,0);
