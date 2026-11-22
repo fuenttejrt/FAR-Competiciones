@@ -43,8 +43,42 @@ public class MainActivity extends Activity {
         Button b=new Button(this);b.setText(title);body.addView(b);b.setOnClickListener(v->click.run());
     }
     void home(){
-        page="home";layout("FAR COMPETICIONES");
-        body.addView(txt("Rugby andaluz · Consulta de competiciones",14,accent));
+        page="landing";layout("FAR COMPETICIONES");
+        TextView subtitle=txt("Rugby andaluz · Tu centro de competiciones",14,accent);
+        body.addView(subtitle);
+        body.addView(txt("¿Qué quieres consultar?",18,Color.WHITE));
+        dashboardCard("🏉  COMPETICIONES","Calendarios, resultados, clasificaciones y actas",()->competitionsHome());
+        dashboardCard("📁  CIRCULARES Y REGLAMENTOS","Temporadas, categorías y documentos oficiales",()->{
+            Intent i=new Intent(this,CircularsActivity.class);
+            i.putExtra("season",season);i.putExtra("category",category);startActivity(i);
+        });
+        dashboardCard("📋  SISTEMA DE COMPETICIÓN","Fases y normas M14 · 2026/27",()->M14RulesActivity.open(this));
+        dashboardCard("🌐  PORTALES OFICIALES","MatchReady y Federación Andaluza de Rugby",()->officialPortals());
+        body.addView(txt("Los resultados proceden de fuentes oficiales. Las reglas se revisan antes de aplicarse.",12,Color.LTGRAY));
+    }
+    void dashboardCard(String heading,String description,Runnable click){
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(12,12,12,12);
+        android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();
+        shape.setColor(panel);shape.setCornerRadius(18*getResources().getDisplayMetrics().density);
+        card.setBackground(shape);
+        TextView title=txt(heading,17,Color.WHITE);title.setTypeface(null,Typeface.BOLD);card.addView(title);
+        card.addView(txt(description,13,0xffb5c5d1));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+        lp.setMargins(0,7,0,7);body.addView(card,lp);
+        card.setOnClickListener(v->click.run());
+    }
+    void officialPortals(){
+        page="portals";layout("Portales oficiales");
+        dashboardCard("🌐  MatchReady","Calendarios y clasificaciones de la FAR",()->openBrowser("https://farugby.matchready.es/"));
+        dashboardCard("🌐  Federación Andaluza","Web oficial FAR",()->openExternal("https://farugby.com/"));
+        String last=getPreferences(0).getString("last_url","");
+        if(last.startsWith("https://farugby.matchready.es/")||last.startsWith("https://farugby.com/"))
+            dashboardCard("↻  Última consulta","Continuar donde lo dejaste",()->openBrowser(last));
+        button("‹ Inicio",()->home());
+    }
+    void competitionsHome(){
+        page="home";layout("Competiciones");
+        body.addView(txt("Selecciona temporada y categoría",14,accent));
         body.addView(txt("Temporada",17,Color.WHITE));
         String[] seasons={"2026/27","2025/26"};
         Spinner seasonSpinner=new Spinner(this);ArrayAdapter<String> seasonAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,seasons);seasonSpinner.setAdapter(seasonAdapter);body.addView(seasonSpinner);
@@ -62,11 +96,7 @@ public class MainActivity extends Activity {
             public void onNothingSelected(AdapterView<?> parent){}
             public void onItemSelected(AdapterView<?> parent,View view,int pos,long id){category=cats[pos];list();}
         });
-        button("Abrir portal público MatchReady",()->openBrowser("https://farugby.matchready.es/"));
-        String last=getPreferences(0).getString("last_url","");
-        if(last.startsWith("https://farugby.matchready.es/")||last.startsWith("https://farugby.com/"))button("Continuar última consulta",()->openBrowser(last));
-        button("Abrir web oficial FAR",()->openExternal("https://farugby.com/"));
-        body.addView(txt("Los resultados no se inventan. Las consultas web requieren conexión.",13,Color.LTGRAY));
+        button("‹ Inicio",()->home());
     }
     void list(){
         while(body.getChildCount()>5)body.removeViewAt(5);
@@ -77,7 +107,7 @@ public class MainActivity extends Activity {
         else entries=category.equals("M14")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M16")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M18")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:new String[]{"Consultar competiciones oficiales"};
         for(String entry:entries){TextView card=txt(entry+"  ›",17,Color.WHITE);card.setBackgroundColor(panel);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,5,0,5);body.addView(card,lp);card.setOnClickListener(v->details(entry));}
         if(category.equals("M14")&&season.equals("2026/27"))button("Sistema de competición · M14 2026/27",()->M14RulesActivity.open(this));
-        button("Circulares y reglamentos · "+season+" · "+category,()->{Intent i=new Intent(this,CircularsActivity.class);i.putExtra("season",season);i.putExtra("category",category);startActivity(i);});
+
         body.addView(txt(category.equals("M14")&&season.equals("2026/27")?"Competiciones contrastadas con la web oficial FAR.":"Estructura orientativa: verificar divisiones y grupos para esta temporada.",12,Color.LTGRAY));
     }
     String officialCalendar(){
@@ -137,7 +167,7 @@ public class MainActivity extends Activity {
             EditText url=new EditText(this);url.setSingleLine(true);url.setHint("Enlace público MatchReady");url.setText(getPreferences(0).getString(key,""));body.addView(url);
             button("Guardar y abrir",()->{String link=url.getText().toString().trim();if(link.startsWith("https://farugby.matchready.es/")){getPreferences(0).edit().putString(key,link).apply();openBrowser(link);}else Toast.makeText(this,"Enlace MatchReady no válido",Toast.LENGTH_LONG).show();});
         }
-        button("‹ Competiciones",()->home());
+        button("‹ Competiciones",()->competitionsHome());
     }
     String cacheKey(){return "native_"+season+"_"+category+"_"+selectedCompetition;}
     void showCachedNative(){
