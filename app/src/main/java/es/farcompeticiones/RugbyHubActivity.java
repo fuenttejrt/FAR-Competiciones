@@ -733,11 +733,14 @@ public final class RugbyHubActivity extends Activity {
                 stripper.setStartPage(pageIndex+1);stripper.setEndPage(pageIndex+1);
                 stripper.getText(pdf);
                 float headingY=-1;
+                float headingX=-1;
                 for(int i=0;i<strings.size();i++)
                     if(strings.get(i).equalsIgnoreCase(heading)){
-                        headingY=positions.get(i)[1];break;
+                        headingY=positions.get(i)[1];headingX=positions.get(i)[0];break;
                     }
                 if(headingY<0)continue;
+                final float middle=pdf.getPage(pageIndex).getCropBox().getWidth()/2f;
+                final boolean leftColumn=headingX<middle;
                 float nextY=Float.MAX_VALUE;
                 for(int i=0;i<strings.size();i++){
                     float y=positions.get(i)[1];
@@ -754,7 +757,9 @@ public final class RugbyHubActivity extends Activity {
                     int teamIndex=-1;
                     for(int i=0;i<strings.size();i++){
                         float y=positions.get(i)[1];
-                        if(y>headingY&&y<nextY&&strings.get(i).matches(
+                        if(y>headingY&&y<nextY&&
+                            (changes||(leftColumn?positions.get(i)[0]<middle:positions.get(i)[0]>=middle))&&
+                            strings.get(i).matches(
                             side==0?"(?i)Equipo local:.*":"(?i)Equipo visitante:.*")){
                             teamIndex=i;break;
                         }
@@ -764,14 +769,17 @@ public final class RugbyHubActivity extends Activity {
                     float end=nextY;
                     for(int i=teamIndex+1;i<strings.size();i++){
                         float y=positions.get(i)[1];
-                        if(y>start+3&&y<end&&strings.get(i).matches("(?i)Equipo (local|visitante):.*")){
+                        if(y>start+3&&y<end&&
+                            (changes||(leftColumn?positions.get(i)[0]<middle:positions.get(i)[0]>=middle))&&
+                            strings.get(i).matches("(?i)Equipo (local|visitante):.*")){
                             end=y;break;
                         }
                     }
                     java.util.LinkedHashMap<String,Float> rowY=new java.util.LinkedHashMap<>();
                     for(int i=teamIndex+1;i<strings.size();i++){
                         float y=positions.get(i)[1];
-                        if(y<=start||y>=end)continue;
+                        if(y<=start||y>=end||(!changes&&
+                            (leftColumn?positions.get(i)[0]>=middle:positions.get(i)[0]<middle)))continue;
                         String v=strings.get(i).toLowerCase(java.util.Locale.ROOT);
                         if(v.equals("tipo *"))rowY.put("tipo",y);
                         else if(v.equals("minuto"))rowY.put("minuto",y);
@@ -783,7 +791,8 @@ public final class RugbyHubActivity extends Activity {
                     java.util.ArrayList<Integer> eventIndices=new java.util.ArrayList<>();
                     for(int i=teamIndex+1;i<strings.size();i++){
                         float[] pos=positions.get(i);
-                        if(pos[1]<=start||pos[1]>=end||pos[0]<65f)continue;
+                        if(pos[1]<=start||pos[1]>=end||
+                            (changes?pos[0]<65f:(leftColumn?pos[0]<65f||pos[0]>=middle:pos[0]<middle)))continue;
                         if(Math.abs(pos[1]-rowY.get("tipo"))<2f&&strings.get(i).matches(
                             changes?"(?i)CT|CL|CS|CC|C1|CJ|C20":"(?i)[A-E]"))
                             eventIndices.add(i);
@@ -792,21 +801,22 @@ public final class RugbyHubActivity extends Activity {
                     for(int k=0;k<eventIndices.size();k++){
                         int event=eventIndices.get(k);
                         float x=positions.get(event)[0];
-                        String minute=positionCell(strings,positions,rowY.get("minuto"),x);
+                        String minute=positionCell(strings,positions,rowY.get("minuto"),x,
+                            changes?0f:(leftColumn?0f:middle),changes?Float.MAX_VALUE:(leftColumn?middle:Float.MAX_VALUE));
                         if(!minute.matches("\\d+"))continue;
                         team.append(k+1).append(". Min ").append(minute).append(" · ");
                         if(changes){
                             String enter=rowY.containsKey("entra")?
-                                positionCell(strings,positions,rowY.get("entra"),x):"";
+                                positionCell(strings,positions,rowY.get("entra"),x,0f,Float.MAX_VALUE):"";
                             String leave=rowY.containsKey("sale")?
-                                positionCell(strings,positions,rowY.get("sale"),x):"";
+                                positionCell(strings,positions,rowY.get("sale"),x,0f,Float.MAX_VALUE):"";
                             team.append("Cambio · ")
                                 .append(enter.matches("\\d+")?"Entra nº "+enter:"Entra sin dorsal")
                                 .append(" · ")
                                 .append(leave.matches("\\d+")?"Sale nº "+leave:"Sale sin dorsal");
                         }else{
                             String dorsal=rowY.containsKey("dorsal")?
-                                positionCell(strings,positions,rowY.get("dorsal"),x):"";
+                                positionCell(strings,positions,rowY.get("dorsal"),x,leftColumn?0f:middle,leftColumn?middle:Float.MAX_VALUE):"";
                             team.append("Tipo ").append(strings.get(event)).append(" · ")
                                 .append(dorsal.matches("\\d+")?"Dorsal "+dorsal:"Dorsal no indicado");
                         }
@@ -823,13 +833,13 @@ public final class RugbyHubActivity extends Activity {
         return output.length()==0?null:output.toString().trim();
     }
     private String positionCell(java.util.List<String> strings,
-        java.util.List<float[]> positions,float rowY,float x){
+        java.util.List<float[]> positions,float rowY,float x,float minX,float maxX){
         float best=12.5f;
         String value="";
         for(int i=0;i<strings.size();i++){
             float[] p=positions.get(i);
             float delta=Math.abs(p[0]-x);
-            if(Math.abs(p[1]-rowY)<2f&&delta<best&&strings.get(i).matches("\\d+")){
+            if(p[0]>=minX&&p[0]<maxX&&Math.abs(p[1]-rowY)<2f&&delta<best&&strings.get(i).matches("\\d+")){
                 best=delta;value=strings.get(i);
             }
         }
