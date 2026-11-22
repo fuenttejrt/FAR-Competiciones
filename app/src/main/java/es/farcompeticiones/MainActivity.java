@@ -74,6 +74,7 @@ public class MainActivity extends Activity {
         if(category.equals("M14")&&season.equals("2026/27"))entries=new String[]{"Primera División","Segunda División · Grupo 1","Segunda División · Grupo 2","Copa FAR"};
         else entries=category.equals("M14")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M16")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:category.equals("M18")?new String[]{"Primera División","Segunda División · Grupos","Copa FAR"}:new String[]{"Consultar competiciones oficiales"};
         for(String entry:entries){TextView card=txt(entry+"  ›",17,Color.WHITE);card.setBackgroundColor(panel);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,5,0,5);body.addView(card,lp);card.setOnClickListener(v->details(entry));}
+        if(category.equals("M14")&&season.equals("2026/27"))button("Sistema de competición · M14 2026/27",()->M14RulesActivity.open(this));
         body.addView(txt(category.equals("M14")&&season.equals("2026/27")?"Competiciones contrastadas con la web oficial FAR.":"Estructura orientativa: verificar divisiones y grupos para esta temporada.",12,Color.LTGRAY));
     }
     String officialCalendar(){
