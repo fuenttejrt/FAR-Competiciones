@@ -144,7 +144,7 @@ public class MainActivity extends Activity {
             super.onDraw(canvas);Canvas c=canvas;float w=getWidth(),h=getHeight();
             c.save();c.translate(w*.5f,h*.48f);float z=Math.min(w,h)/100f;c.scale(z,z);
             p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(6);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
-            p.setColor(0xff18382f);p.setShadowLayer(5,3,5,0xff020609);
+            p.setColor(0xff26323a);p.setShadowLayer(9,5,7,0xff020609);
             drawIcon(c,p,kind);
             p.clearShadowLayer();c.translate(-2,-3);p.setColor(0xfff4fffc);p.setStrokeWidth(5);drawIcon(c,p,kind);
             p.setColor(0xff8de8d0);p.setStrokeWidth(1.6f);c.translate(-1,-1);drawIcon(c,p,kind);
@@ -166,20 +166,31 @@ public class MainActivity extends Activity {
                 c.drawLine(-35,0,35,0,p);c.drawArc(new RectF(-32,-19,32,19),0,180,false,p);
                 c.drawArc(new RectF(-32,-19,32,19),180,180,false,p);
             }else{
-                c.drawCircle(0,0,27,p);c.drawCircle(0,0,10,p);
-                for(int i=0;i<8;i++){double a=i*Math.PI/4;c.drawLine((float)(Math.cos(a)*30),(float)(Math.sin(a)*30),(float)(Math.cos(a)*42),(float)(Math.sin(a)*42),p);}
+                Path gear=new Path();
+                for(int i=0;i<32;i++){
+                    double a=(i*2*Math.PI/32)-Math.PI/2;
+                    int j=i%4;float r=(j==0||j==3)?42:31;
+                    float x=(float)(Math.cos(a)*r),y=(float)(Math.sin(a)*r);
+                    if(i==0)gear.moveTo(x,y);else gear.lineTo(x,y);
+                }
+                gear.close();
+                p.setStyle(Paint.Style.FILL);c.drawPath(gear,p);
+                p.setColor(0xff18242d);c.drawCircle(0,0,17,p);
+                p.setColor(0xffb5d4d3);c.drawCircle(0,0,11,p);
+                p.setColor(0xff18242d);c.drawCircle(0,0,7,p);
+                p.setStyle(Paint.Style.STROKE);
             }
         }
     }
     LinearLayout homeTile(String symbol,String heading,String detail,int top,int bottom,int outline,Runnable click){
         LinearLayout tile=new LinearLayout(this);tile.setOrientation(1);
         tile.setPadding(dp(13),dp(12),dp(9),dp(8));tile.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        tile.setBackground(gradient(top,bottom,outline));
+        tile.setBackground(gradient(top,bottom,outline));tile.setElevation(dp(5));
         LinearLayout.LayoutParams outer=new LinearLayout.LayoutParams(-1,-1);
         outer.setMargins(dp(4),dp(5),dp(4),dp(5));
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
         View pict=new TileIcon(this,symbol);content.addView(pict,new LinearLayout.LayoutParams(dp(66),dp(60)));
-        TextView title=txt(heading,17,Color.WHITE);title.setTypeface(null,Typeface.BOLD);content.addView(title);
+        TextView title=txt(heading,17,Color.WHITE);title.setTypeface(null,Typeface.BOLD);title.setShadowLayer(dp(2),dp(1),dp(2),0xff000000);content.addView(title);
         content.addView(txt(detail,12,0xffe2e8f0));
         tile.addView(content);
         LinearLayout wrapper=new LinearLayout(this);wrapper.addView(tile,outer);
