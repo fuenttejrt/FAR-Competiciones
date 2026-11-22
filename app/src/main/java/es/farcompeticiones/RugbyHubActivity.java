@@ -1447,18 +1447,39 @@ public final class RugbyHubActivity extends Activity {
             reader.setSortByPosition(true);reader.setStartPage(1);reader.setEndPage(1);
             reader.getText(pdf);
             float middle=pdf.getPage(0).getCropBox().getWidth()/2f;
-            StringBuilder[] rosters={new StringBuilder(),new StringBuilder()};
-            int[] count={0,0};
+            StringBuilder[] starters={new StringBuilder(),new StringBuilder()};
+            StringBuilder[] reserves={new StringBuilder(),new StringBuilder()};
+            int[] starterCount={0,0},reserveCount={0,0};
             for(int side=0;side<2;side++){
                 float minX=side==0?0:middle,maxX=side==0?middle:Float.MAX_VALUE;
                 java.util.ArrayList<Float> rowYs=new java.util.ArrayList<>();
+                java.util.ArrayList<Float> headerYs=new java.util.ArrayList<>();
                 for(int i=0;i<words.size();i++){
                     float[] pos=positions.get(i);
                     if(pos[0]<minX||pos[0]>=maxX)continue;
-                    if(words.get(i).matches("\\d{7}")&&!rowYs.contains(pos[2]))
-                        rowYs.add(pos[2]);
+                    if(words.get(i).matches("\\d{7}")){
+                        boolean seen=false;
+                        for(float prior:rowYs)if(Math.abs(prior-pos[2])<2f){seen=true;break;}
+                        if(!seen)rowYs.add(pos[2]);
+                    }
+                    if(words.get(i).matches("(?i).*Dorsal.*")){
+                        boolean seen=false;
+                        for(float prior:headerYs)if(Math.abs(prior-pos[2])<3f){seen=true;break;}
+                        if(!seen)headerYs.add(pos[2]);
+                    }
                 }
                 java.util.Collections.sort(rowYs);
+                java.util.Collections.sort(headerYs);
+                // The form repeats the column headers before the substitute block.
+                float splitY=Float.MAX_VALUE;
+                if(headerYs.size()>=2){
+                    for(float y:headerYs){
+                        if(!rowYs.isEmpty()&&y>rowYs.get(0)+2f){
+                            splitY=y;break;
+                        }
+                    }
+                }
+                int ordinal=0;
                 for(float y:rowYs){
                     java.util.ArrayList<Integer> row=new java.util.ArrayList<>();
                     for(int i=0;i<words.size();i++){
@@ -1479,21 +1500,29 @@ public final class RugbyHubActivity extends Activity {
                     if(!player.matches())continue;
                     String name=player.group(3).trim();
                     if(name.length()<4||name.toLowerCase(java.util.Locale.ROOT).contains("licencia"))continue;
-                    rosters[side].append(player.group(1)).append("  ·  ")
+                    // If headers cannot be located, the first 15 occupied rows
+                    // belong to the starting lineup in this federation form.
+                    boolean reserve=splitY!=Float.MAX_VALUE?y>splitY:ordinal>=15;
+                    StringBuilder target=reserve?reserves[side]:starters[side];
+                    target.append(player.group(1)).append("  ·  ")
                         .append(name).append("  |  ").append(player.group(4));
                     if(player.group(2)!=null){
-                        if(player.group(2).trim().equals("X"))rosters[side].append("  ·  Primera línea");
-                        if(player.group(2).trim().equals("C"))rosters[side].append("  ·  Capitán");
+                        if(player.group(2).trim().equals("X"))target.append("  ·  Primera línea");
+                        if(player.group(2).trim().equals("C"))target.append("  ·  Capitán");
                     }
-                    if(player.group(5)!=null)rosters[side].append("  ·  Formación");
-                    rosters[side].append('\n');count[side]++;
+                    if(player.group(5)!=null)target.append("  ·  Formación");
+                    target.append('\n');
+                    if(reserve)reserveCount[side]++;else starterCount[side]++;
+                    ordinal++;
                 }
             }
-            // Require both rosters to be substantial; otherwise use legacy extraction.
-            if(count[0]<8||count[1]<8)return null;
-            return "EQUIPO LOCAL\nTITULARES Y SUPLENTES ("+count[0]+")\n"+
-                rosters[0]+"\nEQUIPO VISITANTE\nTITULARES Y SUPLENTES ("+
-                count[1]+")\n"+rosters[1];
+            if(starterCount[0]+reserveCount[0]<8||starterCount[1]+reserveCount[1]<8)return null;
+            // A failed header split must not mislabel the entire roster.
+            if(starterCount[0]==0||starterCount[1]==0)return null;
+            return "EQUIPO LOCAL\nTITULARES ("+starterCount[0]+")\n"+
+                starters[0]+"SUPLENTES ("+reserveCount[0]+")\n"+reserves[0]+
+                "\nEQUIPO VISITANTE\nTITULARES ("+starterCount[1]+")\n"+
+                starters[1]+"SUPLENTES ("+reserveCount[1]+")\n"+reserves[1];
         }catch(Exception ignored){return null;}
     }
     private String extractLineupColumns(com.tom_roush.pdfbox.pdmodel.PDDocument pdf){
