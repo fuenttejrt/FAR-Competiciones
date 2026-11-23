@@ -162,13 +162,23 @@ public final class RugbyHubActivity extends Activity {
                             fixedRight.addView(points,new LinearLayout.LayoutParams(-1,dp(rowHeight)));
                             final String selectedTeam=team;
                             View.OnClickListener expand=v->{
-                                detailsArea.removeAllViews();
+                                android.app.Dialog dialog=new android.app.Dialog(RugbyHubActivity.this);
+                                android.widget.ScrollView scroller=new android.widget.ScrollView(RugbyHubActivity.this);
+                                scroller.setFillViewport(false);
                                 LinearLayout detail=new LinearLayout(RugbyHubActivity.this);
                                 detail.setOrientation(1);
                                 detail.setPadding(dp(13),dp(12),dp(13),dp(13));
                                 detail.setBackgroundColor(0xff293f52);
                                 LinearLayout.LayoutParams detailParams=new LinearLayout.LayoutParams(-1,-2);
-                                detailParams.topMargin=dp(10);detailsArea.addView(detail,detailParams);
+                                scroller.addView(detail,new android.widget.ScrollView.LayoutParams(-1,-2));
+                                dialog.setContentView(scroller);
+                                android.view.Window window=dialog.getWindow();
+                                if(window!=null){window.setBackgroundDrawableResource(android.R.color.transparent);
+                                    window.setLayout(getResources().getDisplayMetrics().widthPixels-dp(24),-1);}
+                                dialog.show();
+                                window=dialog.getWindow();
+                                if(window!=null)window.setLayout(getResources().getDisplayMetrics().widthPixels-dp(24),
+                                    getResources().getDisplayMetrics().heightPixels-dp(70));
                                 TextView detailTitle=text(selectedTeam+" · "+values[13]+" puntos",16,true);
                                 detail.addView(detailTitle);
                                 String[] labels={"Partidos jugados","Victorias","Empates","Derrotas",
@@ -214,7 +224,7 @@ public final class RugbyHubActivity extends Activity {
                                 averages.setTextColor(0xffd2e4ef);averages.setPadding(0,dp(9),0,dp(7));detail.addView(averages);
                                 TextView close=text("Cerrar detalles  ×",13,true);
                                 close.setTextColor(0xff87d8b9);close.setPadding(0,dp(12),0,0);
-                                detail.addView(close);close.setOnClickListener(w->detailsArea.removeAllViews());
+                                detail.addView(close);close.setOnClickListener(w->dialog.dismiss());
                             };
                             leftRow.setOnClickListener(expand);
                             midRow.setOnClickListener(expand);
