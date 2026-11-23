@@ -989,7 +989,7 @@ public class MainActivity extends Activity {
                         }
                         if(!thisMatch.isEmpty()){
                             java.util.Map<String,Integer> perAct=verifiedActMinutes(lineup,cached.optString("changes",""),local,
-                                CompetitionRules.matchMinutes(season,category,competition));
+                                CompetitionRules.matchMinutes(season,category,selectedCompetition));
                             if(perAct!=null){
                                 minuteActCount[0]++;
                                 for(java.util.Map.Entry<String,Integer> e:perAct.entrySet()){
