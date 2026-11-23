@@ -286,6 +286,8 @@ final class StandingIntelligence {
                 totals[fixture[0]]+=result[0];
                 totals[fixture[1]]+=result[1];
             }
+            int[] tieKeys=new int[count];
+            for(int i=0;i<count;i++)tieKeys[i]=random.nextInt();
             for(int i=0;i<count;i++){
                 int low=1,high=1;
                 for(int j=0;j<count;j++){
@@ -293,7 +295,8 @@ final class StandingIntelligence {
                     if(totals[j]>totals[i])low++;
                     if(totals[j]>=totals[i])high++;
                 }
-                int assigned=low+(high>low?random.nextInt(high-low+1):0);
+                int assigned=1;
+                for(int j=0;j<count;j++)if(j!=i&&(totals[j]>totals[i]||(totals[j]==totals[i]&&(tieKeys[j]>tieKeys[i]||(tieKeys[j]==tieKeys[i]&&j<i)))))assigned++;
                 positionCounts[i][assigned-1]++;
                 best[i]=Math.min(best[i],low);
                 worst[i]=Math.max(worst[i],high);
