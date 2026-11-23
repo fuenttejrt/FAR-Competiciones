@@ -1073,18 +1073,33 @@ public class MainActivity extends Activity {
                                     String estimated=String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0);
                                     int possibleAhead=0;
                                     int currentPoints=option.optInt("points");
-                                    StringBuilder rivals=new StringBuilder();
+                                    StringBuilder above=new StringBuilder();
+                                    StringBuilder challengers=new StringBuilder();
                                     for(int rivalIndex=0;rivalIndex<options.length();rivalIndex++){
                                         org.json.JSONObject rival=options.optJSONObject(rivalIndex);
                                         if(rival==null||rival==option)continue;
-                                        if(rival.optInt("maximum")>=currentPoints){
-                                            possibleAhead++;
-                                            if(rivals.length()>0)rivals.append("\n");
-                                            rivals.append("• ").append(rival.optString("team"))
-                                                  .append(" · ").append(rival.optInt("points"))
-                                                  .append(" pts, máximo ").append(rival.optInt("maximum"));
+                                        int rivalPoints=rival.optInt("points");
+                                        int rivalMaximum=rival.optInt("maximum");
+                                        String entry="• "+rival.optString("team")+" · "+rivalPoints+
+                                                " pts (máximo "+rivalMaximum+")";
+                                        // Para garantizar el acceso directo, contamos a todos
+                                        // los equipos capaces de igualar los puntos actuales.
+                                        if(rivalMaximum>=currentPoints)possibleAhead++;
+                                        if(rivalPoints>currentPoints){
+                                            if(above.length()>0)above.append("\n");
+                                            above.append(entry);
+                                        }else if(rivalPoints==currentPoints){
+                                            if(challengers.length()>0)challengers.append("\n");
+                                            challengers.append(entry).append(" · empatado actualmente");
+                                        }else if(rivalMaximum>=currentPoints){
+                                            if(challengers.length()>0)challengers.append("\n");
+                                            challengers.append(entry);
                                         }
                                     }
+                                    String rivals="YA ESTÁN POR DELANTE\n"+
+                                            (above.length()>0?above.toString():"Ninguno")+
+                                            "\n\nPUEDEN ADELANTARLO O EMPATARLO\n"+
+                                            (challengers.length()>0?challengers.toString():"Ninguno según los máximos de puntos.");
                                     boolean assured=selectedCompetition.equals("Primera División")&&possibleAhead<5;
                                     String qualification=selectedCompetition.equals("Primera División")?
                                             "Acceso directo estimado: "+estimated+"%\nClasificación matemática: "+
@@ -1100,8 +1115,7 @@ public class MainActivity extends Activity {
                                     addAnalysisFolder(sections,"Probabilidades por puesto",probabilities.toString(),true);
                                     addAnalysisFolder(sections,"Clasificación y acceso",qualification,false);
                                     addAnalysisFolder(sections,"Partidos pendientes",pending,false);
-                                    addAnalysisFolder(sections,"Rivales que pueden alcanzarlo",
-                                            rivals.length()>0?rivals.toString():"Ningún rival puede igualar sus puntos actuales según los máximos disponibles.",false);
+                                    addAnalysisFolder(sections,"Rivales directos",rivals,false);
                                     addAnalysisFolder(sections,"Cómo se calcula",
                                             "3.000 simulaciones ponderadas por puntos por partido y tanteos anteriores disponibles. Los empates se resuelven aleatoriamente. No son probabilidades oficiales ni sustituyen los desempates FAR.",false);
                                     new android.app.AlertDialog.Builder(this).setTitle(tappedTeam+" · Análisis inteligente")
