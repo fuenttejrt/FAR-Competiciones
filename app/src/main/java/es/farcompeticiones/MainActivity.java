@@ -839,7 +839,8 @@ public class MainActivity extends Activity {
                 lastMinute=minute;events++;
             }
         }
-        if(events==0)return null;
+        // An explicit changes table with no rows means no substitutions; starters play the full match.
+        // A missing changes table remains unverified.
         for(String dorsal:onField){
             String id=byDorsal.get(dorsal);
             minutes.put(id,minutes.get(id)+duration-enteredAt.get(dorsal));
@@ -929,7 +930,7 @@ public class MainActivity extends Activity {
                         java.util.ArrayList<String> missing=new java.util.ArrayList<>();
                         for(org.json.JSONObject match:matches){
                             String url=match.optString("actUrl","");
-                            if(url.startsWith("https://farugby.matchready.es/")&&!actCache.contains(url)&&!attemptedActs.contains(url)&&!missing.contains(url))missing.add(url);
+                            if(url.startsWith("https://farugby.matchready.es/")&&(!actCache.contains(url)||!actCache.getString(url,"").contains("\\"temporaryCards\\""))&&!attemptedActs.contains(url)&&!missing.contains(url))missing.add(url);
                         }
                         if(!missing.isEmpty()){
                             loadingActs[0]=true;
@@ -988,7 +989,19 @@ public class MainActivity extends Activity {
                             }
                         }
                         if(!thisMatch.isEmpty()){
-                            java.util.Map<String,Integer> perAct=verifiedActMinutes(lineup,cached.optString("changes",""),local,
+                            // Until sanctions can be timed reliably, never label a match with expulsions as fully verified.
+                            boolean hasDiscipline=false;
+                            for(String keyName:new String[]{"temporaryCards","definitiveCards"}){
+                                String rawCards=cached.optString(keyName,"");
+                                int cardSide=-1;
+                                for(String cardLine:rawCards.split("\\r?\\n")){
+                                    String ct=cardLine.trim();
+                                    if(ct.matches("(?i)Equipo local:.*"))cardSide=0;
+                                    else if(ct.matches("(?i)Equipo visitante:.*"))cardSide=1;
+                                    else if(cardSide==(local?0:1)&&ct.matches("^\\d+\\. Min .*"))hasDiscipline=true;
+                                }
+                            }
+                            java.util.Map<String,Integer> perAct=hasDiscipline?null:verifiedActMinutes(lineup,cached.optString("changes",""),local,
                                 CompetitionRules.matchMinutes(season,category,selectedCompetition));
                             if(perAct!=null){
                                 minuteActCount[0]++;
