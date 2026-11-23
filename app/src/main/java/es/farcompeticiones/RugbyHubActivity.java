@@ -88,7 +88,7 @@ public final class RugbyHubActivity extends Activity {
                         JSONArray rows=obj.optJSONArray("rows");
                         if(rows==null||rows.length()==0)throw new Exception("La tabla oficial no contiene equipos");
                         results.removeAllViews();
-                        TextView hint=text("Desliza estadísticas · Pulsa un equipo para ampliar",11,false);
+                        TextView hint=text("Desliza estadísticas · Pulsa un equipo para ver sus estadísticas acumuladas 3D",11,false);
                         hint.setTextColor(0xffaab9c9);hint.setPadding(0,dp(2),0,dp(5));
                         results.addView(hint);
                         LinearLayout tableLayout=new LinearLayout(RugbyHubActivity.this);
@@ -179,6 +179,39 @@ public final class RugbyHubActivity extends Activity {
                                     TextView detailLine=text(labels[c-2]+": "+values[c],14,false);
                                     detailLine.setPadding(0,dp(5),0,0);detail.addView(detailLine);
                                 }
+                                TextView dashboardTitle=text("ESTADÍSTICAS ACUMULADAS · TEMPORADA",15,true);
+                                dashboardTitle.setTextColor(0xff61dda5);
+                                dashboardTitle.setPadding(0,dp(15),0,dp(7));detail.addView(dashboardTitle);
+                                int[] seasonTotals=new int[11];
+                                for(int c=2;c<=12;c++){
+                                    try{seasonTotals[c-2]=Integer.parseInt(values[c].trim());}
+                                    catch(Exception ignored){seasonTotals[c-2]=0;}
+                                }
+                                TextView sourceNote=text("Datos oficiales acumulados de la clasificación. Los anotadores y las incidencias individuales requieren consultar las actas de cada partido.",11,false);
+                                sourceNote.setTextColor(0xffb7cbd9);detail.addView(sourceNote);
+                                addStatTitle(detail,"Resultados de la temporada");
+                                addStatPie(detail,"Victorias · Empates · Derrotas",
+                                    new int[]{seasonTotals[1],seasonTotals[2],seasonTotals[3]},
+                                    new String[]{"Victorias","Empates","Derrotas"});
+                                addStatTitle(detail,"Puntos a favor y en contra");
+                                addStatPie(detail,"Tantos oficiales",
+                                    new int[]{seasonTotals[4],seasonTotals[5]},
+                                    new String[]{"A favor","En contra"});
+                                addStatTitle(detail,"Ensayos a favor y en contra");
+                                addStatPie(detail,"Ensayos oficiales",
+                                    new int[]{seasonTotals[7],seasonTotals[8]},
+                                    new String[]{"A favor","En contra"});
+                                addStatTitle(detail,"Puntos bonus");
+                                addStatPie(detail,"Bonus obtenidos",
+                                    new int[]{seasonTotals[9],seasonTotals[10]},
+                                    new String[]{"Ofensivos","Defensivos"});
+                                int played=seasonTotals[0];
+                                TextView averages=text(played>0?
+                                    String.format(java.util.Locale.getDefault(),
+                                        "Media por partido: %.1f tantos a favor · %.1f en contra · %.1f ensayos a favor",
+                                        seasonTotals[4]/(double)played,seasonTotals[5]/(double)played,
+                                        seasonTotals[7]/(double)played):"Sin partidos disputados",12,false);
+                                averages.setTextColor(0xffd2e4ef);averages.setPadding(0,dp(9),0,dp(7));detail.addView(averages);
                                 TextView close=text("Cerrar detalles  ×",13,true);
                                 close.setTextColor(0xff87d8b9);close.setPadding(0,dp(12),0,0);
                                 detail.addView(close);close.setOnClickListener(w->detailsArea.removeAllViews());
