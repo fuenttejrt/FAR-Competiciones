@@ -64,8 +64,25 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk FAR-Competiciones-v0.70.apk
           git tag -f v0.70
           git push origin refs/tags/v0.70 --force
-          if gh release view v0.70 >/dev/null 2>&1; then
-            gh release upload v0.70 FAR-Competiciones-v0.70.apk --clobber
-          else
-            gh release create v0.70 FAR-Competiciones-v0.70.apk --title "FAR Competiciones v0.70" --notes "APK con firma permanente." --prerelease
+          # GitHub puede tardar unos segundos en resolver el release tras mover el tag.
+          # Reintentar evita marcar como fallida una APK compilada correctamente.
+          published=false
+          for attempt in 1 2 3 4 5; do
+            if gh release view v0.70 >/dev/null 2>&1; then
+              if gh release upload v0.70 FAR-Competiciones-v0.70.apk --clobber; then
+                published=true
+                break
+              fi
+            else
+              if gh release create v0.70 FAR-Competiciones-v0.70.apk --title "FAR Competiciones v0.70" --notes "APK con firma permanente." --prerelease; then
+                published=true
+                break
+              fi
+            fi
+            echo "Publicacion pendiente; reintento $attempt/5"
+            sleep 8
+          done
+          if [ "$published" != true ]; then
+            echo "No se pudo publicar el APK tras 5 intentos."
+            exit 1
           fi
