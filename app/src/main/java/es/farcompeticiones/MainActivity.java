@@ -12,8 +12,9 @@
             if(!organizer.isEmpty())meta.append("Organizador: ").append(organizer);
             if(!dates.isEmpty()){
                 if(meta.length()>0)meta.append(" · ");
+                int dateNumber=0;
                 for(String date:dates){
-                    if(meta.indexOf(" · ")>=0 || (!organizer.isEmpty() && !date.equals(dates.iterator().next())))meta.append(", ");
+                    if(dateNumber++>0)meta.append(", ");
                     meta.append(date);
                 }
             }
