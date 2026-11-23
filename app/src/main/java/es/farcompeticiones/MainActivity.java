@@ -1049,7 +1049,9 @@ public class MainActivity extends Activity {
                                 simulatedCells.add(positionCell);
                                 simulatedNames.add(option.optString("team"));
                             }
-                            final TextView simulationNote=txt("* Puestos orientativos por límites de puntos. Calculando enfrentamientos directos…",10,Color.LTGRAY);
+                            final TextView simulationStatus=txt("◌ Calculando escenarios…",11,0xffffca65);
+                            body.addView(simulationStatus);
+                            final TextView simulationNote=txt("* Puestos orientativos por límites de puntos hasta completar el cálculo.",10,Color.LTGRAY);
                             body.addView(simulationNote);
                             final String simSeason=season,simCategory=category,simCompetition=selectedCompetition;
                             final int simPhase=detectedPhase;
@@ -1062,7 +1064,8 @@ public class MainActivity extends Activity {
                                     runOnUiThread(()->{
                                         if(body!=originalBody||!originalBody.isAttachedToWindow())return;
                                         if(simulation==null){
-                                            simulationNote.setText("* Puestos orientativos por límites de puntos; no se ha podido completar la simulación.");
+                                            simulationStatus.setText("⚠ Simulación no disponible");
+                                            simulationNote.setText("* Se mantienen los puestos orientativos por límites de puntos.");
                                             return;
                                         }
                                         org.json.JSONArray simulated=simulation.optJSONArray("teams");
@@ -1076,12 +1079,15 @@ public class MainActivity extends Activity {
                                             String range=ranges.get(simulatedNames.get(cellIndex));
                                             if(range!=null)simulatedCells.get(cellIndex).setText(range);
                                         }
-                                        simulationNote.setText("* Puestos observados en 3.000 simulaciones de resultados compatibles. No son cotas matemáticas exhaustivas; desempates y resoluciones FAR pendientes.");
+                                        simulationStatus.setText("✓ Simulación completada · 3.000 escenarios");
+                                        simulationStatus.setTextColor(accent);
+                                        simulationNote.setText("* Puestos observados en simulaciones de resultados compatibles. No son cotas matemáticas exhaustivas; desempates y resoluciones FAR pendientes.");
                                     });
                                 }catch(Throwable error){
                                     runOnUiThread(()->{
                                         if(body==originalBody&&originalBody.isAttachedToWindow())
-                                            simulationNote.setText("* Puestos orientativos por límites de puntos. Simulación no disponible.");
+                                            { simulationStatus.setText("⚠ Simulación no disponible");
+                                            simulationNote.setText("* Se mantienen los puestos orientativos por límites de puntos."); }
                                     });
                                 }
                             },"far-standings-simulation").start();
