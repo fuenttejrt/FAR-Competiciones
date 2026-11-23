@@ -925,6 +925,7 @@ public class MainActivity extends Activity {
                     java.util.Map<String,Integer> verifiedMinutes=new java.util.HashMap<>();
                     java.util.Map<String,Integer> verifiedMatches=new java.util.HashMap<>();
                     int[] minuteActCount={0};
+                    java.util.ArrayList<String> minuteActDiagnostics=new java.util.ArrayList<>();
                     android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
                     if(!loadingActs[0]){
                         java.util.ArrayList<String> missing=new java.util.ArrayList<>();
@@ -1003,6 +1004,15 @@ public class MainActivity extends Activity {
                             }
                             java.util.Map<String,Integer> perAct=hasDiscipline?null:verifiedActMinutes(lineup,cached.optString("changes",""),local,
                                 CompetitionRules.matchMinutes(season,category,selectedCompetition));
+                            String matchLabel=match.optString("home","")+" - "+match.optString("away","");
+                            if(perAct==null){
+                                String reason=hasDiscipline?"Expulsión registrada: tiempo fuera de juego pendiente de verificar":
+                                    cached.optString("changes","").trim().isEmpty()?"Sin tabla de cambios legible":
+                                    "Sustituciones no conciliadas con la alineación";
+                                minuteActDiagnostics.add("⚠ "+matchLabel+" · "+reason);
+                            }else{
+                                minuteActDiagnostics.add("✓ "+matchLabel+" · "+CompetitionRules.matchMinutes(season,category,selectedCompetition)+" min analizados");
+                            }
                             if(perAct!=null){
                                 minuteActCount[0]++;
                                 for(java.util.Map.Entry<String,Integer> e:perAct.entrySet()){
@@ -1055,7 +1065,23 @@ public class MainActivity extends Activity {
                                 legend.addView(line);
                             }
                         }
-                        content.addView(txt("Minutos verificados: "+minuteActCount[0]+" de "+actCount+" actas. Solo se suman partidos con sustituciones completas y coherentes.",11,0xffa9c4d2));
+                        content.addView(txt("Minutos comprobados: "+minuteActCount[0]+" de "+actCount+" actas. Los minutos mostrados son parciales.",11,0xffa9c4d2));
+                        TextView diagnosticToggle=txt("Ver comprobación de los "+actCount+" partidos  ▾",12,0xff75e6b2);
+                        content.addView(diagnosticToggle);
+                        LinearLayout diagnosticList=new LinearLayout(this);
+                        diagnosticList.setOrientation(1);
+                        diagnosticList.setVisibility(android.view.View.GONE);
+                        content.addView(diagnosticList);
+                        for(String diagnostic:minuteActDiagnostics){
+                            TextView detail=txt(diagnostic,11,diagnostic.startsWith("✓")?0xff75e6b2:0xffffb48b);
+                            detail.setPadding(dp(7),dp(5),dp(7),dp(5));
+                            diagnosticList.addView(detail);
+                        }
+                        diagnosticToggle.setOnClickListener(v->{
+                            boolean show=diagnosticList.getVisibility()!=android.view.View.VISIBLE;
+                            diagnosticList.setVisibility(show?android.view.View.VISIBLE:android.view.View.GONE);
+                            diagnosticToggle.setText("Comprobación de partidos  "+(show?"▴":"▾"));
+                        });
                         standingSection(content,"Plantilla · "+ranking.size()+" jugadores");
                         android.widget.EditText searchPlayer=new android.widget.EditText(this);
                         searchPlayer.setSingleLine(true);searchPlayer.setTextSize(13);
