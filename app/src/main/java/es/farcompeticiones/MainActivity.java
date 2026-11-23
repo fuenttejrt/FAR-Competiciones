@@ -605,9 +605,9 @@ public class MainActivity extends Activity {
             new int[]{0xff34566a,0xff1a3447,0xff122737});
         bgCard.setCornerRadius(dp(12));bgCard.setStroke(dp(1),0xff3d7380);
         card.setBackground(bgCard);card.setElevation(dp(4));
-        TextView big=txt(value,19,0xff75e6b2);big.setGravity(Gravity.CENTER);
+        TextView big=txt(value,19,0xff75e6b2);big.setGravity(android.view.Gravity.CENTER);
         big.setTypeface(null,android.graphics.Typeface.BOLD);card.addView(big);
-        TextView small=txt(label,10,0xffd2e4ef);small.setGravity(Gravity.CENTER);card.addView(small);
+        TextView small=txt(label,10,0xffd2e4ef);small.setGravity(android.view.Gravity.CENTER);card.addView(small);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);
         lp.setMargins(dp(3),dp(5),dp(3),dp(5));target.addView(card,lp);
     }
@@ -657,7 +657,7 @@ public class MainActivity extends Activity {
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
         content.setPadding(dp(8),dp(4),dp(8),dp(12));
         scroll.addView(content);frame.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        TextView close=txt("CERRAR  ×",14,0xff75e6b2);close.setGravity(Gravity.CENTER);
+        TextView close=txt("CERRAR  ×",14,0xff75e6b2);close.setGravity(android.view.Gravity.CENTER);
         close.setOnClickListener(v->dialog.dismiss());frame.addView(close);
         dialog.setContentView(frame);
         String[] labels={"Resumen","Evolución","Partidos","Jugadores"};
@@ -711,7 +711,7 @@ public class MainActivity extends Activity {
         };
         for(int i=0;i<labels.length;i++){
             final int index=i;TextView tab=txt(labels[i],11,Color.WHITE);
-            tab.setGravity(Gravity.CENTER);tab.setPadding(dp(2),dp(13),dp(2),dp(13));
+            tab.setGravity(android.view.Gravity.CENTER);tab.setPadding(dp(2),dp(13),dp(2),dp(13));
             tabs.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
             tab.setOnClickListener(v->{active[0]=index;redraw.run();});
         }
