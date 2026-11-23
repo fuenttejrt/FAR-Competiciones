@@ -792,6 +792,31 @@ public class MainActivity extends Activity {
         try{return new int[]{Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2))};}
         catch(Exception e){return null;}
     }
+    /** PDF text extraction can list substitutions in column order rather than minute order. */
+    private String orderedSubstitutionLines(String changes){
+        java.util.ArrayList<String> output=new java.util.ArrayList<>();
+        java.util.ArrayList<String> block=new java.util.ArrayList<>();
+        for(String line:changes.split("\\r?\\n")){
+            String t=line.trim();
+            if(t.matches("(?i)Equipo (local|visitante):.*")){
+                if(!block.isEmpty()){sortSubstitutionBlock(block);output.addAll(block);block.clear();}
+                output.add(t);
+            }else if(t.matches("^\\d+\\. Min .*"))block.add(t);
+            else if(!t.isEmpty())output.add(t);
+        }
+        if(!block.isEmpty()){sortSubstitutionBlock(block);output.addAll(block);}
+        return android.text.TextUtils.join("\\n",output);
+    }
+
+    private void sortSubstitutionBlock(java.util.ArrayList<String> block){
+        java.util.regex.Pattern minutePattern=java.util.regex.Pattern.compile("^\\d+\\. Min (\\d+).*");
+        java.util.Collections.sort(block,(a,b)->{
+            java.util.regex.Matcher ma=minutePattern.matcher(a),mb=minutePattern.matcher(b);
+            if(!ma.matches()||!mb.matches())return 0;
+            return Integer.compare(Integer.parseInt(ma.group(1)),Integer.parseInt(mb.group(1)));
+        });
+    }
+
     private String substitutionFailureDetail(String lineup,String changes,boolean local,int duration){
         java.util.HashSet<String> known=new java.util.HashSet<>();
         java.util.HashSet<String> active=new java.util.HashSet<>();
@@ -814,7 +839,7 @@ public class MainActivity extends Activity {
         if(active.isEmpty())return "No se identifican titulares";
         side=-1;int last=-1;
         java.util.regex.Pattern change=java.util.regex.Pattern.compile("^\\d+\\. Min (\\d+) · Cambio · Entra nº (\\d+) · Sale nº (\\d+).*$");
-        for(String line:changes.split("\\r?\\n")){
+        for(String line:orderedSubstitutionLines(changes).split("\\r?\\n")){
             String t=line.trim();
             if(t.matches("(?i)Equipo local:.*"))side=0;
             else if(t.matches("(?i)Equipo visitante:.*"))side=1;
@@ -862,7 +887,7 @@ public class MainActivity extends Activity {
         side=-1;int lastMinute=-1;int events=0;
         java.util.regex.Pattern event=java.util.regex.Pattern.compile(
             "^\\d+\\. Min (\\d+) · Cambio · Entra nº (\\d+) · Sale nº (\\d+).*$");
-        for(String line:changes.split("\\r?\\n")){
+        for(String line:orderedSubstitutionLines(changes).split("\\r?\\n")){
             String t=line.trim();
             if(t.matches("(?i)Equipo local:.*"))side=0;
             else if(t.matches("(?i)Equipo visitante:.*"))side=1;
