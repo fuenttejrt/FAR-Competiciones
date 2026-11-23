@@ -859,9 +859,47 @@ public class MainActivity extends Activity {
                     standingMetric(durationCards,duration>0?(duration/2)+" min":"—","Cada tiempo");
                     content.addView(txt(duration>0?"Duración prevista según las reglas verificadas de esta competición.":"Duración pendiente de la circular oficial de esta categoría y temporada.",12,0xffb8d4cc));
                     int actCount=0;
-                    for(org.json.JSONObject match:matches)if(match.optJSONObject("acta")!=null)actCount++;
+                    java.util.Map<String,Integer> appearances=new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+                    android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
+                    for(org.json.JSONObject match:matches){
+                        String url=match.optString("statsUrl","");
+                        org.json.JSONObject cached=null;
+                        try{String raw=actCache.getString(url,null);if(raw!=null)cached=new org.json.JSONObject(raw);}catch(Exception ignored){}
+                        if(cached==null){if(match.optJSONObject("acta")!=null)actCount++;continue;}
+                        String lineup=cached.optString("lineups","");
+                        if(lineup.isEmpty())continue;
+                        boolean local=teamKey(team).equals(teamKey(match.optString("home","")));
+                        int side=-1;java.util.HashSet<String> thisMatch=new java.util.HashSet<>();
+                        java.util.regex.Pattern player=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$");
+                        for(String line:lineup.split("\\r?\\n")){
+                            String t=line.trim();
+                            if(t.equals("EQUIPO LOCAL"))side=0;
+                            else if(t.equals("EQUIPO VISITANTE"))side=1;
+                            else if(t.startsWith("JUGADORES SIN EQUIPO"))side=-1;
+                            else if(side==(local?0:1)){
+                                java.util.regex.Matcher m=player.matcher(t);
+                                if(m.matches()){
+                                    String playerId=m.group(3)+"|"+m.group(2).trim();
+                                    thisMatch.add(playerId);
+                                }
+                            }
+                        }
+                        if(!thisMatch.isEmpty()){actCount++;for(String id:thisMatch)appearances.put(id,appearances.getOrDefault(id,0)+1);}
+                    }
+                    if(!appearances.isEmpty()){
+                        standingSection(content,"Jugadores identificados · actas consultadas");
+                        java.util.ArrayList<java.util.Map.Entry<String,Integer>> ranking=new java.util.ArrayList<>(appearances.entrySet());
+                        java.util.Collections.sort(ranking,(a,b)->Integer.compare(b.getValue(),a.getValue()));
+                        for(java.util.Map.Entry<String,Integer> item:ranking){
+                            String[] parts=item.getKey().split("\\|",2);
+                            String playerName=parts.length>1?parts[1]:item.getKey();
+                            content.addView(txt(playerName+"  ·  "+item.getValue()+" acta(s)",13,0xffd2e4ef));
+                            content.addView(txt("Licencia: "+parts[0]+"  ·  Minutos: sin verificar",11,0xffa9c4d2));
+                        }
+                    }
                     standingSection(content,"Actas y participación");
-                    content.addView(txt(actCount+" de "+matches.size()+" partidos con acta estructurada disponible",13,0xffd2e4ef));
+                    content.addView(txt(actCount+" de "+matches.size()+" partidos con alineación disponible",13,0xffd2e4ef));
+                    content.addView(txt("Abre las actas oficiales desde aquí para incorporar sus alineaciones; al volver, entra de nuevo en Jugadores para actualizar el recuento.",11,0xff75e6b2));
                     content.addView(txt("Los minutos individuales se calcularán con las alineaciones, entradas, salidas y reingresos de cada acta. Sin sustituciones verificadas no se asignarán minutos estimados.",12,0xffb8d4cc));
                     if(matches.isEmpty())content.addView(txt("Todavía no hay partidos oficiales vinculados a este equipo.",12,0xffd2e4ef));
                     for(org.json.JSONObject match:matches){
