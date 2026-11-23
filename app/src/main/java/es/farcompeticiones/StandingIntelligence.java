@@ -366,7 +366,7 @@ final class StandingIntelligence {
                 if(!seen.add(id))continue;
                 String opponent=local?away:home;
                 String when=game.optString("when","").trim();
-                if(text.length()>0)text.append("\\n");
+                if(text.length()>0)text.append("\n");
                 text.append(local?"Local vs ":"Visitante vs ").append(opponent);
                 if(!when.isEmpty())text.append(" · ").append(when);
             }
