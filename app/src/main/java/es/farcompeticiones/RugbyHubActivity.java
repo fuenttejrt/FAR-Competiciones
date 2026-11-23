@@ -600,6 +600,91 @@ public final class RugbyHubActivity extends Activity {
             }finally{if(conn!=null)conn.disconnect();}
         }).start();
     }
+    private static final class MatchNumbers {
+        int tries, conversions, penalties, drops, points, changes, cards;
+        final java.util.ArrayList<int[]> events=new java.util.ArrayList<>();
+        final java.util.LinkedHashMap<String,Integer> scorers=new java.util.LinkedHashMap<>();
+    }
+    private MatchNumbers readMatchNumbers(String section,String team,boolean away){
+        MatchNumbers n=new MatchNumbers();
+        if(section==null)return n;
+        String[] lines=section.split("\\r?\\n");
+        boolean active=false;
+        for(String raw:lines){
+            String line=raw.trim();
+            if(line.startsWith("Equipo local:")){active=!away;continue;}
+            if(line.startsWith("Equipo visitante:")){active=away;continue;}
+            if(!active)continue;
+            java.util.regex.Matcher event=java.util.regex.Pattern.compile(
+                "(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)\\s*[-·]\\s*Dorsal\\s*(\\d+)"
+            ).matcher(line);
+            if(event.find()){
+                int minute=Integer.parseInt(event.group(1));
+                int points=Integer.parseInt(event.group(3));
+                String kind=event.group(2).toLowerCase(java.util.Locale.ROOT);
+                if(kind.contains("ensayo"))n.tries++;
+                else if(kind.contains("transform"))n.conversions++;
+                else if(kind.contains("castigo")||kind.contains("penal"))n.penalties++;
+                else if(kind.contains("drop"))n.drops++;
+                n.points+=points;
+                n.events.add(new int[]{minute,points});
+                String dorsal=event.group(4);
+                n.scorers.put(dorsal,n.scorers.containsKey(dorsal)?n.scorers.get(dorsal)+points:points);
+            }
+        }
+        return n;
+    }
+    private int countActItems(String section,boolean away){
+        if(section==null)return 0;
+        boolean active=false;int count=0;
+        for(String raw:section.split("\\r?\\n")){
+            String line=raw.trim();
+            if(line.startsWith("Equipo local:")){active=!away;continue;}
+            if(line.startsWith("Equipo visitante:")){active=away;continue;}
+            if(active&&line.matches("(?i)^\\d+\\.\\s*Min\\s*\\d+.*"))count++;
+        }
+        return count;
+    }
+    private void addStatTitle(LinearLayout host,String title){
+        TextView label=text(title,15,true);
+        label.setTextColor(0xff61dda5);
+        label.setPadding(0,dp(15),0,dp(7));
+        host.addView(label);
+    }
+    private void addStatCompare(LinearLayout host,String label,int local,int visitor,int max){
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(12),dp(10),dp(12),dp(10));
+        box.setBackgroundColor(0xff1b2d3f);
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+        params.bottomMargin=dp(6);host.addView(box,params);
+        TextView heading=text(local+"    "+label+"    "+visitor,13,true);
+        heading.setGravity(Gravity.CENTER);box.addView(heading);
+        LinearLayout bars=new LinearLayout(this);
+        bars.setOrientation(LinearLayout.HORIZONTAL);
+        bars.setPadding(0,dp(7),0,0);
+        box.addView(bars);
+        int scale=Math.max(1,Math.max(max,Math.max(local,visitor)));
+        for(int i=0;i<2;i++){
+            int value=i==0?local:visitor;
+            LinearLayout track=new LinearLayout(this);
+            track.setOrientation(LinearLayout.HORIZONTAL);
+            track.setBackgroundColor(0xff101c28);
+            LinearLayout.LayoutParams trackParams=new LinearLayout.LayoutParams(0,dp(14),1);
+            if(i==0)trackParams.rightMargin=dp(4);else trackParams.leftMargin=dp(4);
+            bars.addView(track,trackParams);
+            android.view.View fill=new android.view.View(this);
+            android.graphics.drawable.GradientDrawable gradient=new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                i==0?new int[]{0xffa0e8c8,0xff239568}:new int[]{0xff91c9ff,0xff29649a});
+            gradient.setCornerRadius(dp(4));
+            fill.setBackground(gradient);
+            fill.setElevation(dp(3));
+            track.addView(fill,new LinearLayout.LayoutParams(0,-1,Math.max(0.001f,value/(float)scale)));
+            android.view.View rest=new android.view.View(this);
+            track.addView(rest,new LinearLayout.LayoutParams(0,-1,Math.max(0.001f,1f-value/(float)scale)));
+        }
+    }
     private void showActMatchStatistics(android.widget.ScrollView scroll,String scoreboard,
             String discipline,String changes,String home,String away){
         scroll.removeAllViews();
@@ -608,24 +693,62 @@ public final class RugbyHubActivity extends Activity {
         host.setPadding(dp(12),dp(10),dp(12),dp(14));
         host.setBackgroundColor(0xff101a24);
         scroll.addView(host);
-        TextView heading=text("Estadísticas del partido",19,true);
-        heading.setPadding(0,0,0,dp(12));
-        host.addView(heading);
-        TextView teams=text((home==null?"Local":home)+"  vs  "+(away==null?"Visitante":away),15,true);
-        teams.setPadding(0,0,0,dp(12));
-        host.addView(teams);
-        addActStatBlock(host,"Anotaciones y marcador",scoreboard);
-        addActStatBlock(host,"Disciplina",discipline);
-        addActStatBlock(host,"Sustituciones",changes);
-        TextView note=text("Información obtenida del acta de este partido. Las cifras no disponibles no se estiman; las estadísticas acumuladas se consultarán desde la clasificación.",11,false);
-        note.setTextColor(0xffafc0cb);
-        note.setPadding(0,dp(12),0,0);
-        host.addView(note);
+        MatchNumbers local=readMatchNumbers(scoreboard,home,false);
+        MatchNumbers visitor=readMatchNumbers(scoreboard,away,true);
+        local.changes=countActItems(changes,false);
+        visitor.changes=countActItems(changes,true);
+        addStatTitle(host,(home==null?"Local":home)+"  VS  "+(away==null?"Visitante":away));
+        TextView result=text(local.points+"  —  "+visitor.points,30,true);
+        result.setGravity(Gravity.CENTER);
+        result.setTextColor(0xff61dda5);
+        result.setPadding(0,dp(6),0,dp(10));
+        host.addView(result);
+        TextView caveat=text("Puntos de anotaciones identificadas en el acta; no sustituyen al marcador oficial.",11,false);
+        caveat.setTextColor(0xffa8bbc9);host.addView(caveat);
+        addStatTitle(host,"Comparativa de anotaciones");
+        addStatCompare(host,"Ensayos",local.tries,visitor.tries,1);
+        addStatCompare(host,"Transformaciones",local.conversions,visitor.conversions,1);
+        addStatCompare(host,"Golpes de castigo",local.penalties,visitor.penalties,1);
+        addStatCompare(host,"Drops",local.drops,visitor.drops,1);
+        addStatTitle(host,"Actividad del partido");
+        addStatCompare(host,"Sustituciones",local.changes,visitor.changes,1);
+        addStatTitle(host,"Anotadores por dorsal");
+        addActStatBlock(host,home==null?"Local":home,formatScorers(local));
+        addActStatBlock(host,away==null?"Visitante":away,formatScorers(visitor));
+        addStatTitle(host,"Cronología de anotaciones");
+        java.util.ArrayList<int[]> timeline=new java.util.ArrayList<>();
+        for(int[] event:local.events)timeline.add(new int[]{event[0],event[1],0});
+        for(int[] event:visitor.events)timeline.add(new int[]{event[0],event[1],1});
+        java.util.Collections.sort(timeline,(x,y)->Integer.compare(x[0],y[0]));
+        int lp=0,vp=0;
+        if(timeline.isEmpty())host.addView(text("No hay anotaciones identificadas.",12,false));
+        for(int[] event:timeline){
+            if(event[2]==0)lp+=event[1];else vp+=event[1];
+            TextView item=text("Min "+event[0]+"  ·  "+(event[2]==0?home:away)+
+                " +"+event[1]+"     "+lp+"–"+vp,12,false);
+            item.setPadding(dp(10),dp(6),dp(10),dp(6));
+            item.setBackgroundColor(0xff1b2d3f);
+            LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);
+            p.bottomMargin=dp(3);host.addView(item,p);
+        }
+        addStatTitle(host,"Disciplina");
+        addActStatBlock(host,"Tarjetas y expulsiones",discipline);
+        TextView note=text("Gráficos con relieve visual. Solo se cuentan incidencias identificadas en el acta; las estadísticas no registradas se muestran como no disponibles, no como cero.",11,false);
+        note.setTextColor(0xffa8bbc9);note.setPadding(0,dp(12),0,0);host.addView(note);
+    }
+    private String formatScorers(MatchNumbers numbers){
+        if(numbers.scorers.isEmpty())return "No se han identificado anotadores.";
+        StringBuilder sb=new StringBuilder();
+        for(java.util.Map.Entry<String,Integer> e:numbers.scorers.entrySet()){
+            if(sb.length()>0)sb.append("\n");
+            sb.append("Dorsal ").append(e.getKey()).append(" · ").append(e.getValue()).append(" puntos");
+        }
+        return sb.toString();
     }
     private void addActStatBlock(LinearLayout host,String heading,String value){
-        TextView title=text(heading,14,true);
+        TextView title=text(heading,13,true);
         title.setTextColor(0xff66e1a4);
-        title.setPadding(dp(10),dp(12),dp(10),dp(5));
+        title.setPadding(dp(10),dp(8),dp(10),dp(5));
         host.addView(title);
         String detail=value==null||value.trim().isEmpty()?
             "No hay datos estructurados disponibles en esta acta.":value.trim();
