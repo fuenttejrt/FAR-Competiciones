@@ -491,6 +491,10 @@ public final class RugbyHubActivity extends Activity {
                 while((n=in.read(buf))!=-1){out.write(buf,0,n);if(out.size()>12000000)throw new java.io.IOException("Acta demasiado grande");}
                 bytes=out.toByteArray();
             }
+            // Activity construction on a worker thread requires a Looper on some Android versions.
+            // PDF extraction itself does not interact with the UI; prepare the worker's
+            // message queue before constructing the legacy parser.
+            if(android.os.Looper.myLooper()==null)android.os.Looper.prepare();
             RugbyHubActivity parser=new RugbyHubActivity();
             try(com.tom_roush.pdfbox.pdmodel.PDDocument pdf=com.tom_roush.pdfbox.pdmodel.PDDocument.load(bytes)){
                 String lineup=parser.coordinateLineups(pdf);
