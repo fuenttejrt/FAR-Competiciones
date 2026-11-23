@@ -272,6 +272,7 @@ final class StandingIntelligence {
         if(fixtures.isEmpty())return null;
         int count=teams.size();
         int[] best=new int[count],worst=new int[count];
+        int[][] positionCounts=new int[count][count];
         java.util.Arrays.fill(best,count);
         java.util.Arrays.fill(worst,1);
         int[][] outcomes={{5,0},{4,0},{5,1},{4,1},{2,2},{0,5},{0,4},{1,5},{1,4}};
@@ -292,6 +293,8 @@ final class StandingIntelligence {
                     if(totals[j]>totals[i])low++;
                     if(totals[j]>=totals[i])high++;
                 }
+                int assigned=low+(high>low?random.nextInt(high-low+1):0);
+                positionCounts[i][assigned-1]++;
                 best[i]=Math.min(best[i],low);
                 worst[i]=Math.max(worst[i],high);
             }
@@ -304,6 +307,9 @@ final class StandingIntelligence {
                 row.put("team",teams.get(i).name);
                 row.put("best",best[i]);
                 row.put("worst",worst[i]);
+                JSONArray distribution=new JSONArray();
+                for(int rank=0;rank<count;rank++)distribution.put(positionCounts[i][rank]);
+                row.put("positions",distribution);
                 output.put(row);
             }
             result.put("teams",output);
