@@ -1326,6 +1326,8 @@ public class MainActivity extends Activity {
                             info.addView(txt(playedCount+" partidos  ·  "+starterCount+" titular  ·  "+benchCount+" suplente",11,0xff75e6b2));
                             if(verifiedMatches.getOrDefault(item.getKey(),0)>0)
                                 info.addView(txt(verifiedMinutes.getOrDefault(item.getKey(),0)+" min verificados · "+verifiedMatches.get(item.getKey())+" actas",11,0xffa9c4d2));
+                            if(estimatedMatches.getOrDefault(item.getKey(),0)>0)
+                                info.addView(txt(estimatedMinutes.getOrDefault(item.getKey(),0)+" min estimados · "+estimatedMatches.get(item.getKey())+" acta(s) con amarilla",11,0xffffc38c));
                             playerRow.addView(txt("›",23,0xff75e6b2));
                             playerRow.setOnClickListener(v->{
                                 LinearLayout details=new LinearLayout(this);
@@ -1339,7 +1341,19 @@ public class MainActivity extends Activity {
                                 int mins=verifiedMinutes.getOrDefault(item.getKey(),0);
                                 int checked=verifiedMatches.getOrDefault(item.getKey(),0);
                                 details.addView(txt("Minutos verificados: "+(checked>0?mins+" min en "+checked+" acta(s)":"Sin datos verificables"),14,0xff75e6b2));
-                                details.addView(txt("Los minutos no incluyen partidos sin sustituciones verificables. Anotaciones pendientes de calcular.",12,0xffa9c4d2));
+                                int estimated=estimatedMinutes.getOrDefault(item.getKey(),0);
+                                int estimatedCount=estimatedMatches.getOrDefault(item.getKey(),0);
+                                if(estimatedCount>0){
+                                    details.addView(txt("Minutos estimados por sanción: "+estimated+" min en "+estimatedCount+" acta(s)",13,0xffffc38c));
+                                    details.addView(txt("Total orientativo: "+(mins+estimated)+" min · verificados y estimados separados",13,0xffffc38c));
+                                }
+                                details.addView(txt("Los minutos estimados descuentan 5 minutos reglamentarios de amarilla dentro de los intervalos de participación. El regreso efectivo no figura en el acta; no se consideran verificados.",11,0xffa9c4d2));
+                                java.util.ArrayList<String> breakdown=playerMinuteBreakdown.get(item.getKey());
+                                if(breakdown!=null&&!breakdown.isEmpty()){
+                                    details.addView(txt("Desglose por partido",14,0xff75e6b2));
+                                    for(String line:breakdown)
+                                        details.addView(txt("• "+line,11,line.contains("estimados")?0xffffc38c:0xffd2e4ef));
+                                }
                                 standingColumns3D(details,new String[]{"Partidos","Titular","Suplente"},
                                     new int[]{playedCount,starterCount,benchCount},
                                     new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
