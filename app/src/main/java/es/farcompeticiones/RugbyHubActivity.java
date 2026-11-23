@@ -500,10 +500,14 @@ public final class RugbyHubActivity extends Activity {
                 String lineup=parser.coordinateLineups(pdf);
                 if(lineup==null)lineup=parser.extractLineupColumns(pdf);
                 String changes=parser.positionEventTable(pdf,"Cambios",true);
+                String temporary=parser.positionEventTable(pdf,"Expulsiones temporales",false);
+                String definitive=parser.positionEventTable(pdf,"Expulsiones definitivas",false);
                 String scoreboard=parser.extractScoreboardColumns(pdf);
                 org.json.JSONObject result=new org.json.JSONObject();
                 result.put("lineups",lineup==null?"":lineup);
                 result.put("changes",changes==null?"":changes);
+                result.put("temporaryCards",temporary==null?"":temporary);
+                result.put("definitiveCards",definitive==null?"":definitive);
                 result.put("scoreboard",scoreboard==null?"":scoreboard);
                 return result;
             }
