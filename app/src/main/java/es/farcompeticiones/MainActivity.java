@@ -1029,7 +1029,7 @@ public class MainActivity extends Activity {
                             addStandingFixed(columns,"Rest.",dp(46),accent);
                             addStandingFixed(columns,"Pts",dp(45),accent);
                             addStandingFixed(columns,"Máx.",dp(45),accent);
-                            addStandingFixed(columns,"Puesto*",dp(72),accent);
+                            addStandingFixed(columns,"Esc.*",dp(72),accent);
                             for(int n=0;n<options.length();n++){
                                 org.json.JSONObject option=options.optJSONObject(n);
                                 if(option==null)continue;
@@ -1041,9 +1041,9 @@ public class MainActivity extends Activity {
                                 addStandingFixed(compactRow,String.valueOf(option.optInt("remaining")),dp(46),Color.WHITE);
                                 addStandingFixed(compactRow,String.valueOf(option.optInt("points")),dp(45),Color.WHITE);
                                 addStandingFixed(compactRow,String.valueOf(option.optInt("maximum")),dp(45),accent);
-                                addStandingFixed(compactRow,option.optInt("best")+"–"+option.optInt("worst"),dp(72),0xffa5dbc6);
+                                addStandingFixed(compactRow,option.optInt("scenarioBest")+"–"+option.optInt("scenarioWorst"),dp(72),0xffa5dbc6);
                             }
-                            body.addView(txt("* Puestos posibles según límites de puntos; son cotas orientativas, no posiciones garantizadas. Empates, enfrentamientos entre equipos y resoluciones FAR pueden restringirlas.",10,Color.LTGRAY));
+                            body.addView(txt("* Esc.: posiciones observadas en 3.000 simulaciones de resultados compatibles entre rivales. No son todos los escenarios posibles ni certifican clasificación matemática; desempates y resoluciones FAR pendientes.",10,Color.LTGRAY));
                         }
                     }
                     body.addView(txt("Puestos orientativos, sujetos a sanciones, renuncias y resoluciones de la FAR.",11,Color.LTGRAY));
