@@ -864,6 +864,8 @@ public class MainActivity extends Activity {
                     content.addView(txt(duration>0?"Duración prevista según las reglas verificadas de esta competición.":"Duración pendiente de la circular oficial de esta categoría y temporada.",12,0xffb8d4cc));
                     int actCount=0;
                     java.util.Map<String,Integer> appearances=new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+                    java.util.Map<String,Integer> starts=new java.util.HashMap<>();
+                    java.util.Map<String,Integer> benches=new java.util.HashMap<>();
                     android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
                     if(!loadingActs[0]){
                         java.util.ArrayList<String> missing=new java.util.ArrayList<>();
@@ -906,32 +908,61 @@ public class MainActivity extends Activity {
                         String lineup=cached.optString("lineups","");
                         if(lineup.isEmpty())continue;
                         boolean local=teamKey(team).equals(teamKey(match.optString("home","")));
-                        int side=-1;java.util.HashSet<String> thisMatch=new java.util.HashSet<>();
+                        int side=-1;boolean starterSection=false;
+                        java.util.HashSet<String> thisMatch=new java.util.HashSet<>();
+                        java.util.HashSet<String> matchStarters=new java.util.HashSet<>();
+                        java.util.HashSet<String> matchBenches=new java.util.HashSet<>();
                         java.util.regex.Pattern player=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$");
                         for(String line:lineup.split("\\r?\\n")){
                             String t=line.trim();
                             if(t.equals("EQUIPO LOCAL"))side=0;
                             else if(t.equals("EQUIPO VISITANTE"))side=1;
                             else if(t.startsWith("JUGADORES SIN EQUIPO"))side=-1;
+                            else if(t.startsWith("TITULARES ("))starterSection=true;
+                            else if(t.startsWith("SUPLENTES ("))starterSection=false;
                             else if(side==(local?0:1)){
                                 java.util.regex.Matcher m=player.matcher(t);
                                 if(m.matches()){
                                     String playerId=m.group(3)+"|"+m.group(2).trim();
                                     thisMatch.add(playerId);
+                                    if(starterSection)matchStarters.add(playerId);else matchBenches.add(playerId);
                                 }
                             }
                         }
-                        if(!thisMatch.isEmpty()){actCount++;for(String id:thisMatch)appearances.put(id,appearances.getOrDefault(id,0)+1);}
+                        if(!thisMatch.isEmpty()){
+                            actCount++;
+                            for(String id:thisMatch)appearances.put(id,appearances.getOrDefault(id,0)+1);
+                            for(String id:matchStarters)starts.put(id,starts.getOrDefault(id,0)+1);
+                            for(String id:matchBenches)benches.put(id,benches.getOrDefault(id,0)+1);
+                        }
                     }
                     if(!appearances.isEmpty()){
                         standingSection(content,"Jugadores identificados · actas consultadas");
                         java.util.ArrayList<java.util.Map.Entry<String,Integer>> ranking=new java.util.ArrayList<>(appearances.entrySet());
                         java.util.Collections.sort(ranking,(a,b)->Integer.compare(b.getValue(),a.getValue()));
+                        int chartSize=Math.min(7,ranking.size());
+                        if(chartSize>0){
+                            String[] chartNames=new String[chartSize];
+                            int[] chartCounts=new int[chartSize];
+                            int[] chartColors=new int[chartSize];
+                            for(int k=0;k<chartSize;k++){
+                                java.util.Map.Entry<String,Integer> entry=ranking.get(k);
+                                String[] parts=entry.getKey().split("\\|",2);
+                                String name=parts.length>1?parts[1]:entry.getKey();
+                                chartNames[k]=name.length()>12?name.substring(0,12)+"…":name;
+                                chartCounts[k]=entry.getValue();
+                                chartColors[k]=k%2==0?0xff48dca2:0xff56aaf2;
+                            }
+                            standingSection(content,"Participaciones · gráfico 3D");
+                            standingColumns3D(content,chartNames,chartCounts,chartColors);
+                        }
+                        standingSection(content,"Plantilla · partidos y convocatorias");
                         for(java.util.Map.Entry<String,Integer> item:ranking){
                             String[] parts=item.getKey().split("\\|",2);
                             String playerName=parts.length>1?parts[1]:item.getKey();
-                            content.addView(txt(playerName+"  ·  "+item.getValue()+" acta(s)",13,0xffd2e4ef));
-                            content.addView(txt("Licencia: "+parts[0]+"  ·  Minutos: sin verificar",11,0xffa9c4d2));
+                            content.addView(txt(playerName,14,0xffd2e4ef));
+                            content.addView(txt("Partidos: "+item.getValue()+"   ·   Titular: "+starts.getOrDefault(item.getKey(),0)+"   ·   Suplente: "+benches.getOrDefault(item.getKey(),0),12,0xff75e6b2));
+                            content.addView(txt("Licencia: "+parts[0]+"   ·   Minutos pendientes",11,0xffa9c4d2));
                         }
                     }
                     if(!actErrors.isEmpty()){
