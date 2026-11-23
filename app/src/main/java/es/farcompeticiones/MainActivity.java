@@ -596,44 +596,130 @@ public class MainActivity extends Activity {
             fill.setLayoutParams(lp);
         });
     }
+
+    private void standingMetric(LinearLayout target,String value,String label){
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+        card.setPadding(dp(8),dp(7),dp(8),dp(7));
+        android.graphics.drawable.GradientDrawable bgCard=new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            new int[]{0xff34566a,0xff1a3447,0xff122737});
+        bgCard.setCornerRadius(dp(12));bgCard.setStroke(dp(1),0xff3d7380);
+        card.setBackground(bgCard);card.setElevation(dp(4));
+        TextView big=txt(value,19,0xff75e6b2);big.setGravity(Gravity.CENTER);
+        big.setTypeface(null,android.graphics.Typeface.BOLD);card.addView(big);
+        TextView small=txt(label,10,0xffd2e4ef);small.setGravity(Gravity.CENTER);card.addView(small);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);
+        lp.setMargins(dp(3),dp(5),dp(3),dp(5));target.addView(card,lp);
+    }
+    private void standingSection(LinearLayout target,String title){
+        TextView t=txt(title,15,0xff75e6b2);t.setTypeface(null,android.graphics.Typeface.BOLD);
+        target.addView(t);
+    }
+    private void standingPie(LinearLayout target,int[] values,int[] colors,String[] names){
+        final int sum=Math.max(0,values[0])+Math.max(0,values[1])+Math.max(0,values[2]);
+        android.view.View chart=new android.view.View(this){
+            final android.graphics.Paint paint=new android.graphics.Paint(3);
+            @Override protected void onDraw(android.graphics.Canvas canvas){
+                super.onDraw(canvas);
+                float w=getWidth(),h=getHeight(),radius=Math.min(w*.36f,h*.38f);
+                float cx=w*.5f,cy=h*.45f;
+                android.graphics.RectF oval=new android.graphics.RectF(cx-radius,cy-radius*.64f,cx+radius,cy+radius*.64f);
+                paint.setStyle(android.graphics.Paint.Style.FILL);
+                paint.setColor(0xff0b1b29);
+                canvas.drawOval(cx-radius,cy-radius*.64f+dp(15),cx+radius,cy+radius*.64f+dp(15),paint);
+                float start=-90f;
+                for(int i=0;i<values.length;i++){
+                    if(values[i]<=0||sum==0)continue;
+                    float sweep=360f*values[i]/sum;
+                    paint.setColor(colors[i]);canvas.drawArc(oval,start,sweep,true,paint);
+                    start+=sweep;
+                }
+                paint.setColor(0x55ffffff);
+                paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(2));
+                canvas.drawOval(oval,paint);paint.setStyle(android.graphics.Paint.Style.FILL);
+            }
+        };
+        target.addView(chart,new LinearLayout.LayoutParams(-1,dp(185)));
+        for(int i=0;i<values.length;i++){
+            TextView legend=txt("●  "+names[i]+": "+values[i]+(sum>0?"  ("+Math.round(values[i]*100f/sum)+" %)":""),12,colors[i]);
+            target.addView(legend);
+        }
+    }
     private void showStandingTeamStatistics(String team,String[] values){
         android.app.Dialog dialog=new android.app.Dialog(this);
+        LinearLayout frame=new LinearLayout(this);frame.setOrientation(1);
+        frame.setBackgroundColor(0xff172b3c);
+        TextView title=txt(team+" · ESTADÍSTICAS",18,0xff75e6b2);
+        title.setTypeface(null,android.graphics.Typeface.BOLD);frame.addView(title);
+        frame.addView(txt("Temporada "+season+" · "+selectedCompetition,11,0xffb8d4cc));
+        LinearLayout tabs=new LinearLayout(this);frame.addView(tabs);
         android.widget.ScrollView scroll=new android.widget.ScrollView(this);
-        LinearLayout content=new LinearLayout(this);
-        content.setOrientation(1);
-        content.setPadding(dp(12),dp(12),dp(12),dp(18));
-        content.setBackgroundColor(0xff203447);
-        scroll.addView(content);
-        dialog.setContentView(scroll);
-        TextView title=txt(team+" · ESTADÍSTICAS",19,0xff66e1a4);
-        title.setTypeface(null,android.graphics.Typeface.BOLD);
-        content.addView(title);
-        content.addView(txt("Temporada "+season+" · "+selectedCompetition,12,0xffb8d4cc));
-        String[] names={"Jugados","Ganados","Empatados","Perdidos","Tantos a favor",
-            "Tantos en contra","Diferencia","Ensayos a favor","Ensayos en contra",
-            "Bonus ofensivo","Bonus defensivo"};
-        for(int i=0;i<names.length;i++){
-            content.addView(txt(names[i]+": "+values[i+2],13,Color.WHITE));
+        LinearLayout content=new LinearLayout(this);content.setOrientation(1);
+        content.setPadding(dp(8),dp(4),dp(8),dp(12));
+        scroll.addView(content);frame.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        TextView close=txt("CERRAR  ×",14,0xff75e6b2);close.setGravity(Gravity.CENTER);
+        close.setOnClickListener(v->dialog.dismiss());frame.addView(close);
+        dialog.setContentView(frame);
+        String[] labels={"Resumen","Evolución","Partidos","Jugadores"};
+        final int[] active={0};
+        Runnable redraw=()->{
+            content.removeAllViews();
+            for(int i=0;i<tabs.getChildCount();i++){
+                TextView tab=(TextView)tabs.getChildAt(i);
+                tab.setTextColor(i==active[0]?0xff75e6b2:0xffb0c6d1);
+                tab.setBackgroundColor(i==active[0]?0xff28546a:0xff1a3447);
+            }
+            if(active[0]==0){
+                int played=standingNumber(values[2]),won=standingNumber(values[3]);
+                int drawn=standingNumber(values[4]),lost=standingNumber(values[5]);
+                int forPoints=standingNumber(values[6]),against=standingNumber(values[7]);
+                int triesFor=standingNumber(values[9]),triesAgainst=standingNumber(values[10]);
+                LinearLayout top=new LinearLayout(this);content.addView(top);
+                standingMetric(top,values[13],"Puntos");
+                standingMetric(top,String.valueOf(played),"Partidos");
+                standingMetric(top,played>0?Math.round(won*100f/played)+" %":"—","Victorias");
+                LinearLayout second=new LinearLayout(this);content.addView(second);
+                standingMetric(second,values[8],"Diferencia");
+                standingMetric(second,played>0?String.format(java.util.Locale.getDefault(),"%.1f",forPoints/(double)played):"—","Tantos / partido");
+                standingMetric(second,played>0?String.format(java.util.Locale.getDefault(),"%.1f",triesFor/(double)played):"—","Ensayos / partido");
+                standingSection(content,"Resultados · distribución 3D");
+                standingPie(content,new int[]{won,drawn,lost},
+                    new int[]{0xff45dca3,0xffffc365,0xffed7979},
+                    new String[]{"Victorias","Empates","Derrotas"});
+                standingSection(content,"Tantos · ataque y defensa");
+                int maxPoints=Math.max(1,Math.max(forPoints,against));
+                standingBar(content,"A favor",forPoints,maxPoints,0xff45dca3);
+                standingBar(content,"En contra",against,maxPoints,0xffed7979);
+                standingSection(content,"Ensayos · ataque y defensa");
+                int maxTries=Math.max(1,Math.max(triesFor,triesAgainst));
+                standingBar(content,"A favor",triesFor,maxTries,0xff45dca3);
+                standingBar(content,"En contra",triesAgainst,maxTries,0xff66b8fa);
+                standingSection(content,"Bonus");
+                int bonusO=standingNumber(values[11]),bonusD=standingNumber(values[12]);
+                standingBar(content,"Ofensivos",bonusO,Math.max(1,Math.max(bonusO,bonusD)),0xff45dca3);
+                standingBar(content,"Defensivos",bonusD,Math.max(1,Math.max(bonusO,bonusD)),0xff66b8fa);
+            }else{
+                standingSection(content,labels[active[0]]);
+                String message=active[0]==1?
+                    "Para mostrar la evolución real por jornada necesitamos vincular los resultados históricos de este equipo. No se inventarán posiciones ni puntuaciones.":
+                    active[0]==2?
+                    "Aquí aparecerán las comparativas por rival y como local o visitante cuando se vinculen los resultados de cada partido.":
+                    "Los ensayos y anotadores individuales se mostrarán al vincular las actas oficiales de los partidos. Los datos no disponibles no se contarán como cero.";
+                content.addView(txt(message,13,0xffd2e4ef));
+            }
+            scroll.scrollTo(0,0);
+        };
+        for(int i=0;i<labels.length;i++){
+            final int index=i;TextView tab=txt(labels[i],11,Color.WHITE);
+            tab.setGravity(Gravity.CENTER);tab.setPadding(dp(2),dp(13),dp(2),dp(13));
+            tabs.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
+            tab.setOnClickListener(v->{active[0]=index;redraw.run();});
         }
-        content.addView(txt("GRÁFICOS DE TEMPORADA",16,0xff66e1a4));
-        int played=Math.max(1,standingNumber(values[2]));
-        standingBar(content,"Victorias",standingNumber(values[3]),played,0xff38c989);
-        standingBar(content,"Empates",standingNumber(values[4]),played,0xfff3c56d);
-        standingBar(content,"Derrotas",standingNumber(values[5]),played,0xffe77878);
-        int maxTantos=Math.max(1,Math.max(standingNumber(values[6]),standingNumber(values[7])));
-        standingBar(content,"Tantos a favor",standingNumber(values[6]),maxTantos,0xff38c989);
-        standingBar(content,"Tantos en contra",standingNumber(values[7]),maxTantos,0xffe77878);
-        int maxEnsayos=Math.max(1,Math.max(standingNumber(values[9]),standingNumber(values[10])));
-        standingBar(content,"Ensayos a favor",standingNumber(values[9]),maxEnsayos,0xff38c989);
-        standingBar(content,"Ensayos en contra",standingNumber(values[10]),maxEnsayos,0xffe77878);
-        TextView close=txt("CERRAR  ×",15,0xff66e1a4);
-        close.setGravity(android.view.Gravity.CENTER);
-        close.setOnClickListener(v->dialog.dismiss());
-        content.addView(close);
+        redraw.run();
         dialog.show();
         android.view.Window window=dialog.getWindow();
-        if(window!=null)window.setLayout(getResources().getDisplayMetrics().widthPixels-dp(22),
-            getResources().getDisplayMetrics().heightPixels-dp(80));
+        if(window!=null)window.setLayout(getResources().getDisplayMetrics().widthPixels-dp(20),
+            getResources().getDisplayMetrics().heightPixels-dp(65));
     }
     void addStandingTeam(LinearLayout parent,String team,String crest,int width){
         LinearLayout fixed=new LinearLayout(this);
