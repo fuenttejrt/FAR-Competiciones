@@ -615,6 +615,47 @@ public class MainActivity extends Activity {
         TextView t=txt(title,15,0xff75e6b2);t.setTypeface(null,android.graphics.Typeface.BOLD);
         target.addView(t);
     }
+    private void standingColumns3D(LinearLayout target,String[] labels,int[] values,int[] colors){
+        android.view.View chart=new android.view.View(this){
+            final android.graphics.Paint p=new android.graphics.Paint(3);
+            @Override protected void onDraw(android.graphics.Canvas c){
+                super.onDraw(c);
+                c.save();c.scale(getWidth()/360f,getHeight()/205f);
+                int max=1;for(int v:values)max=Math.max(max,v);
+                p.setColor(0xff375064);p.setStrokeWidth(1);c.drawLine(12,151,348,151,p);
+                float slot=330f/Math.max(1,values.length);
+                for(int i=0;i<values.length;i++){
+                    float x=17+i*slot+slot*.24f;
+                    float barWidth=Math.min(35,slot*.5f);
+                    float height=values[i]*110f/max,top=147-height;
+                    int color=colors[i%colors.length];
+                    android.graphics.Path side=new android.graphics.Path();
+                    side.moveTo(x+barWidth,top);side.lineTo(x+barWidth+9,top-8);
+                    side.lineTo(x+barWidth+9,143);side.lineTo(x+barWidth,151);side.close();
+                    p.setColor(0xff235568);c.drawPath(side,p);
+                    p.setShader(new android.graphics.LinearGradient(x,top,x+barWidth,top,
+                        0xffc2ffed,color,android.graphics.Shader.TileMode.CLAMP));
+                    c.drawRect(x,top,x+barWidth,151,p);p.setShader(null);
+                    android.graphics.Path cap=new android.graphics.Path();
+                    cap.moveTo(x,top);cap.lineTo(x+9,top-8);
+                    cap.lineTo(x+barWidth+9,top-8);cap.lineTo(x+barWidth,top);cap.close();
+                    p.setColor(0x99ffffff);c.drawPath(cap,p);
+                    p.setColor(0xfff1f7fc);p.setTextSize(14);
+                    p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                    p.setTextAlign(android.graphics.Paint.Align.CENTER);
+                    c.drawText(String.valueOf(values[i]),x+barWidth*.5f,Math.max(18,top-13),p);
+                    p.setTextSize(12);p.setTypeface(android.graphics.Typeface.DEFAULT);
+                    c.drawText(labels[i],x+barWidth*.5f,174,p);
+                }
+                c.restore();
+            }
+        };
+        android.graphics.drawable.GradientDrawable panelBg=new android.graphics.drawable.GradientDrawable();
+        panelBg.setColor(0xff1b2d3f);panelBg.setCornerRadius(dp(12));
+        chart.setBackground(panelBg);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(205));
+        lp.setMargins(dp(4),dp(5),dp(4),dp(12));target.addView(chart,lp);
+    }
     private void standingPie(LinearLayout target,int[] values,int[] colors,String[] names){
         final int sum=Math.max(0,values[0])+Math.max(0,values[1])+Math.max(0,values[2]);
         android.view.View chart=new android.view.View(this){
@@ -688,16 +729,13 @@ public class MainActivity extends Activity {
                     new String[]{"Victorias","Empates","Derrotas"});
                 standingSection(content,"Tantos · ataque y defensa");
                 int maxPoints=Math.max(1,Math.max(forPoints,against));
-                standingBar(content,"A favor",forPoints,maxPoints,0xff45dca3);
-                standingBar(content,"En contra",against,maxPoints,0xffed7979);
+                standingColumns3D(content,new String[]{"Favor","Contra"},new int[]{forPoints,against},new int[]{0xff48dca2,0xff56aaf2});
                 standingSection(content,"Ensayos · ataque y defensa");
                 int maxTries=Math.max(1,Math.max(triesFor,triesAgainst));
-                standingBar(content,"A favor",triesFor,maxTries,0xff45dca3);
-                standingBar(content,"En contra",triesAgainst,maxTries,0xff66b8fa);
+                standingColumns3D(content,new String[]{"Favor","Contra"},new int[]{triesFor,triesAgainst},new int[]{0xff48dca2,0xff56aaf2});
                 standingSection(content,"Bonus");
                 int bonusO=standingNumber(values[11]),bonusD=standingNumber(values[12]);
-                standingBar(content,"Ofensivos",bonusO,Math.max(1,Math.max(bonusO,bonusD)),0xff45dca3);
-                standingBar(content,"Defensivos",bonusD,Math.max(1,Math.max(bonusO,bonusD)),0xff66b8fa);
+                standingColumns3D(content,new String[]{"Ofens.","Defens."},new int[]{bonusO,bonusD},new int[]{0xff48dca2,0xff56aaf2});
             }else{
                 standingSection(content,labels[active[0]]);
                 String message=active[0]==1?
