@@ -775,7 +775,7 @@ public final class RugbyHubActivity extends Activity {
         }
         @Override protected void onDraw(android.graphics.Canvas canvas){
             super.onDraw(canvas);
-            float sx=getWidth()/360f,sy=getHeight()/190f;
+            float sx=getWidth()/360f,sy=getHeight()/200f;
             canvas.save();canvas.scale(sx,sy);
             paint.setColor(0xff273f53);paint.setStrokeWidth(1);
             for(int i=0;i<4;i++)canvas.drawLine(30,24+i*38,344,24+i*38,paint);
@@ -804,7 +804,12 @@ public final class RugbyHubActivity extends Activity {
                 }
             }
             paint.setTextSize(11);paint.setColor(0xffaebfca);
-            canvas.drawText("0'",27,164,paint);canvas.drawText(maxMinute+"'",310,164,paint);
+            canvas.drawText("0'",27,164,paint);
+            canvas.drawText((maxMinute/2)+"'",175,164,paint);
+            canvas.drawText(maxMinute+"'",310,164,paint);
+            paint.setTextSize(13);paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            paint.setColor(0xff55dba3);canvas.drawText(""+local,304,Math.max(20,145-112f*local/maxPoints-9),paint);
+            paint.setColor(0xff63b9ff);canvas.drawText(""+away,304,Math.min(150,145-112f*away/maxPoints+17),paint);
             paint.setColor(0xff55dba3);canvas.drawText("● Local",35,183,paint);
             paint.setColor(0xff63b9ff);canvas.drawText("● Visitante",190,183,paint);
             canvas.restore();
@@ -861,11 +866,12 @@ public final class RugbyHubActivity extends Activity {
                     android.graphics.Path cap=new android.graphics.Path();
                     cap.moveTo(bx,top);cap.lineTo(bx+7,top-6);cap.lineTo(bx+24,top-6);
                     cap.lineTo(bx+17,top);cap.close();paint.setColor(0x88ffffff);c.drawPath(cap,paint);
-                    paint.setColor(0xfff1f7fc);paint.setTextSize(11);
+                    paint.setColor(0xfff1f7fc);paint.setTextSize(13);
+                    paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
                     paint.setTextAlign(android.graphics.Paint.Align.CENTER);
-                    c.drawText(""+values[i][j],bx+9,Math.max(15,top-8),paint);
+                    c.drawText(""+values[i][j],bx+9,Math.max(17,top-9),paint);
                 }
-                paint.setColor(0xffc4d4df);paint.setTextSize(11);
+                paint.setColor(0xffdcebf5);paint.setTextSize(12);
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                 c.drawText(labels[i],x+21,160,paint);
             }
@@ -951,10 +957,12 @@ public final class RugbyHubActivity extends Activity {
         addStatTitle(host,"Evolución del marcador");
         addStatTimeline(host,timeline);
         addStatTitle(host,"Distribución de anotaciones");
-        addStatPie(host,"Puntos por tipo",new int[]{
+        addStatPie(host,"Puntos por tipo · ambos equipos",new int[]{
             5*(local.tries+visitor.tries),2*(local.conversions+visitor.conversions),
             3*(local.penalties+visitor.penalties),3*(local.drops+visitor.drops)},
             new String[]{"Ens.","Trans.","Cast.","Drop"});
+        TextView totalNote=text("Distribución conjunta: "+(local.points+visitor.points)+" puntos identificados ("+local.points+" local + "+visitor.points+" visitante).",11,false);
+        totalNote.setTextColor(0xffa8bbc9);host.addView(totalNote);
         addStatTitle(host,"Anotadores");
         addStatScorersCompact(host,home==null?"Local":home,local,names[0]);
         addStatScorersCompact(host,away==null?"Visitante":away,visitor,names[1]);
@@ -971,6 +979,23 @@ public final class RugbyHubActivity extends Activity {
         TextView note=text("Solo se muestran datos identificados en el acta. Las estadísticas no registradas no se consideran cero.",11,false);
         note.setTextColor(0xffa8bbc9);note.setPadding(0,dp(8),0,0);host.addView(note);
     }
+    private void addStatScorerLegend(LinearLayout host,
+            java.util.ArrayList<java.util.Map.Entry<String,Integer>> ordered,
+            java.util.Map<String,String> names){
+        int total=0;for(java.util.Map.Entry<String,Integer> e:ordered)total+=e.getValue();
+        int[] palette={0xff46dca0,0xff52a9f7,0xfff7b84b,0xffd47aff,
+            0xffff7c8c,0xff66d7e9,0xffe8dd78,0xff9cc783};
+        for(int i=0;i<ordered.size();i++){
+            java.util.Map.Entry<String,Integer> e=ordered.get(i);
+            String name=names.get(e.getKey());
+            String label=name==null||name.trim().isEmpty()?"Dorsal "+e.getKey():name;
+            int percent=total<=0?0:Math.round(e.getValue()*100f/total);
+            TextView item=text("●  "+label+" (nº "+e.getKey()+") · "+e.getValue()+
+                " puntos ("+percent+"%)",12,false);
+            item.setTextColor(palette[i%palette.length]);
+            item.setPadding(dp(7),dp(3),dp(4),dp(3));host.addView(item);
+        }
+    }
     private void addStatScorersCompact(LinearLayout host,String team,MatchNumbers numbers,
             java.util.Map<String,String> names){
         LinearLayout card=statCard(host);
@@ -985,9 +1010,8 @@ public final class RugbyHubActivity extends Activity {
             values[i]=e.getValue();labels[i]="Nº "+e.getKey();
         }
         card.addView(new ThreeDChart(values,labels,true));
-        addStatLegend(card,values,labels);
-        TextView details=text(statScorerDetails(numbers,names),12,false);
-        details.setTextColor(0xffbcd0df);card.addView(details);
+        addStatScorerLegend(card,ordered,names);
+
 
     }
     private String formatScorers(MatchNumbers numbers){
