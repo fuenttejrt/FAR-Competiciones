@@ -1030,6 +1030,8 @@ public class MainActivity extends Activity {
                             addStandingFixed(columns,"Pts",dp(45),accent);
                             addStandingFixed(columns,"Máx.",dp(45),accent);
                             addStandingFixed(columns,"Puesto*",dp(72),accent);
+                            final java.util.ArrayList<TextView> simulatedCells=new java.util.ArrayList<>();
+                            final java.util.ArrayList<String> simulatedNames=new java.util.ArrayList<>();
                             for(int n=0;n<options.length();n++){
                                 org.json.JSONObject option=options.optJSONObject(n);
                                 if(option==null)continue;
@@ -1041,9 +1043,48 @@ public class MainActivity extends Activity {
                                 addStandingFixed(compactRow,String.valueOf(option.optInt("remaining")),dp(46),Color.WHITE);
                                 addStandingFixed(compactRow,String.valueOf(option.optInt("points")),dp(45),Color.WHITE);
                                 addStandingFixed(compactRow,String.valueOf(option.optInt("maximum")),dp(45),accent);
-                                addStandingFixed(compactRow,option.optInt("best")+"–"+option.optInt("worst"),dp(72),0xffa5dbc6);
+                                TextView positionCell=txt(option.optInt("best")+"–"+option.optInt("worst"),11,0xffa5dbc6);
+                                positionCell.setWidth(dp(72));
+                                compactRow.addView(positionCell);
+                                simulatedCells.add(positionCell);
+                                simulatedNames.add(option.optString("team"));
                             }
-                            body.addView(txt("* Puestos posibles según límites de puntos; son cotas orientativas, no posiciones garantizadas. Empates, enfrentamientos entre equipos y resoluciones FAR pueden restringirlas.",10,Color.LTGRAY));
+                            final TextView simulationNote=txt("* Puestos orientativos por límites de puntos. Calculando enfrentamientos directos…",10,Color.LTGRAY);
+                            body.addView(simulationNote);
+                            final String simSeason=season,simCategory=category,simCompetition=selectedCompetition;
+                            final int simPhase=detectedPhase;
+                            final org.json.JSONArray simRows=rows;
+                            final org.json.JSONObject simData=data;
+                            final LinearLayout originalBody=body;
+                            new Thread(()->{
+                                try{
+                                    final org.json.JSONObject simulation=StandingIntelligence.simulatedPositions(simSeason,simCategory,simCompetition,simPhase,simRows,simData);
+                                    runOnUiThread(()->{
+                                        if(body!=originalBody||!originalBody.isAttachedToWindow())return;
+                                        if(simulation==null){
+                                            simulationNote.setText("* Puestos orientativos por límites de puntos; no se ha podido completar la simulación.");
+                                            return;
+                                        }
+                                        org.json.JSONArray simulated=simulation.optJSONArray("teams");
+                                        if(simulated==null)return;
+                                        java.util.HashMap<String,String> ranges=new java.util.HashMap<>();
+                                        for(int i=0;i<simulated.length();i++){
+                                            org.json.JSONObject item=simulated.optJSONObject(i);
+                                            if(item!=null)ranges.put(item.optString("team"),item.optInt("best")+"–"+item.optInt("worst"));
+                                        }
+                                        for(int i=0;i<simulatedCells.size();i++){
+                                            String range=ranges.get(simulatedNames.get(i));
+                                            if(range!=null)simulatedCells.get(i).setText(range);
+                                        }
+                                        simulationNote.setText("* Puestos observados en 3.000 simulaciones de resultados compatibles. No son cotas matemáticas exhaustivas; desempates y resoluciones FAR pendientes.");
+                                    });
+                                }catch(Throwable error){
+                                    runOnUiThread(()->{
+                                        if(body==originalBody&&originalBody.isAttachedToWindow())
+                                            simulationNote.setText("* Puestos orientativos por límites de puntos. Simulación no disponible.");
+                                    });
+                                }
+                            },"far-standings-simulation").start();
                         }
                     }
                     body.addView(txt("Puestos orientativos, sujetos a sanciones, renuncias y resoluciones de la FAR.",11,Color.LTGRAY));
