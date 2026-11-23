@@ -795,7 +795,7 @@ public class MainActivity extends Activity {
     /** Calculate only fully traceable playing intervals from an official act. */
     private java.util.Map<String,Integer> verifiedActMinutes(String lineup,String changes,boolean local,int duration){
         if(duration<=0||changes==null||changes.trim().isEmpty())return null;
-        java.util.Map<String,Integer> byDorsal=new java.util.HashMap<>();
+        java.util.Map<String,String> byDorsal=new java.util.HashMap<>();
         java.util.Map<String,Integer> minutes=new java.util.HashMap<>();
         java.util.Map<String,Integer> enteredAt=new java.util.HashMap<>();
         java.util.HashSet<String> onField=new java.util.HashSet<>();
