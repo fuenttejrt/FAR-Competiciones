@@ -1028,6 +1028,9 @@ public class MainActivity extends Activity {
                     java.util.Map<String,Integer> benches=new java.util.HashMap<>();
                     java.util.Map<String,Integer> verifiedMinutes=new java.util.HashMap<>();
                     java.util.Map<String,Integer> verifiedMatches=new java.util.HashMap<>();
+                    java.util.Map<String,Integer> estimatedMinutes=new java.util.HashMap<>();
+                    java.util.Map<String,Integer> estimatedMatches=new java.util.HashMap<>();
+                    java.util.Map<String,java.util.ArrayList<String>> playerMinuteBreakdown=new java.util.HashMap<>();
                     int[] minuteActCount={0};
                     java.util.ArrayList<String> minuteActDiagnostics=new java.util.ArrayList<>();
                     android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
@@ -1096,6 +1099,8 @@ public class MainActivity extends Activity {
                         if(!thisMatch.isEmpty()){
                             // Sanctions affect the identified player, not the whole team.
                             java.util.HashSet<String> sanctionedDorsals=new java.util.HashSet<>();
+                            java.util.Map<String,java.util.ArrayList<int[]>> yellowIntervals=new java.util.HashMap<>();
+                            java.util.HashSet<String> redDorsals=new java.util.HashSet<>();
                             boolean unknownSanction=false;
                             java.util.ArrayList<String> sanctionDetails=new java.util.ArrayList<>();
                             for(String keyName:new String[]{"temporaryCards","definitiveCards"}){
@@ -1109,6 +1114,18 @@ public class MainActivity extends Activity {
                                         java.util.regex.Matcher dm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(ct);
                                         if(dm.find()){
                                             sanctionedDorsals.add(dm.group(1));
+                                            if(keyName.equals("definitiveCards"))redDorsals.add(dm.group(1));
+                                            else{
+                                                java.util.regex.Matcher sm=java.util.regex.Pattern.compile("Min (\\d+)").matcher(ct);
+                                                int suspension=CompetitionRules.temporarySuspensionMinutes(season,category);
+                                                int total=CompetitionRules.matchMinutes(season,category,selectedCompetition);
+                                                if(sm.find()&&suspension>0&&total>0){
+                                                    int from=Integer.parseInt(sm.group(1));
+                                                    if(from>=0&&from<total)
+                                                        yellowIntervals.computeIfAbsent(dm.group(1),k->new java.util.ArrayList<>())
+                                                            .add(new int[]{from,Math.min(total,from+suspension)});
+                                                }
+                                            }
                                             java.util.regex.Matcher minuteMatcher=java.util.regex.Pattern.compile("Min (\\d+)").matcher(ct);
                                             String minuteLabel=minuteMatcher.find()?minuteMatcher.group(1):"?";
                                             java.util.regex.Matcher typeMatcher=java.util.regex.Pattern.compile("Tipo ([A-E])").matcher(ct);
@@ -1145,8 +1162,35 @@ public class MainActivity extends Activity {
                                 }
                                 for(String dorsal:sanctionedDorsals){
                                     String id=dorsalIds.get(dorsal);
-                                    if(id==null)unknownSanction=true;
-                                    else if(perAct.remove(id)!=null)excludedPlayers++;
+                                    if(id==null){unknownSanction=true;continue;}
+                                    Integer base=perAct.remove(id);
+                                    if(base==null)continue;
+                                    excludedPlayers++;
+                                    if(redDorsals.contains(dorsal))continue; // Definitive cards require separate handling.
+                                    java.util.ArrayList<int[]> intervals=yellowIntervals.get(dorsal);
+                                    if(intervals==null||intervals.isEmpty())continue;
+                                    // Avoid double-counting overlapping yellow-card intervals.
+                                    java.util.Collections.sort(intervals,(a,b)->Integer.compare(a[0],b[0]));
+                                    int deducted=0,previousEnd=-1;
+                                    boolean calculable=true;
+                                    for(int[] interval:intervals){
+                                        int from=Math.max(interval[0],previousEnd);
+                                        if(from<interval[1]){
+                                            int overlap=suspensionOverlap(lineup,cached.optString("changes",""),local,dorsal,from,interval[1],
+                                                CompetitionRules.matchMinutes(season,category,selectedCompetition));
+                                            if(overlap<0){calculable=false;break;}
+                                            deducted+=overlap;
+                                        }
+                                        previousEnd=Math.max(previousEnd,interval[1]);
+                                    }
+                                    if(calculable){
+                                        int estimate=Math.max(0,base-deducted);
+                                        estimatedMinutes.put(id,estimatedMinutes.getOrDefault(id,0)+estimate);
+                                        estimatedMatches.put(id,estimatedMatches.getOrDefault(id,0)+1);
+                                        playerMinuteBreakdown.computeIfAbsent(id,k->new java.util.ArrayList<>())
+                                            .add(match.optString("home","")+" – "+match.optString("away","")+" · "+estimate
+                                                +" min estimados (amarilla: "+deducted+" min de juego descontados; regreso no confirmado)");
+                                    }
                                 }
                             }
                             // If a card has no identifiable player, no minute count can be certified.
@@ -1169,6 +1213,8 @@ public class MainActivity extends Activity {
                                 for(java.util.Map.Entry<String,Integer> e:perAct.entrySet()){
                                     verifiedMinutes.put(e.getKey(),verifiedMinutes.getOrDefault(e.getKey(),0)+e.getValue());
                                     verifiedMatches.put(e.getKey(),verifiedMatches.getOrDefault(e.getKey(),0)+1);
+                                    playerMinuteBreakdown.computeIfAbsent(e.getKey(),k->new java.util.ArrayList<>())
+                                        .add(match.optString("home","")+" – "+match.optString("away","")+" · "+e.getValue()+" min verificados");
                                 }
                             }
                             actCount++;
