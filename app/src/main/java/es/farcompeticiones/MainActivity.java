@@ -949,12 +949,24 @@ public class MainActivity extends Activity {
                                 java.util.Map.Entry<String,Integer> entry=ranking.get(k);
                                 String[] parts=entry.getKey().split("\\|",2);
                                 String name=parts.length>1?parts[1]:entry.getKey();
-                                chartNames[k]=name.length()>12?name.substring(0,12)+"…":name;
+                                chartNames[k]=String.valueOf(k+1);
                                 chartCounts[k]=entry.getValue();
                                 chartColors[k]=k%2==0?0xff48dca2:0xff56aaf2;
                             }
                             standingSection(content,"Participaciones · gráfico 3D");
                             standingColumns3D(content,chartNames,chartCounts,chartColors);
+                            LinearLayout legend=new LinearLayout(this);
+                            legend.setOrientation(1);
+                            legend.setPadding(dp(9),dp(8),dp(9),dp(9));
+                            content.addView(legend);
+                            for(int k=0;k<chartSize;k++){
+                                java.util.Map.Entry<String,Integer> entry=ranking.get(k);
+                                String[] parts=entry.getKey().split("\\|",2);
+                                String name=parts.length>1?parts[1]:entry.getKey();
+                                TextView line=txt((k+1)+".  "+name+"  ·  "+entry.getValue()+" partidos",12,0xffd2e4ef);
+                                line.setPadding(dp(3),dp(4),dp(3),dp(4));
+                                legend.addView(line);
+                            }
                         }
                         standingSection(content,"Plantilla · "+ranking.size()+" jugadores");
                         android.widget.EditText searchPlayer=new android.widget.EditText(this);
