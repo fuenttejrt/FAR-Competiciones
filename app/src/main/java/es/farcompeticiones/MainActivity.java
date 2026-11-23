@@ -1060,32 +1060,51 @@ public class MainActivity extends Activity {
                                     }
                                     org.json.JSONArray distribution=details.optJSONArray("positions");
                                     if(distribution==null)return;
-                                    StringBuilder message=new StringBuilder();
+                                    StringBuilder probabilities=new StringBuilder();
                                     int direct=0;
                                     for(int rank=0;rank<distribution.length();rank++){
                                         int occurrences=distribution.optInt(rank);
                                         if(rank<5&&selectedCompetition.equals("Primera División"))direct+=occurrences;
-                                        message.append(rank+1).append(".º puesto: ").append(String.format(java.util.Locale.getDefault(),"%.1f",occurrences*100.0/3000.0)).append("%\n");
+                                        probabilities.append(rank+1).append(".º puesto: ")
+                                                .append(String.format(java.util.Locale.getDefault(),"%.1f",occurrences*100.0/3000.0))
+                                                .append("%\\n");
                                     }
-                                    if(selectedCompetition.equals("Primera División")){
-                                        message.append("\nAcceso directo estimado (1.º–5.º): ")
-                                                .append(String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0)).append("%");
-                                        // Certificacion conservadora: si menos de cinco rivales
-                                        // pueden alcanzar los puntos actuales, no puede acabar sexto.
-                                        int possibleAhead=0;
-                                        int currentPoints=option.optInt("points");
-                                        for(int rivalIndex=0;rivalIndex<options.length();rivalIndex++){
-                                            org.json.JSONObject rival=options.optJSONObject(rivalIndex);
-                                            if(rival==null||rival==option)continue;
-                                            if(rival.optInt("maximum")>=currentPoints)possibleAhead++;
+                                    String estimated=String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0);
+                                    int possibleAhead=0;
+                                    int currentPoints=option.optInt("points");
+                                    StringBuilder rivals=new StringBuilder();
+                                    for(int rivalIndex=0;rivalIndex<options.length();rivalIndex++){
+                                        org.json.JSONObject rival=options.optJSONObject(rivalIndex);
+                                        if(rival==null||rival==option)continue;
+                                        if(rival.optInt("maximum")>=currentPoints){
+                                            possibleAhead++;
+                                            if(rivals.length()>0)rivals.append("\\n");
+                                            rivals.append("• ").append(rival.optString("team"))
+                                                  .append(" · ").append(rival.optInt("points"))
+                                                  .append(" pts, máximo ").append(rival.optInt("maximum"));
                                         }
-                                        if(possibleAhead<5)
-                                            message.append("\nClasificación matemática: ASEGURADA por límite de puntos.");
-                                        else
-                                            message.append("\nClasificación matemática: NO CONFIRMADA.");
                                     }
-                                    message.append("\n\nEstimaciones de 3.000 simulaciones ponderadas por puntos por partido y tanteos previos disponibles, con desempates aleatorios. Un 100 % simulado no equivale a clasificación matemática asegurada. Modelo orientativo, no probabilidades oficiales de la FAR.");
-                                    new android.app.AlertDialog.Builder(this).setTitle(tappedTeam+" · Escenarios").setMessage(message.toString()).setPositiveButton("Cerrar",null).show();
+                                    boolean assured=selectedCompetition.equals("Primera División")&&possibleAhead<5;
+                                    String qualification=selectedCompetition.equals("Primera División")?
+                                            "Acceso directo estimado: "+estimated+"%\\nClasificación matemática: "+
+                                            (assured?"ASEGURADA por límite de puntos.":"NO CONFIRMADA.")+
+                                            "\\n\\nEl 100 % en simulaciones no implica garantía matemática.":
+                                            "Los porcentajes son estimaciones, no plazas matemáticamente confirmadas.";
+                                    String pending=StandingIntelligence.pendingForTeam(tappedTeam,simData);
+                                    android.widget.ScrollView scroll=new android.widget.ScrollView(this);
+                                    LinearLayout sections=new LinearLayout(this);
+                                    sections.setOrientation(LinearLayout.VERTICAL);
+                                    sections.setPadding(dp(12),dp(8),dp(12),dp(8));
+                                    scroll.addView(sections);
+                                    addAnalysisFolder(sections,"Probabilidades por puesto",probabilities.toString(),true);
+                                    addAnalysisFolder(sections,"Clasificación y acceso",qualification,false);
+                                    addAnalysisFolder(sections,"Partidos pendientes",pending,false);
+                                    addAnalysisFolder(sections,"Rivales que pueden alcanzarlo",
+                                            rivals.length()>0?rivals.toString():"Ningún rival puede igualar sus puntos actuales según los máximos disponibles.",false);
+                                    addAnalysisFolder(sections,"Cómo se calcula",
+                                            "3.000 simulaciones ponderadas por puntos por partido y tanteos anteriores disponibles. Los empates se resuelven aleatoriamente. No son probabilidades oficiales ni sustituyen los desempates FAR.",false);
+                                    new android.app.AlertDialog.Builder(this).setTitle(tappedTeam+" · Análisis inteligente")
+                                            .setView(scroll).setPositiveButton("Cerrar",null).show();
                                 });
                                 simulatedNames.add(option.optString("team"));
                             }
@@ -1336,4 +1355,23 @@ public class MainActivity extends Activity {
     }
     @Override public void onBackPressed(){if(browser!=null&&browser.canGoBack())browser.goBack();else if(page.equals("browser")&&!selectedCompetition.isEmpty())showCompetitionTab(selectedTab);else home();}
     @Override protected void onDestroy(){if(browser!=null)browser.destroy();if(dataBrowser!=null)dataBrowser.destroy();super.onDestroy();}
+    private void addAnalysisFolder(LinearLayout container,String title,String content,boolean expanded){
+        LinearLayout group=new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        container.addView(group);
+        TextView header=txt((expanded?"▾ ":"▸ ")+title,14,accent);
+        header.setPadding(dp(8),dp(12),dp(8),dp(12));
+        header.setBackgroundColor(panel);
+        group.addView(header);
+        TextView details=txt(content,13,Color.WHITE);
+        details.setPadding(dp(12),dp(10),dp(10),dp(14));
+        details.setVisibility(expanded?View.VISIBLE:View.GONE);
+        group.addView(details);
+        header.setOnClickListener(v->{
+            boolean open=details.getVisibility()!=View.VISIBLE;
+            details.setVisibility(open?View.VISIBLE:View.GONE);
+            header.setText((open?"▾ ":"▸ ")+title);
+        });
+    }
+
 }
