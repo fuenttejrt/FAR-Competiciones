@@ -478,6 +478,34 @@ public final class RugbyHubActivity extends Activity {
         }
         new AlertDialog.Builder(this).setView(content).setPositiveButton("Cerrar",null).show();
     }
+    /** Reuses the existing PDF act extraction without opening the match screen. */
+    static org.json.JSONObject extractOfficialAct(String url) throws Exception {
+        if(url==null||!url.startsWith("https://farugby.matchready.es/"))throw new java.io.IOException("URL de acta no válida");
+        java.net.HttpURLConnection conn=null;
+        try{
+            conn=(java.net.HttpURLConnection)new java.net.URL(url).openConnection();
+            conn.setConnectTimeout(10000);conn.setReadTimeout(20000);
+            byte[] bytes;
+            try(java.io.InputStream in=conn.getInputStream();java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){
+                byte[] buf=new byte[16384];int n;
+                while((n=in.read(buf))!=-1){out.write(buf,0,n);if(out.size()>12000000)throw new java.io.IOException("Acta demasiado grande");}
+                bytes=out.toByteArray();
+            }
+            RugbyHubActivity parser=new RugbyHubActivity();
+            try(com.tom_roush.pdfbox.pdmodel.PDDocument pdf=com.tom_roush.pdfbox.pdmodel.PDDocument.load(bytes)){
+                String lineup=parser.coordinateLineups(pdf);
+                if(lineup==null)lineup=parser.extractLineupColumns(pdf);
+                String changes=parser.positionEventTable(pdf,"Cambios",true);
+                String scoreboard=parser.extractScoreboardColumns(pdf);
+                org.json.JSONObject result=new org.json.JSONObject();
+                result.put("lineups",lineup==null?"":lineup);
+                result.put("changes",changes==null?"":changes);
+                result.put("scoreboard",scoreboard==null?"":scoreboard);
+                return result;
+            }
+        }finally{if(conn!=null)conn.disconnect();}
+    }
+
     private void showReadableAct(String url,String homeName,String awayName){
         android.app.Dialog dialog=new android.app.Dialog(this);
         LinearLayout root=new LinearLayout(this);root.setOrientation(1);
