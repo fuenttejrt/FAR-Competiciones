@@ -167,4 +167,67 @@ final class StandingIntelligence {
         return result.toString();
     }
 
+    /**
+     * Cotas conservadoras de puestos: cada rival puede obtener entre 0 y 5 puntos
+     * por encuentro pendiente. No resuelve empates ni simula resultados incompatibles.
+     */
+    static JSONObject compactAnalysis(String season,String category,String competition,int phase,
+                                      JSONArray standings,JSONObject data) {
+        if(!CompetitionRules.hasM14Rules(season,category)||phase!=1)return null;
+        ArrayList<Team> teams=teams(standings);
+        if(teams.size()<2)return null;
+        JSONArray tables=data.optJSONArray("tables");
+        if(tables==null)return null;
+        java.util.HashMap<String,Integer> pending=new java.util.HashMap<>();
+        java.util.HashSet<String> unique=new java.util.HashSet<>();
+        int validTables=0;
+        for(int i=0;i<tables.length();i++){
+            JSONObject table=tables.optJSONObject(i);
+            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            String heading=table.optString("heading","").toLowerCase(java.util.Locale.ROOT);
+            if(!heading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))continue;
+            validTables++;
+            JSONArray games=table.optJSONArray("rows");
+            if(games==null)continue;
+            for(int j=0;j<games.length();j++){
+                JSONObject game=games.optJSONObject(j);
+                if(game==null||score(game.optString("score","")))continue;
+                String home=key(game.optString("home","")),away=key(game.optString("away",""));
+                if(home.isEmpty()||away.isEmpty()||home.equals(away))continue;
+                String id=home+"|"+away+"|"+game.optString("when","");
+                if(!unique.add(id))continue;
+                pending.put(home,pending.containsKey(home)?pending.get(home)+1:1);
+                pending.put(away,pending.containsKey(away)?pending.get(away)+1:1);
+            }
+        }
+        if(validTables==0)return null;
+        JSONObject result=new JSONObject();
+        JSONArray lines=new JSONArray();
+        try{
+            for(Team team:teams){
+                int remaining=pending.containsKey(key(team.name))?pending.get(key(team.name)):0;
+                int maximum=team.points+5*remaining;
+                int best=1,worst=1;
+                for(Team other:teams){
+                    if(other==team)continue;
+                    int otherRemaining=pending.containsKey(key(other.name))?pending.get(key(other.name)):0;
+                    // En igualdad de puntos, el desempate desconocido puede perjudicar al equipo.
+                    if(other.points>=maximum)best++;
+                    if(other.points+5*otherRemaining>=team.points)worst++;
+                }
+                JSONObject line=new JSONObject();
+                line.put("team",team.name);
+                line.put("points",team.points);
+                line.put("remaining",remaining);
+                line.put("maximum",maximum);
+                line.put("best",best);
+                line.put("worst",worst);
+                lines.put(line);
+            }
+            result.put("teams",lines);
+            result.put("fixtures",unique.size());
+            return result;
+        }catch(org.json.JSONException ex){return null;}
+    }
+
 }
