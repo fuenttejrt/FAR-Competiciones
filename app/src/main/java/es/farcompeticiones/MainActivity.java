@@ -930,7 +930,7 @@ public class MainActivity extends Activity {
                         java.util.ArrayList<String> missing=new java.util.ArrayList<>();
                         for(org.json.JSONObject match:matches){
                             String url=match.optString("actUrl","");
-                            if(url.startsWith("https://farugby.matchready.es/")&&(!actCache.contains(url)||!actCache.getString(url,"").contains("\\"temporaryCards\\""))&&!attemptedActs.contains(url)&&!missing.contains(url))missing.add(url);
+                            if(url.startsWith("https://farugby.matchready.es/")&&(!actCache.contains(url)||!actCache.getString(url,"").contains("temporaryCards"))&&!attemptedActs.contains(url)&&!missing.contains(url))missing.add(url);
                         }
                         if(!missing.isEmpty()){
                             loadingActs[0]=true;
