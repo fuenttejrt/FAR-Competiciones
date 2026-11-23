@@ -763,6 +763,45 @@ public final class RugbyHubActivity extends Activity {
             host.addView(item);
         }
     }
+    private void addStatTypeSelector(LinearLayout host,MatchNumbers local,MatchNumbers visitor,
+            String home,String away){
+        LinearLayout card=statCard(host);
+        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(LinearLayout.HORIZONTAL);
+        card.addView(tabs);
+        TextView heading=text("",13,true);heading.setGravity(Gravity.CENTER);
+        heading.setTextColor(0xffe7f2f8);heading.setPadding(0,dp(9),0,dp(3));card.addView(heading);
+        LinearLayout graph=new LinearLayout(this);graph.setOrientation(LinearLayout.VERTICAL);
+        card.addView(graph);
+        String[] choices={"Local","Visitante","Ambos"};
+        TextView[] buttons=new TextView[3];
+        final int[][] scores={
+            {5*local.tries,2*local.conversions,3*local.penalties,3*local.drops},
+            {5*visitor.tries,2*visitor.conversions,3*visitor.penalties,3*visitor.drops},
+            {5*local.tries,2*local.conversions,3*local.penalties,3*local.drops,
+             5*visitor.tries,2*visitor.conversions,3*visitor.penalties,3*visitor.drops}};
+        final String[] kinds={"Ensayos","Transformaciones","Castigos","Drops"};
+        final String[] combined={"Local · Ensayos","Local · Transform.","Local · Castigos","Local · Drops",
+            "Visitante · Ensayos","Visitante · Transform.","Visitante · Castigos","Visitante · Drops"};
+        for(int i=0;i<3;i++){
+            final int index=i;
+            TextView button=text(choices[i],12,true);button.setGravity(Gravity.CENTER);
+            button.setPadding(dp(3),dp(10),dp(3),dp(10));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1f);
+            lp.setMargins(dp(2),0,dp(2),0);tabs.addView(button,lp);buttons[i]=button;
+            button.setOnClickListener(v->{
+                for(int j=0;j<3;j++){
+                    buttons[j].setBackgroundColor(j==index?0xff28618a:0xff26394b);
+                    buttons[j].setTextColor(j==index?0xffffffff:0xffb9cad7);
+                }
+                graph.removeAllViews();
+                heading.setText(index==0?(home==null?"Local":home):
+                    index==1?(away==null?"Visitante":away):"Ambos equipos · separados por equipo");
+                graph.addView(new ThreeDChart(scores[index],index==2?combined:kinds,true));
+                addStatLegend(graph,scores[index],index==2?combined:kinds);
+            });
+        }
+        buttons[0].performClick();
+    }
     private final class ScoreTimeline3D extends android.view.View {
         private final java.util.ArrayList<int[]> events;
         private final android.graphics.Paint paint=new android.graphics.Paint(3);
@@ -957,12 +996,7 @@ public final class RugbyHubActivity extends Activity {
         addStatTitle(host,"Evolución del marcador");
         addStatTimeline(host,timeline);
         addStatTitle(host,"Distribución de anotaciones");
-        addStatPie(host,"Puntos por tipo · ambos equipos",new int[]{
-            5*(local.tries+visitor.tries),2*(local.conversions+visitor.conversions),
-            3*(local.penalties+visitor.penalties),3*(local.drops+visitor.drops)},
-            new String[]{"Ens.","Trans.","Cast.","Drop"});
-        TextView totalNote=text("Distribución conjunta: "+(local.points+visitor.points)+" puntos identificados ("+local.points+" local + "+visitor.points+" visitante).",11,false);
-        totalNote.setTextColor(0xffa8bbc9);host.addView(totalNote);
+        addStatTypeSelector(host,local,visitor,home,away);
         addStatTitle(host,"Anotadores");
         addStatScorersCompact(host,home==null?"Local":home,local,names[0]);
         addStatScorersCompact(host,away==null?"Visitante":away,visitor,names[1]);
