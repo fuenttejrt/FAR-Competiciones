@@ -28,6 +28,16 @@ final class CompetitionRules {
         return total > 0 ? total / 2 : -1;
     }
 
+    /**
+     * FER, Variaciones a las Reglas M14 (noviembre 2021), regla 9.29:
+     * suspensión por amarilla = 5 minutos de tiempo de juego.
+     * La circular FAR 10/2026-27 remite a las variaciones M14.
+     * -1 para temporadas/categorías sin norma contrastada.
+     */
+    static int temporarySuspensionMinutes(String season,String category){
+        return hasM14Rules(season,category)?5:-1;
+    }
+
     /** 0: no confirmada, 1: primera fase, 2: segunda fase. */
     static int phase(String season, String category, String competition, JSONObject data, JSONObject standing) {
         if (!hasM14Rules(season, category)) return 0;
