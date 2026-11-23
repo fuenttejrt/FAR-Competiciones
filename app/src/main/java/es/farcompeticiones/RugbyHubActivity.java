@@ -226,6 +226,14 @@ public final class RugbyHubActivity extends Activity {
                                 close.setTextColor(0xff87d8b9);close.setPadding(0,dp(12),0,0);
                                 detail.addView(close);close.setOnClickListener(w->dialog.dismiss());
                             };
+                            crest.setClickable(true);
+                            crest.setFocusable(true);
+                            crest.setContentDescription("Ver estadísticas de "+selectedTeam);
+                            crest.setOnClickListener(expand);
+                            name.setClickable(true);
+                            name.setFocusable(true);
+                            name.setContentDescription("Ver estadísticas de "+selectedTeam);
+                            name.setOnClickListener(expand);
                             leftRow.setOnClickListener(expand);
                             midRow.setOnClickListener(expand);
                             points.setOnClickListener(expand);
