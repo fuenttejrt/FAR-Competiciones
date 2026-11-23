@@ -1009,11 +1009,42 @@ public class MainActivity extends Activity {
                     }else{
                         body.addView(txt("No se puede confirmar la fase a partir de las etiquetas oficiales disponibles. Actualiza los datos para volver a comprobarlo.",12,Color.LTGRAY));
                     }
-                    String insight=StandingIntelligence.summary(season,category,selectedCompetition,detectedPhase,rows);
-                    if(!insight.isEmpty())body.addView(txt("ANÁLISIS · "+insight,11,0xffa5dbc6));
-                    String scenarios=StandingIntelligence.remainingScenario(season,category,selectedCompetition,detectedPhase,rows,data);
-                    if(!scenarios.isEmpty()){
-                        body.addView(txt("ENCUENTROS SIN MARCADOR · "+scenarios,11,0xffa5dbc6));
+                    org.json.JSONObject smart=StandingIntelligence.compactAnalysis(season,category,selectedCompetition,detectedPhase,rows,data);
+                    if(smart!=null){
+                        org.json.JSONArray options=smart.optJSONArray("teams");
+                        int cutoff=selectedCompetition.equals("Primera División")?5:3;
+                        if(options!=null&&options.length()>cutoff){
+                            org.json.JSONObject border=options.optJSONObject(cutoff-1);
+                            org.json.JSONObject below=options.optJSONObject(cutoff);
+                            if(border!=null&&below!=null){
+                                int difference=border.optInt("points")-below.optInt("points");
+                                body.addView(txt("ANÁLISIS INTELIGENTE",12,accent));
+                                body.addView(txt("Diferencia en el corte: "+difference+" puntos · "+border.optString("team")+" / "+below.optString("team"),11,0xffa5dbc6));
+                            }
+                            LinearLayout columns=new LinearLayout(this);
+                            columns.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                            columns.setBackgroundColor(panel);
+                            body.addView(columns);
+                            addStandingFixed(columns,"Equipo",dp(150),accent);
+                            addStandingFixed(columns,"Rest.",dp(46),accent);
+                            addStandingFixed(columns,"Pts",dp(45),accent);
+                            addStandingFixed(columns,"Máx.",dp(45),accent);
+                            addStandingFixed(columns,"Puesto*",dp(72),accent);
+                            for(int n=0;n<options.length();n++){
+                                org.json.JSONObject option=options.optJSONObject(n);
+                                if(option==null)continue;
+                                LinearLayout compactRow=new LinearLayout(this);
+                                compactRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                                compactRow.setBackgroundColor(n%2==0?panel:bg);
+                                body.addView(compactRow);
+                                addStandingFixed(compactRow,option.optString("team"),dp(150),Color.WHITE);
+                                addStandingFixed(compactRow,String.valueOf(option.optInt("remaining")),dp(46),Color.WHITE);
+                                addStandingFixed(compactRow,String.valueOf(option.optInt("points")),dp(45),Color.WHITE);
+                                addStandingFixed(compactRow,String.valueOf(option.optInt("maximum")),dp(45),accent);
+                                addStandingFixed(compactRow,option.optInt("best")+"–"+option.optInt("worst"),dp(72),0xffa5dbc6);
+                            }
+                            body.addView(txt("* Puestos posibles según límites de puntos; son cotas orientativas, no posiciones garantizadas. Empates, enfrentamientos entre equipos y resoluciones FAR pueden restringirlas.",10,Color.LTGRAY));
+                        }
                     }
                     body.addView(txt("Puestos orientativos, sujetos a sanciones, renuncias y resoluciones de la FAR.",11,Color.LTGRAY));
                 }
