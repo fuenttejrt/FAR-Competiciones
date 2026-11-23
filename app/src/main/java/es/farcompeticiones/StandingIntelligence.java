@@ -226,36 +226,11 @@ final class StandingIntelligence {
                 line.put("maximum",maximum);
                 line.put("best",best);
                 line.put("worst",worst);
-                // Escenarios compatibles: un unico resultado para cada partido
-                // actualiza simultaneamente a sus dos participantes.
-                int observedBest=teams.size(),observedWorst=1;
-                java.util.Random random=new java.util.Random(173L);
-                int[][] outcomes={{5,0},{4,0},{5,1},{4,1},{2,2},{0,5},{0,4},{1,5},{1,4}};
-                for(int trial=0;trial<3000;trial++){
-                    java.util.HashMap<String,Integer> totals=new java.util.HashMap<>();
-                    for(Team current:teams)totals.put(key(current.name),current.points);
-                    for(String[] fixture:fixtures){
-                        int[] points=outcomes[random.nextInt(outcomes.length)];
-                        if(totals.containsKey(fixture[0]))totals.put(fixture[0],totals.get(fixture[0])+points[0]);
-                        if(totals.containsKey(fixture[1]))totals.put(fixture[1],totals.get(fixture[1])+points[1]);
-                    }
-                    Integer ownValue=totals.get(key(team.name));
-                    if(ownValue==null)continue;
-                    int own=ownValue;
-                    int rankLow=1,rankHigh=1;
-                    for(Team rival:teams){
-                        if(rival==team)continue;
-                        Integer rivalValue=totals.get(key(rival.name));
-                        if(rivalValue==null)continue;
-                        int value=rivalValue;
-                        if(value>own)rankLow++;
-                        if(value>=own)rankHigh++;
-                    }
-                    if(rankLow<observedBest)observedBest=rankLow;
-                    if(rankHigh>observedWorst)observedWorst=rankHigh;
-                }
-                line.put("scenarioBest",observedBest);
-                line.put("scenarioWorst",observedWorst);
+                // Calculo ligero y seguro en el hilo de interfaz.
+                // La simulacion intensiva queda desactivada hasta ejecutarla
+                // fuera del hilo principal y validar los datos de calendario.
+                line.put("scenarioBest",best);
+                line.put("scenarioWorst",worst);
                 lines.put(line);
             }
             result.put("teams",lines);
