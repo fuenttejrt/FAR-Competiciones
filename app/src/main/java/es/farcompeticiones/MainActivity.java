@@ -763,16 +763,28 @@ public class MainActivity extends Activity {
                     }
                 }
                 p.setColor(0xffd6e6f0);p.setTextSize(11);p.setTextAlign(android.graphics.Paint.Align.CENTER);
-                for(int i=0;i<=n;i++)c.drawText(String.valueOf(i),34+306f*i/Math.max(1,n),216,p);
+                for(int i=0;i<=n;i++)c.drawText(i==0?"Inicio":"P"+i,34+306f*i/Math.max(1,n),216,p);
+                for(int i=1;i<=n;i++){
+                    float x=34+306f*i/Math.max(1,n);
+                    boolean win=scored.get(i-1)>conceded.get(i-1);
+                    boolean draw=scored.get(i-1).equals(conceded.get(i-1));
+                    p.setColor(draw?0xffffc365:win?0xff4cdda7:0xffed7979);
+                    c.drawCircle(x,230,3.8f,p);
+                }
                 c.restore();
             }
         };
         chart.setBackgroundColor(0xff1b2d3f);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(245));
         lp.setMargins(dp(4),dp(8),dp(4),dp(10));target.addView(chart,lp);
-        TextView legend=txt("● Tantos a favor acumulados     ● Tantos en contra acumulados",11,0xffc8deea);
-        target.addView(legend);
-        target.addView(txt("Eje horizontal: partidos disputados, en orden de fecha",11,0xffa9c4d2));
+        LinearLayout legend=new LinearLayout(this);legend.setOrientation(1);target.addView(legend);
+        TextView green=txt("●  Tantos a favor acumulados",11,0xff4cdda7);
+        TextView blue=txt("●  Tantos en contra acumulados",11,0xff5caefa);
+        green.setPadding(dp(8),dp(1),dp(8),dp(1));
+        blue.setPadding(dp(8),dp(1),dp(8),dp(1));
+        legend.addView(green);legend.addView(blue);
+        TextView note=txt("P1, P2…: orden de partidos  ·  ● Verde: victoria  ● Rojo: derrota  ● Amarillo: empate",10,0xffa9c4d2);
+        note.setPadding(dp(8),dp(2),dp(8),dp(3));target.addView(note);
     }
     private int[] standingMatchScore(String score){
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d+)\\s*[-–:]\\s*(\\d+)").matcher(score);
