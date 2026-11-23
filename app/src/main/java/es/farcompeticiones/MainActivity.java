@@ -1031,6 +1031,8 @@ public class MainActivity extends Activity {
                             addStandingFixed(columns,"Máx.",dp(45),accent);
                             addStandingFixed(columns,"Puesto*",dp(72),accent);
                             final java.util.ArrayList<TextView> simulatedCells=new java.util.ArrayList<>();
+                            final java.util.ArrayList<LinearLayout> simulatedRows=new java.util.ArrayList<>();
+                            final java.util.HashMap<String,org.json.JSONObject> teamSimulations=new java.util.HashMap<>();
                             final java.util.ArrayList<String> simulatedNames=new java.util.ArrayList<>();
                             for(int n=0;n<options.length();n++){
                                 org.json.JSONObject option=options.optJSONObject(n);
@@ -1047,6 +1049,28 @@ public class MainActivity extends Activity {
                                 positionCell.setWidth(dp(72));
                                 compactRow.addView(positionCell);
                                 simulatedCells.add(positionCell);
+                                simulatedRows.add(compactRow);
+                                final String tappedTeam=option.optString("team");
+                                compactRow.setClickable(true);
+                                compactRow.setOnClickListener(v->{
+                                    org.json.JSONObject details=teamSimulations.get(tappedTeam);
+                                    if(details==null){
+                                        new android.app.AlertDialog.Builder(this).setTitle(tappedTeam).setMessage("Calculando escenarios. Vuelve a pulsar cuando termine la simulación.").setPositiveButton("Cerrar",null).show();
+                                        return;
+                                    }
+                                    org.json.JSONArray distribution=details.optJSONArray("positions");
+                                    if(distribution==null)return;
+                                    StringBuilder message=new StringBuilder();
+                                    int direct=0;
+                                    for(int rank=0;rank<distribution.length();rank++){
+                                        int occurrences=distribution.optInt(rank);
+                                        if(rank<5&&selectedCompetition.equals("Primera División"))direct+=occurrences;
+                                        message.append(rank+1).append(".º puesto: ").append(String.format(java.util.Locale.getDefault(),"%.1f",occurrences*100.0/3000.0)).append("%\\n");
+                                    }
+                                    if(simCompetitionIsFirstDivision())message.append("\\nAcceso directo (1.º–5.º): ").append(String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0)).append("%");
+                                    message.append("\\n\\nEstimaciones de 3.000 simulaciones con resultados equiprobables y desempates aleatorios. No son probabilidades oficiales de la FAR.");
+                                    new android.app.AlertDialog.Builder(this).setTitle(tappedTeam+" · Escenarios").setMessage(message.toString()).setPositiveButton("Cerrar",null).show();
+                                });
                                 simulatedNames.add(option.optString("team"));
                             }
                             final TextView simulationStatus=txt("◌ Calculando escenarios…",11,0xffffca65);
@@ -1073,13 +1097,16 @@ public class MainActivity extends Activity {
                                         java.util.HashMap<String,String> ranges=new java.util.HashMap<>();
                                         for(int simIndex=0;simIndex<simulated.length();simIndex++){
                                             org.json.JSONObject item=simulated.optJSONObject(simIndex);
-                                            if(item!=null)ranges.put(item.optString("team"),item.optInt("best")+"–"+item.optInt("worst"));
+                                            if(item!=null){
+                                                ranges.put(item.optString("team"),item.optInt("best")+"–"+item.optInt("worst"));
+                                                teamSimulations.put(item.optString("team"),item);
+                                            }
                                         }
                                         for(int cellIndex=0;cellIndex<simulatedCells.size();cellIndex++){
                                             String range=ranges.get(simulatedNames.get(cellIndex));
                                             if(range!=null)simulatedCells.get(cellIndex).setText(range);
                                         }
-                                        simulationStatus.setText("✓ Simulación completada · 3.000 escenarios");
+                                        simulationStatus.setText("✓ Simulación completada · 3.000 escenarios · Pulsa un equipo");
                                         simulationStatus.setTextColor(accent);
                                         simulationNote.setText("* Puestos observados en simulaciones de resultados compatibles. No son cotas matemáticas exhaustivas; desempates y resoluciones FAR pendientes.");
                                     });
