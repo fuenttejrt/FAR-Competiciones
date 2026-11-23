@@ -792,6 +792,61 @@ public class MainActivity extends Activity {
         try{return new int[]{Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2))};}
         catch(Exception e){return null;}
     }
+    /** Calculate only fully traceable playing intervals from an official act. */
+    private java.util.Map<String,Integer> verifiedActMinutes(String lineup,String changes,boolean local,int duration){
+        if(duration<=0||changes==null||changes.trim().isEmpty())return null;
+        java.util.Map<String,Integer> byDorsal=new java.util.HashMap<>();
+        java.util.Map<String,Integer> minutes=new java.util.HashMap<>();
+        java.util.Map<String,Integer> enteredAt=new java.util.HashMap<>();
+        java.util.HashSet<String> onField=new java.util.HashSet<>();
+        int side=-1;boolean starter=false;
+        java.util.regex.Pattern player=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$");
+        for(String line:lineup.split("\\r?\\n")){
+            String t=line.trim();
+            if(t.equals("EQUIPO LOCAL"))side=0;
+            else if(t.equals("EQUIPO VISITANTE"))side=1;
+            else if(t.startsWith("TITULARES ("))starter=true;
+            else if(t.startsWith("SUPLENTES ("))starter=false;
+            else if(side==(local?0:1)){
+                java.util.regex.Matcher m=player.matcher(t);
+                if(m.matches()){
+                    String dorsal=m.group(1),id=m.group(3)+"|"+m.group(2).trim();
+                    if(byDorsal.containsKey(dorsal))return null;
+                    byDorsal.put(dorsal,id);minutes.put(id,0);
+                    if(starter){onField.add(dorsal);enteredAt.put(dorsal,0);}
+                }
+            }
+        }
+        if(onField.isEmpty())return null;
+        side=-1;int lastMinute=-1;int events=0;
+        java.util.regex.Pattern event=java.util.regex.Pattern.compile(
+            "^\\d+\\. Min (\\d+) · Cambio · Entra nº (\\d+) · Sale nº (\\d+).*$");
+        for(String line:changes.split("\\r?\\n")){
+            String t=line.trim();
+            if(t.matches("(?i)Equipo local:.*"))side=0;
+            else if(t.matches("(?i)Equipo visitante:.*"))side=1;
+            else if(side==(local?0:1)&&t.matches("^\\d+\\. Min .*")){
+                java.util.regex.Matcher m=event.matcher(t);
+                if(!m.matches())return null;
+                int minute=Integer.parseInt(m.group(1));
+                String in=m.group(2),out=m.group(3);
+                if(minute<0||minute>duration||minute<lastMinute||!onField.contains(out)
+                    ||onField.contains(in)||!byDorsal.containsKey(in)||!byDorsal.containsKey(out))return null;
+                String id=byDorsal.get(out);
+                minutes.put(id,minutes.get(id)+minute-enteredAt.get(out));
+                onField.remove(out);enteredAt.remove(out);
+                onField.add(in);enteredAt.put(in,minute);
+                lastMinute=minute;events++;
+            }
+        }
+        if(events==0)return null;
+        for(String dorsal:onField){
+            String id=byDorsal.get(dorsal);
+            minutes.put(id,minutes.get(id)+duration-enteredAt.get(dorsal));
+        }
+        return minutes;
+    }
+
     private void showStandingTeamStatistics(String team,String[] values,org.json.JSONObject data){
         android.app.Dialog dialog=new android.app.Dialog(this);
         LinearLayout frame=new LinearLayout(this);frame.setOrientation(1);
