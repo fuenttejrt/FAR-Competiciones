@@ -531,6 +531,7 @@ public final class RugbyHubActivity extends Activity {
                         if(safeDiscipline!=null)parsed.put("Expulsiones",safeDiscipline);
                         if(safeScoreboard!=null)parsed.put("Marcador",safeScoreboard);
                         if(safeChanges!=null)parsed.put("Cambios",safeChanges);
+                        parsed.put("Estadísticas","");
                         sections.removeAllViews();
                         
                         LinearLayout tabStack=new LinearLayout(this);
@@ -578,6 +579,8 @@ public final class RugbyHubActivity extends Activity {
                                     showActScoreboard(scroll,entry.getValue(),safeLineups,homeName,awayName);
                                 else if("Cambios".equals(entry.getKey()))
                                     showActChanges(scroll,entry.getValue(),safeLineups,homeName,awayName);
+                                else if("Estadísticas".equals(entry.getKey()))
+                                    showActMatchStatistics(scroll,safeScoreboard,safeDiscipline,safeChanges,homeName,awayName);
                                 else if("Expulsiones".equals(entry.getKey()))
                                     showActDiscipline(scroll,entry.getValue(),parsed.get("Cambios"),safeLineups,homeName,awayName);
                                 else if("Alineaciones".equals(entry.getKey()) && safeLineups!=null)
@@ -596,6 +599,41 @@ public final class RugbyHubActivity extends Activity {
                     "No se pudo leer el acta. Puedes abrir el PDF original.");});
             }finally{if(conn!=null)conn.disconnect();}
         }).start();
+    }
+    private void showActMatchStatistics(android.widget.ScrollView scroll,String scoreboard,
+            String discipline,String changes,String home,String away){
+        scroll.removeAllViews();
+        LinearLayout host=new LinearLayout(this);
+        host.setOrientation(LinearLayout.VERTICAL);
+        host.setPadding(dp(12),dp(10),dp(12),dp(14));
+        host.setBackgroundColor(0xff101a24);
+        scroll.addView(host);
+        TextView heading=text("Estadísticas del partido",19,true);
+        heading.setPadding(0,0,0,dp(12));
+        host.addView(heading);
+        TextView teams=text((home==null?"Local":home)+"  vs  "+(away==null?"Visitante":away),15,true);
+        teams.setPadding(0,0,0,dp(12));
+        host.addView(teams);
+        addActStatBlock(host,"Anotaciones y marcador",scoreboard);
+        addActStatBlock(host,"Disciplina",discipline);
+        addActStatBlock(host,"Sustituciones",changes);
+        TextView note=text("Información obtenida del acta de este partido. Las cifras no disponibles no se estiman; las estadísticas acumuladas se consultarán desde la clasificación.",11,false);
+        note.setTextColor(0xffafc0cb);
+        note.setPadding(0,dp(12),0,0);
+        host.addView(note);
+    }
+    private void addActStatBlock(LinearLayout host,String heading,String value){
+        TextView title=text(heading,14,true);
+        title.setTextColor(0xff66e1a4);
+        title.setPadding(dp(10),dp(12),dp(10),dp(5));
+        host.addView(title);
+        String detail=value==null||value.trim().isEmpty()?
+            "No hay datos estructurados disponibles en esta acta.":value.trim();
+        TextView content=text(detail,12,false);
+        content.setTextIsSelectable(true);
+        content.setPadding(dp(10),dp(8),dp(10),dp(10));
+        content.setBackgroundColor(0xff1b2b3b);
+        host.addView(content);
     }
     // Prototype: inspect PDF glyph coordinates without altering the production parser.
     // A text stream cannot represent empty cells; coordinates can reveal their gaps.
