@@ -921,6 +921,9 @@ public class MainActivity extends Activity {
                     java.util.Map<String,Integer> appearances=new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
                     java.util.Map<String,Integer> starts=new java.util.HashMap<>();
                     java.util.Map<String,Integer> benches=new java.util.HashMap<>();
+                    java.util.Map<String,Integer> verifiedMinutes=new java.util.HashMap<>();
+                    java.util.Map<String,Integer> verifiedMatches=new java.util.HashMap<>();
+                    int[] minuteActCount={0};
                     android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
                     if(!loadingActs[0]){
                         java.util.ArrayList<String> missing=new java.util.ArrayList<>();
@@ -985,6 +988,15 @@ public class MainActivity extends Activity {
                             }
                         }
                         if(!thisMatch.isEmpty()){
+                            java.util.Map<String,Integer> perAct=verifiedActMinutes(lineup,cached.optString("changes",""),local,
+                                CompetitionRules.matchMinutes(season,category,competition));
+                            if(perAct!=null){
+                                minuteActCount[0]++;
+                                for(java.util.Map.Entry<String,Integer> e:perAct.entrySet()){
+                                    verifiedMinutes.put(e.getKey(),verifiedMinutes.getOrDefault(e.getKey(),0)+e.getValue());
+                                    verifiedMatches.put(e.getKey(),verifiedMatches.getOrDefault(e.getKey(),0)+1);
+                                }
+                            }
                             actCount++;
                             for(String id:thisMatch)appearances.put(id,appearances.getOrDefault(id,0)+1);
                             for(String id:matchStarters)starts.put(id,starts.getOrDefault(id,0)+1);
@@ -1030,6 +1042,7 @@ public class MainActivity extends Activity {
                                 legend.addView(line);
                             }
                         }
+                        content.addView(txt("Minutos verificados: "+minuteActCount[0]+" de "+actCount+" actas. Solo se suman partidos con sustituciones completas y coherentes.",11,0xffa9c4d2));
                         standingSection(content,"Plantilla · "+ranking.size()+" jugadores");
                         android.widget.EditText searchPlayer=new android.widget.EditText(this);
                         searchPlayer.setSingleLine(true);searchPlayer.setTextSize(13);
@@ -1075,6 +1088,8 @@ public class MainActivity extends Activity {
                             nameLabel.setTypeface(null,android.graphics.Typeface.BOLD);
                             info.addView(nameLabel);
                             info.addView(txt(playedCount+" partidos  ·  "+starterCount+" titular  ·  "+benchCount+" suplente",11,0xff75e6b2));
+                            if(verifiedMatches.getOrDefault(item.getKey(),0)>0)
+                                info.addView(txt(verifiedMinutes.getOrDefault(item.getKey(),0)+" min verificados · "+verifiedMatches.get(item.getKey())+" actas",11,0xffa9c4d2));
                             playerRow.addView(txt("›",23,0xff75e6b2));
                             playerRow.setOnClickListener(v->{
                                 LinearLayout details=new LinearLayout(this);
@@ -1085,7 +1100,10 @@ public class MainActivity extends Activity {
                                 details.addView(txt("Partidos con alineación: "+playedCount,14,0xffe2f5fa));
                                 details.addView(txt("Titularidades: "+starterCount,14,0xffe2f5fa));
                                 details.addView(txt("Convocatorias como suplente: "+benchCount,14,0xffe2f5fa));
-                                details.addView(txt("Minutos y anotaciones: pendientes de verificar en los eventos de las actas.",12,0xffa9c4d2));
+                                int mins=verifiedMinutes.getOrDefault(item.getKey(),0);
+                                int checked=verifiedMatches.getOrDefault(item.getKey(),0);
+                                details.addView(txt("Minutos verificados: "+(checked>0?mins+" min en "+checked+" acta(s)":"Sin datos verificables"),14,0xff75e6b2));
+                                details.addView(txt("Los minutos no incluyen partidos sin sustituciones verificables. Anotaciones pendientes de calcular.",12,0xffa9c4d2));
                                 standingColumns3D(details,new String[]{"Partidos","Titular","Suplente"},
                                     new int[]{playedCount,starterCount,benchCount},
                                     new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
