@@ -1068,13 +1068,13 @@ public class MainActivity extends Activity {
                                         org.json.JSONArray simulated=simulation.optJSONArray("teams");
                                         if(simulated==null)return;
                                         java.util.HashMap<String,String> ranges=new java.util.HashMap<>();
-                                        for(int i=0;i<simulated.length();i++){
-                                            org.json.JSONObject item=simulated.optJSONObject(i);
+                                        for(int simIndex=0;simIndex<simulated.length();simIndex++){
+                                            org.json.JSONObject item=simulated.optJSONObject(simIndex);
                                             if(item!=null)ranges.put(item.optString("team"),item.optInt("best")+"–"+item.optInt("worst"));
                                         }
-                                        for(int i=0;i<simulatedCells.size();i++){
-                                            String range=ranges.get(simulatedNames.get(i));
-                                            if(range!=null)simulatedCells.get(i).setText(range);
+                                        for(int cellIndex=0;cellIndex<simulatedCells.size();cellIndex++){
+                                            String range=ranges.get(simulatedNames.get(cellIndex));
+                                            if(range!=null)simulatedCells.get(cellIndex).setText(range);
                                         }
                                         simulationNote.setText("* Puestos observados en 3.000 simulaciones de resultados compatibles. No son cotas matemáticas exhaustivas; desempates y resoluciones FAR pendientes.");
                                     });
