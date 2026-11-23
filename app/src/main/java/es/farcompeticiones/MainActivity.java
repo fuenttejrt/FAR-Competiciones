@@ -1106,7 +1106,7 @@ public class MainActivity extends Activity {
                                             (assured?"ASEGURADA por límite de puntos.":"NO CONFIRMADA.")+
                                             "\n\nEl 100 % en simulaciones no implica garantía matemática.":
                                             "Los porcentajes son estimaciones, no plazas matemáticamente confirmadas.";
-                                    String pending=StandingIntelligence.pendingForTeam(tappedTeam,detailData);
+                                    org.json.JSONArray pending=StandingIntelligence.pendingMatches(tappedTeam,detailData);
                                     android.widget.ScrollView scroll=new android.widget.ScrollView(this);
                                     LinearLayout sections=new LinearLayout(this);
                                     sections.setOrientation(LinearLayout.VERTICAL);
@@ -1114,7 +1114,7 @@ public class MainActivity extends Activity {
                                     scroll.addView(sections);
                                     addAnalysisFolder(sections,"Probabilidades por puesto",probabilities.toString(),true);
                                     addAnalysisFolder(sections,"Clasificación y acceso",qualification,false);
-                                    addAnalysisFolder(sections,"Partidos pendientes",pending,false);
+                                    addPendingMatchFolder(sections,pending);
                                     addAnalysisFolder(sections,"Rivales directos",rivals,false);
                                     addAnalysisFolder(sections,"Cómo se calcula",
                                             "3.000 simulaciones ponderadas por puntos por partido y tanteos anteriores disponibles. Los empates se resuelven aleatoriamente. No son probabilidades oficiales ni sustituyen los desempates FAR.",false);
@@ -1386,6 +1386,47 @@ public class MainActivity extends Activity {
             boolean open=details.getVisibility()!=View.VISIBLE;
             details.setVisibility(open?View.VISIBLE:View.GONE);
             header.setText((open?"▾ ":"▸ ")+title);
+        });
+    }
+
+    private void addPendingMatchFolder(LinearLayout container,org.json.JSONArray matches){
+        LinearLayout group=new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        container.addView(group);
+        TextView header=txt("▸ Partidos pendientes ("+matches.length()+")",14,accent);
+        header.setPadding(dp(8),dp(12),dp(8),dp(12));
+        header.setBackgroundColor(panel);
+        group.addView(header);
+        LinearLayout content=new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(6),dp(8),dp(6),dp(8));
+        content.setVisibility(View.GONE);
+        group.addView(content);
+        if(matches.length()==0){
+            content.addView(txt("No se han encontrado partidos pendientes en el calendario importado.",12,Color.LTGRAY));
+        }
+        for(int index=0;index<matches.length();index++){
+            org.json.JSONObject match=matches.optJSONObject(index);
+            if(match==null)continue;
+            LinearLayout card=new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(12),dp(10),dp(12),dp(10));
+            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+            params.bottomMargin=dp(7);
+            content.addView(card,params);
+            card.setBackgroundColor(panel);
+            String opponent=match.optString("opponent","Rival pendiente");
+            card.addView(txt((index+1)+". "+(match.optBoolean("home")?"Local · ":"Visitante · ")+opponent,13,Color.WHITE));
+            String when=match.optString("when","").trim();
+            String round=match.optString("round","").trim();
+            if(!round.isEmpty())card.addView(txt(round,11,Color.LTGRAY));
+            if(!when.isEmpty())card.addView(txt("Fecha / horario: "+when,11,Color.LTGRAY));
+            card.addView(txt("Puntos posibles en el partido: 0–5 (según resultado y bonus)",11,accent));
+        }
+        header.setOnClickListener(v->{
+            boolean open=content.getVisibility()!=View.VISIBLE;
+            content.setVisibility(open?View.VISIBLE:View.GONE);
+            header.setText((open?"▾ ":"▸ ")+"Partidos pendientes ("+matches.length()+")");
         });
     }
 
