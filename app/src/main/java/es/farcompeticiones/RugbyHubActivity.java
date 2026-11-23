@@ -654,7 +654,7 @@ public final class RugbyHubActivity extends Activity {
     private final class ThreeDChart extends android.view.View {
         private final int[] values;
         private final String[] labels;
-        private final int[] colors={0xff46dca0,0xff52a9f7,0xfff7b84b,0xffd47aff};
+        private final int[] colors={0xff46dca0,0xff52a9f7,0xfff7b84b,0xffd47aff,0xffff7c8c,0xff66d7e9,0xffe8dd78,0xff9cc783};
         private final boolean pie;
         private final android.graphics.Paint p=new android.graphics.Paint(3);
         ThreeDChart(int[] values,String[] labels,boolean pie){
@@ -680,19 +680,19 @@ public final class RugbyHubActivity extends Activity {
             p.setTextAlign(android.graphics.Paint.Align.CENTER);c.drawText(text,x,y,p);
         }
         @Override protected void onMeasure(int w,int h){
-            setMeasuredDimension(android.view.View.MeasureSpec.getSize(w),dp(pie?205:170));
+            setMeasuredDimension(android.view.View.MeasureSpec.getSize(w),dp(pie?170:170));
         }
         @Override protected void onDraw(android.graphics.Canvas canvas){
             super.onDraw(canvas);
             float width=getWidth(),height=getHeight(),density=getResources().getDisplayMetrics().density;
-            canvas.save();canvas.scale(width/360f,height/(pie?205f:170f));
+            canvas.save();canvas.scale(width/360f,height/170f);
             if(pie){
                 int total=0;for(int v:values)total+=Math.max(0,v);
                 if(total<=0){label(canvas,"Sin anotaciones registradas",180,95,15,0xffb6c6d1);canvas.restore();return;}
                 float start=-90;
-                android.graphics.RectF oval=new android.graphics.RectF(65,28,295,147);
+                android.graphics.RectF oval=new android.graphics.RectF(65,15,295,135);
                 for(int depth=18;depth>=1;depth-=2){
-                    android.graphics.RectF base=new android.graphics.RectF(65,28+depth,295,147+depth);
+                    android.graphics.RectF base=new android.graphics.RectF(65,15+depth,295,135+depth);
                     float angle=start;
                     for(int i=0;i<values.length;i++){
                         float sweep=360f*Math.max(0,values[i])/total;
@@ -703,13 +703,9 @@ public final class RugbyHubActivity extends Activity {
                 for(int i=0;i<values.length;i++){
                     float sweep=360f*Math.max(0,values[i])/total;
                     p.setColor(colors[i%colors.length]);canvas.drawArc(oval,start,sweep,true,p);
+                    android.graphics.RectF shine=new android.graphics.RectF(78,20,282,115);
+                    p.setColor(0x22ffffff);canvas.drawArc(shine,start,sweep,true,p);
                     start+=sweep;
-                }
-                float step=360f/Math.max(1,labels.length);
-                for(int i=0;i<labels.length;i++){
-                    p.setColor(colors[i%colors.length]);
-                    canvas.drawCircle(15+i*115,190,5,p);
-                    label(canvas,labels[i]+": "+values[i],64+i*115,194,10,0xffe7f2f8);
                 }
             }else{
                 int max=1;for(int v:values)max=Math.max(max,v);
@@ -753,6 +749,19 @@ public final class RugbyHubActivity extends Activity {
         TextView heading=text(title,14,true);
         heading.setGravity(Gravity.CENTER);box.addView(heading);
         box.addView(new ThreeDChart(values,labels,true));
+        addStatLegend(box,values,labels);
+    }
+    private void addStatLegend(LinearLayout host,int[] values,String[] labels){
+        int total=0;for(int v:values)total+=Math.max(0,v);
+        int[] palette={0xff46dca0,0xff52a9f7,0xfff7b84b,0xffd47aff,0xffff7c8c,0xff66d7e9,0xffe8dd78,0xff9cc783};
+        for(int i=0;i<values.length;i++){
+            if(values[i]<=0)continue;
+            String label=i<labels.length?labels[i]:"Otro";
+            int percent=total==0?0:Math.round(values[i]*100f/total);
+            TextView item=text("●  "+label+"   ·   "+values[i]+" puntos   ("+percent+"%)",12,false);
+            item.setTextColor(palette[i%palette.length]);item.setPadding(dp(8),dp(2),dp(5),dp(2));
+            host.addView(item);
+        }
     }
     private final class ScoreTimeline3D extends android.view.View {
         private final java.util.ArrayList<int[]> events;
@@ -762,7 +771,7 @@ public final class RugbyHubActivity extends Activity {
             setLayerType(android.view.View.LAYER_TYPE_SOFTWARE,null);
         }
         @Override protected void onMeasure(int w,int h){
-            setMeasuredDimension(android.view.View.MeasureSpec.getSize(w),dp(190));
+            setMeasuredDimension(android.view.View.MeasureSpec.getSize(w),dp(200));
         }
         @Override protected void onDraw(android.graphics.Canvas canvas){
             super.onDraw(canvas);
@@ -834,19 +843,24 @@ public final class RugbyHubActivity extends Activity {
             setMeasuredDimension(android.view.View.MeasureSpec.getSize(w),dp(190));
         }
         @Override protected void onDraw(android.graphics.Canvas c){
-            super.onDraw(c);c.save();c.scale(getWidth()/360f,getHeight()/190f);
+            super.onDraw(c);c.save();c.scale(getWidth()/360f,getHeight()/200f);
             int max=1;for(int[] pair:values)for(int v:pair)max=Math.max(max,v);
             paint.setColor(0xff375064);paint.setStrokeWidth(1);c.drawLine(12,145,348,145,paint);
             for(int i=0;i<values.length;i++){
                 float x=20+i*68;
                 for(int j=0;j<2;j++){
-                    float h=values[i][j]*99f/max,top=141-h,bx=x+j*24;
+                    float h=values[i][j]*112f/max,top=141-h,bx=x+j*24;
                     int color=j==0?0xff48dca2:0xff56aaf2;
                     android.graphics.Path side=new android.graphics.Path();
                     side.moveTo(bx+17,top);side.lineTo(bx+24,top-6);
                     side.lineTo(bx+24,135);side.lineTo(bx+17,141);side.close();
                     paint.setColor(j==0?0xff238b68:0xff296ca3);c.drawPath(side,paint);
-                    paint.setColor(color);c.drawRect(bx,top,bx+17,141,paint);
+                    paint.setShader(new android.graphics.LinearGradient(bx,top,bx+17,top,
+                        j==0?0xffa0ffe0:0xffa4dbff,color,android.graphics.Shader.TileMode.CLAMP));
+                    c.drawRect(bx,top,bx+17,141,paint);paint.setShader(null);
+                    android.graphics.Path cap=new android.graphics.Path();
+                    cap.moveTo(bx,top);cap.lineTo(bx+7,top-6);cap.lineTo(bx+24,top-6);
+                    cap.lineTo(bx+17,top);cap.close();paint.setColor(0x88ffffff);c.drawPath(cap,paint);
                     paint.setColor(0xfff1f7fc);paint.setTextSize(11);
                     paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                     c.drawText(""+values[i][j],bx+9,Math.max(15,top-8),paint);
@@ -855,9 +869,9 @@ public final class RugbyHubActivity extends Activity {
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                 c.drawText(labels[i],x+21,160,paint);
             }
-            paint.setTextSize(11);paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setColor(0xff48dca2);c.drawText("● Local",32,183,paint);
-            paint.setColor(0xff56aaf2);c.drawText("● Visitante",195,183,paint);
+            paint.setTextSize(13);paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+            paint.setColor(0xff48dca2);c.drawText("● Local",32,190,paint);
+            paint.setColor(0xff56aaf2);c.drawText("● Visitante",195,190,paint);
             c.restore();
         }
     }
@@ -965,18 +979,16 @@ public final class RugbyHubActivity extends Activity {
         java.util.ArrayList<java.util.Map.Entry<String,Integer>> ordered=
             new java.util.ArrayList<>(numbers.scorers.entrySet());
         java.util.Collections.sort(ordered,(a,b)->Integer.compare(b.getValue(),a.getValue()));
-        int count=Math.min(4,ordered.size());int[] values=new int[count];String[] labels=new String[count];
+        int count=ordered.size();int[] values=new int[count];String[] labels=new String[count];
         for(int i=0;i<count;i++){
             java.util.Map.Entry<String,Integer> e=ordered.get(i);
             values[i]=e.getValue();labels[i]="Nº "+e.getKey();
         }
         card.addView(new ThreeDChart(values,labels,true));
+        addStatLegend(card,values,labels);
         TextView details=text(statScorerDetails(numbers,names),12,false);
         details.setTextColor(0xffbcd0df);card.addView(details);
-        if(ordered.size()>4){
-            TextView more=text("El gráfico muestra los cuatro máximos anotadores; listado completo debajo.",11,false);
-            more.setTextColor(0xffa8bbc9);card.addView(more);
-        }
+
     }
     private String formatScorers(MatchNumbers numbers){
         if(numbers.scorers.isEmpty())return "No se han identificado anotadores.";
