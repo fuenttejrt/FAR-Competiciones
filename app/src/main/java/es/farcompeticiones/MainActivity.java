@@ -818,6 +818,8 @@ public class MainActivity extends Activity {
         final int[] active={0};
         final boolean[] loadingActs={false};
         final java.util.HashSet<String> attemptedActs=new java.util.HashSet<>();
+        final java.util.LinkedHashMap<String,String> actErrors=new java.util.LinkedHashMap<>();
+        final Runnable[] redrawRef=new Runnable[1];
         Runnable redraw=()->{
             content.removeAllViews();
             for(int i=0;i<tabs.getChildCount();i++){
@@ -878,14 +880,18 @@ public class MainActivity extends Activity {
                                 for(String url:missing){
                                     try{
                                         org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);
+                                        if(parsed.optString("lineups","").trim().isEmpty())throw new java.io.IOException("El lector no ha identificado las alineaciones");
                                         actCache.edit().putString(url,parsed.toString()).apply();
-                                    }catch(Exception ignored){}
+                                        actErrors.remove(url);
+                                    }catch(Exception error){
+                                        synchronized(actErrors){actErrors.put(url,error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage()));}
+                                    }
                                 }
                                 runOnUiThread(()->{
                                     loadingActs[0]=false;
                                     if(dialog.isShowing()&&active[0]==3) {
                                         // Refresh the same tab without reopening the dialog.
-                                        tabs.getChildAt(3).performClick();
+                                        if(redrawRef[0]!=null)redrawRef[0].run();
                                     }
                                 });
                             }).start();
@@ -927,6 +933,11 @@ public class MainActivity extends Activity {
                             content.addView(txt(playerName+"  ·  "+item.getValue()+" acta(s)",13,0xffd2e4ef));
                             content.addView(txt("Licencia: "+parts[0]+"  ·  Minutos: sin verificar",11,0xffa9c4d2));
                         }
+                    }
+                    if(!actErrors.isEmpty()){
+                        content.addView(txt("No se pudieron extraer "+actErrors.size()+" actas. Detalle técnico:",12,0xffffb48b));
+                        for(java.util.Map.Entry<String,String> err:actErrors.entrySet())
+                            content.addView(txt(err.getValue(),10,0xffffb48b));
                     }
                     standingSection(content,"Actas y participación");
                     content.addView(txt(actCount+" de "+matches.size()+" partidos con alineación disponible",13,0xffd2e4ef));
@@ -1009,6 +1020,7 @@ public class MainActivity extends Activity {
             tabs.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
             tab.setOnClickListener(v->{active[0]=index;redraw.run();});
         }
+        redrawRef[0]=redraw;
         redraw.run();
         dialog.show();
         android.view.Window window=dialog.getWindow();
