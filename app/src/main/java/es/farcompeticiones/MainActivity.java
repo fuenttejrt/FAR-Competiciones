@@ -879,7 +879,13 @@ public class MainActivity extends Activity {
                         if(actUrl.startsWith("https://farugby.matchready.es/")){
                             TextView open=txt("Consultar acta oficial ›",12,0xff75e6b2);
                             open.setPadding(dp(8),dp(4),dp(8),dp(10));content.addView(open);
-                            open.setOnClickListener(v->startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(actUrl))));
+                            open.setOnClickListener(v->{
+                                android.content.Intent intent=new android.content.Intent(this,RugbyHubActivity.class);
+                                intent.putExtra("far_act_url",actUrl);
+                                intent.putExtra("far_home",match.optString("home",""));
+                                intent.putExtra("far_away",match.optString("away",""));
+                                startActivity(intent);
+                            });
                         }
                     }
                 }else if(matches.isEmpty()){
