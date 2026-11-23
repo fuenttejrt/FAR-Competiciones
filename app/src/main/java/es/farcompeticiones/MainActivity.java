@@ -727,6 +727,53 @@ public class MainActivity extends Activity {
         java.util.Collections.sort(found,(a,b)->Long.compare(matchTimestamp(a,false),matchTimestamp(b,false)));
         return found;
     }
+    private void standingEvolutionChart(LinearLayout target,java.util.ArrayList<Integer> scored,java.util.ArrayList<Integer> conceded){
+        final int n=Math.min(scored.size(),conceded.size());
+        final int[] own=new int[n+1],opp=new int[n+1];
+        for(int i=0;i<n;i++){own[i+1]=own[i]+scored.get(i);opp[i+1]=opp[i]+conceded.get(i);}
+        android.view.View chart=new android.view.View(this){
+            final android.graphics.Paint p=new android.graphics.Paint(3);
+            @Override protected void onDraw(android.graphics.Canvas c){
+                super.onDraw(c);c.save();c.scale(getWidth()/360f,getHeight()/245f);
+                int max=1;for(int i=0;i<=n;i++)max=Math.max(max,Math.max(own[i],opp[i]));
+                p.setColor(0xff456074);p.setStrokeWidth(1);
+                for(int k=0;k<5;k++){
+                    float y=195-k*39;
+                    c.drawLine(34,y,340,y,p);
+                    p.setColor(0xffb9d0dd);p.setTextSize(10);p.setTextAlign(android.graphics.Paint.Align.RIGHT);
+                    c.drawText(String.valueOf(Math.round(max*k/4f)),29,y+4,p);
+                    p.setColor(0xff456074);
+                }
+                for(int j=0;j<2;j++){
+                    int[] series=j==0?own:opp;
+                    int color=j==0?0xff4cdda7:0xff5caefa;
+                    android.graphics.Path path=new android.graphics.Path();
+                    for(int i=0;i<=n;i++){
+                        float x=34+306f*i/Math.max(1,n);
+                        float y=195-156f*series[i]/max;
+                        if(i==0)path.moveTo(x,y);else path.lineTo(x,y);
+                    }
+                    p.setColor(0x66000000);p.setStyle(android.graphics.Paint.Style.STROKE);p.setStrokeWidth(7);
+                    c.save();c.translate(3,4);c.drawPath(path,p);c.restore();
+                    p.setColor(color);p.setStrokeWidth(3.5f);c.drawPath(path,p);
+                    p.setStyle(android.graphics.Paint.Style.FILL);
+                    for(int i=0;i<=n;i++){
+                        float x=34+306f*i/Math.max(1,n),y=195-156f*series[i]/max;
+                        c.drawCircle(x,y,4,p);
+                    }
+                }
+                p.setColor(0xffd6e6f0);p.setTextSize(11);p.setTextAlign(android.graphics.Paint.Align.CENTER);
+                for(int i=0;i<=n;i++)c.drawText(String.valueOf(i),34+306f*i/Math.max(1,n),216,p);
+                c.restore();
+            }
+        };
+        chart.setBackgroundColor(0xff1b2d3f);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(245));
+        lp.setMargins(dp(4),dp(8),dp(4),dp(10));target.addView(chart,lp);
+        TextView legend=txt("● Tantos a favor acumulados     ● Tantos en contra acumulados",11,0xffc8deea);
+        target.addView(legend);
+        target.addView(txt("Eje horizontal: partidos disputados, en orden de fecha",11,0xffa9c4d2));
+    }
     private int[] standingMatchScore(String score){
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d+)\\s*[-–:]\\s*(\\d+)").matcher(score);
         if(!m.find())return null;
@@ -810,15 +857,18 @@ public class MainActivity extends Activity {
                         else{awayPlayed++;awayFor+=pf;if(pf>pa)awayWins++;}
                     }
                     if(active[0]==1){
-                        content.addView(txt("Resultados por orden de fecha · "+pointsFor.size()+" partidos",12,0xffb8d4cc));
+                        content.addView(txt("Evolución acumulada · "+pointsFor.size()+" partidos",12,0xffb8d4cc));
+                        standingEvolutionChart(content,pointsFor,pointsAgainst);
+                        int wins=0,losses=0,draws=0;
                         for(int k=0;k<pointsFor.size();k++){
-                            org.json.JSONObject match=matches.get(k);
-                            String rival=teamKey(team).equals(teamKey(match.optString("home","")))?match.optString("away",""):match.optString("home","");
-                            content.addView(txt((k+1)+". "+rival+" · "+pointsFor.get(k)+"–"+pointsAgainst.get(k),12,Color.WHITE));
-                            standingColumns3D(content,new String[]{"Favor","Contra"},
-                                new int[]{pointsFor.get(k),pointsAgainst.get(k)},
-                                new int[]{0xff48dca2,0xff56aaf2});
+                            int pf=pointsFor.get(k),pa=pointsAgainst.get(k);
+                            if(pf>pa)wins++;else if(pf<pa)losses++;else draws++;
                         }
+                        LinearLayout summary=new LinearLayout(this);content.addView(summary);
+                        standingMetric(summary,String.valueOf(wins),"Victorias");
+                        standingMetric(summary,String.valueOf(draws),"Empates");
+                        standingMetric(summary,String.valueOf(losses),"Derrotas");
+                        content.addView(txt("Los puntos de clasificación por jornada requieren conocer los bonus de cada partido.",11,0xffa9c4d2));
                     }else{
                         LinearLayout pair=new LinearLayout(this);content.addView(pair);
                         standingMetric(pair,String.valueOf(homePlayed),"En casa");
