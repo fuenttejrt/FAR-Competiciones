@@ -1497,8 +1497,8 @@ public class MainActivity extends Activity {
                         int otherGames=Math.max(0,remaining-1);
                         int possibleMax=pointsAfter+5*otherGames;
                         impact.setText("Puntos: "+currentPoints+" → "+pointsAfter+
-                                " (+"+earned+")\\nMáximo restante: "+possibleMax+
-                                "\\nVictoria: 4–5 pts; empate: 2–3 pts; derrota: 0–2 pts, según bonus. "+
+                                " (+"+earned+")\nMáximo restante: "+possibleMax+
+                                "\nVictoria: 4–5 pts; empate: 2–3 pts; derrota: 0–2 pts, según bonus. "+
                                 "La selección usa el mínimo sin bonus.");
                     });
                 }
