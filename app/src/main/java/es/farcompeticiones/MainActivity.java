@@ -792,6 +792,47 @@ public class MainActivity extends Activity {
         try{return new int[]{Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2))};}
         catch(Exception e){return null;}
     }
+    private String substitutionFailureDetail(String lineup,String changes,boolean local,int duration){
+        java.util.HashSet<String> known=new java.util.HashSet<>();
+        java.util.HashSet<String> active=new java.util.HashSet<>();
+        int side=-1;boolean starter=false;
+        java.util.regex.Pattern player=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$");
+        for(String line:lineup.split("\\r?\\n")){
+            String t=line.trim();
+            if(t.equals("EQUIPO LOCAL"))side=0;
+            else if(t.equals("EQUIPO VISITANTE"))side=1;
+            else if(t.startsWith("TITULARES ("))starter=true;
+            else if(t.startsWith("SUPLENTES ("))starter=false;
+            else if(side==(local?0:1)){
+                java.util.regex.Matcher m=player.matcher(t);
+                if(m.matches()){
+                    if(!known.add(m.group(1)))return "Dorsal duplicado en alineación: "+m.group(1);
+                    if(starter)active.add(m.group(1));
+                }
+            }
+        }
+        if(active.isEmpty())return "No se identifican titulares";
+        side=-1;int last=-1;
+        java.util.regex.Pattern change=java.util.regex.Pattern.compile("^\\d+\\. Min (\\d+) · Cambio · Entra nº (\\d+) · Sale nº (\\d+).*$");
+        for(String line:changes.split("\\r?\\n")){
+            String t=line.trim();
+            if(t.matches("(?i)Equipo local:.*"))side=0;
+            else if(t.matches("(?i)Equipo visitante:.*"))side=1;
+            else if(side==(local?0:1)&&t.matches("^\\d+\\. Min .*")){
+                java.util.regex.Matcher m=change.matcher(t);
+                if(!m.matches())return "Formato de cambio no reconocido: "+t;
+                int minute=Integer.parseInt(m.group(1));
+                String in=m.group(2),out=m.group(3);
+                if(minute<last||minute>duration)return "Minuto fuera de orden o del partido: "+minute;
+                if(!known.contains(in)||!known.contains(out))return "Dorsal no identificado: entra "+in+", sale "+out+" (min "+minute+")";
+                if(!active.contains(out))return "Dorsal "+out+" no estaba en campo al salir (min "+minute+")";
+                if(active.contains(in))return "Dorsal "+in+" ya estaba en campo al entrar (min "+minute+")";
+                active.remove(out);active.add(in);last=minute;
+            }
+        }
+        return "Cambios no conciliados; revisar acta oficial";
+    }
+
     /** Calculate only fully traceable playing intervals from an official act. */
     private java.util.Map<String,Integer> verifiedActMinutes(String lineup,String changes,boolean local,int duration){
         if(duration<=0||changes==null||changes.trim().isEmpty())return null;
@@ -1035,7 +1076,7 @@ public class MainActivity extends Activity {
                             if(perAct==null){
                                 String reason=unknownSanction?"Expulsión sin dorsal identificable":
                                     cached.optString("changes","").trim().isEmpty()?"Sin tabla de cambios legible":
-                                    "Sustituciones no conciliadas con la alineación";
+                                    substitutionFailureDetail(lineup,cached.optString("changes",""),local,CompetitionRules.matchMinutes(season,category,selectedCompetition));
                                 minuteActDiagnostics.add("⚠ "+matchLabel+" · "+reason);
                             }else if(excludedPlayers>0){
                                 minuteActDiagnostics.add("◐ "+matchLabel+" · Minutos calculados para "+perAct.size()+" jugadores; "+excludedPlayers+" sancionado(s) pendientes");
