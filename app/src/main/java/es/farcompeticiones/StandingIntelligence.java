@@ -249,6 +249,7 @@ final class StandingIntelligence {
         JSONArray tables=data.optJSONArray("tables");
         if(tables==null)return null;
         java.util.ArrayList<int[]> fixtures=new java.util.ArrayList<>();
+        int[] scoredFor=new int[teams.size()],scoredAgainst=new int[teams.size()],observed=new int[teams.size()];
         java.util.HashSet<String> seen=new java.util.HashSet<>();
         java.util.HashMap<String,Integer> indexes=new java.util.HashMap<>();
         for(int i=0;i<teams.size();i++)indexes.put(key(teams.get(i).name),i);
@@ -261,12 +262,20 @@ final class StandingIntelligence {
             if(games==null)continue;
             for(int j=0;j<games.length();j++){
                 JSONObject game=games.optJSONObject(j);
-                if(game==null||score(game.optString("score","")))continue;
+                if(game==null)continue;
                 String home=key(game.optString("home","")),away=key(game.optString("away",""));
                 Integer h=indexes.get(home),a=indexes.get(away);
                 if(h==null||a==null||h.equals(a))continue;
                 String id=home+"|"+away+"|"+game.optString("when","");
-                if(seen.add(id))fixtures.add(new int[]{h,a});
+                if(!seen.add(id))continue;
+                java.util.regex.Matcher matcher=java.util.regex.Pattern.compile("(\\d+)\\s*[-–:]\\s*(\\d+)").matcher(game.optString("score",""));
+                if(matcher.find()){
+                    try{
+                        int hs=Integer.parseInt(matcher.group(1)),as=Integer.parseInt(matcher.group(2));
+                        scoredFor[h]+=hs;scoredAgainst[h]+=as;observed[h]++;
+                        scoredFor[a]+=as;scoredAgainst[a]+=hs;observed[a]++;
+                    }catch(NumberFormatException ignored){}
+                }else fixtures.add(new int[]{h,a});
             }
         }
         if(fixtures.isEmpty())return null;
@@ -275,14 +284,27 @@ final class StandingIntelligence {
         int[][] positionCounts=new int[count][count];
         java.util.Arrays.fill(best,count);
         java.util.Arrays.fill(worst,1);
-        int[][] outcomes={{5,0},{4,0},{5,1},{4,1},{2,2},{0,5},{0,4},{1,5},{1,4}};
+        double[] strength=new double[count];
+        for(int i=0;i<count;i++){
+            double ppm=teams.get(i).points/(double)Math.max(1,teams.get(i).played);
+            double margin=observed[i]>0?(scoredFor[i]-scoredAgainst[i])/(double)observed[i]:0;
+            strength[i]=ppm+Math.max(-1.5,Math.min(1.5,margin/25.0));
+        }
+        int[][] homeWins={{5,0},{4,0},{5,1},{4,1}};
+        int[][] awayWins={{0,5},{0,4},{1,5},{1,4}};
         java.util.Random random=new java.util.Random(173L);
         for(int trial=0;trial<3000;trial++){
             if(Thread.currentThread().isInterrupted())return null;
             int[] totals=new int[count];
             for(int i=0;i<count;i++)totals[i]=teams.get(i).points;
             for(int[] fixture:fixtures){
-                int[] result=outcomes[random.nextInt(outcomes.length)];
+                double difference=strength[fixture[0]]-strength[fixture[1]];
+                double homeWin=0.08+0.84/(1.0+Math.exp(-difference/1.5));
+                double roll=random.nextDouble();
+                int[] result=roll<0.025?new int[]{2,2}:
+                        roll<0.025+0.975*homeWin?
+                        homeWins[random.nextInt(homeWins.length)]:
+                        awayWins[random.nextInt(awayWins.length)];
                 totals[fixture[0]]+=result[0];
                 totals[fixture[1]]+=result[1];
             }
