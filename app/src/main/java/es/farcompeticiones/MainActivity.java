@@ -956,8 +956,23 @@ public class MainActivity extends Activity {
                             standingSection(content,"Participaciones · gráfico 3D");
                             standingColumns3D(content,chartNames,chartCounts,chartColors);
                         }
-                        standingSection(content,"Plantilla · partidos y convocatorias");
-                        content.addView(txt("Pulsa un jugador para ver su ficha completa.",11,0xffa9c4d2));
+                        standingSection(content,"Plantilla · "+ranking.size()+" jugadores");
+                        android.widget.EditText searchPlayer=new android.widget.EditText(this);
+                        searchPlayer.setSingleLine(true);searchPlayer.setTextSize(13);
+                        searchPlayer.setHint("Buscar nombre o licencia");
+                        searchPlayer.setHintTextColor(0xffa9c4d2);
+                        searchPlayer.setTextColor(0xffe2f5fa);
+                        content.addView(searchPlayer);
+                        android.widget.Spinner playerFilter=new android.widget.Spinner(this);
+                        String[] playerFilters={"Todos","Titulares","Suplentes","Todos los partidos","Mayor participación"};
+                        playerFilter.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,playerFilters));
+                        content.addView(playerFilter);
+                        LinearLayout rosterList=new LinearLayout(this);rosterList.setOrientation(1);content.addView(rosterList);
+                        java.util.ArrayList<android.view.View> playerRows=new java.util.ArrayList<>();
+                        java.util.ArrayList<String> playerSearchKeys=new java.util.ArrayList<>();
+                        java.util.ArrayList<Integer> playerStartCounts=new java.util.ArrayList<>();
+                        java.util.ArrayList<Integer> playerBenchCounts=new java.util.ArrayList<>();
+                        java.util.ArrayList<Integer> playerMatchCounts=new java.util.ArrayList<>();
                         for(java.util.Map.Entry<String,Integer> item:ranking){
                             String[] parts=item.getKey().split("\\|",2);
                             String playerName=parts.length>1?parts[1]:item.getKey();
@@ -975,7 +990,10 @@ public class MainActivity extends Activity {
                             playerRow.setBackground(playerBg);
                             LinearLayout.LayoutParams playerLp=new LinearLayout.LayoutParams(-1,-2);
                             playerLp.setMargins(0,dp(3),0,dp(3));
-                            content.addView(playerRow,playerLp);
+                            rosterList.addView(playerRow,playerLp);
+                            playerRows.add(playerRow);
+                            playerSearchKeys.add((playerName+" "+parts[0]).toLowerCase(java.util.Locale.ROOT));
+                            playerStartCounts.add(starterCount);playerBenchCounts.add(benchCount);playerMatchCounts.add(playedCount);
                             LinearLayout info=new LinearLayout(this);
                             info.setOrientation(1);
                             playerRow.addView(info,new LinearLayout.LayoutParams(0,-2,1));
@@ -994,37 +1012,71 @@ public class MainActivity extends Activity {
                                 details.addView(txt("Titularidades: "+starterCount,14,0xffe2f5fa));
                                 details.addView(txt("Convocatorias como suplente: "+benchCount,14,0xffe2f5fa));
                                 details.addView(txt("Minutos y anotaciones: pendientes de verificar en los eventos de las actas.",12,0xffa9c4d2));
+                                standingColumns3D(details,new String[]{"Partidos","Titular","Suplente"},
+                                    new int[]{playedCount,starterCount,benchCount},
+                                    new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
                                 new android.app.AlertDialog.Builder(this)
                                     .setView(details).setPositiveButton("Cerrar",null).show();
                             });
                         }
+                        Runnable applyPlayerFilter=()->{
+                            String term=searchPlayer.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
+                            int mode=playerFilter.getSelectedItemPosition();
+                            for(int k=0;k<playerRows.size();k++){
+                                boolean show=playerSearchKeys.get(k).contains(term);
+                                if(mode==1)show&=playerStartCounts.get(k)>0;
+                                else if(mode==2)show&=playerBenchCounts.get(k)>0;
+                                else if(mode==3)show&=playerMatchCounts.get(k)==matches.size();
+                                else if(mode==4)show&=playerMatchCounts.get(k)>=Math.max(1,matches.size()-1);
+                                playerRows.get(k).setVisibility(show?android.view.View.VISIBLE:android.view.View.GONE);
+                            }
+                        };
+                        searchPlayer.addTextChangedListener(new android.text.TextWatcher(){
+                            public void beforeTextChanged(CharSequence t,int start,int count,int after){}
+                            public void onTextChanged(CharSequence t,int start,int before,int count){applyPlayerFilter.run();}
+                            public void afterTextChanged(android.text.Editable e){}
+                        });
+                        playerFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
+                            public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){applyPlayerFilter.run();}
+                            public void onNothingSelected(android.widget.AdapterView<?> parent){}
+                        });
                     }
                     if(!actErrors.isEmpty()){
                         content.addView(txt("No se pudieron extraer "+actErrors.size()+" actas. Detalle técnico:",12,0xffffb48b));
                         for(java.util.Map.Entry<String,String> err:actErrors.entrySet())
                             content.addView(txt(err.getValue(),10,0xffffb48b));
                     }
-                    standingSection(content,"Actas y participación");
-                    content.addView(txt(actCount+" de "+matches.size()+" partidos con alineación disponible",13,0xffd2e4ef));
-                    content.addView(txt("Las alineaciones se leen automáticamente desde los PDF oficiales de cada partido.",11,0xff75e6b2));
-                    content.addView(txt("Los minutos individuales se calcularán con las alineaciones, entradas, salidas y reingresos de cada acta. Sin sustituciones verificadas no se asignarán minutos estimados.",12,0xffb8d4cc));
-                    if(matches.isEmpty())content.addView(txt("Todavía no hay partidos oficiales vinculados a este equipo.",12,0xffd2e4ef));
+                    final int displayedActCount=actCount;
+                    TextView actToggle=txt("Actas oficiales · "+displayedActCount+"/"+matches.size()+"  ▾",14,0xff75e6b2);
+                    actToggle.setPadding(dp(10),dp(12),dp(10),dp(12));content.addView(actToggle);
+                    LinearLayout actDetails=new LinearLayout(this);actDetails.setOrientation(1);
+                    actDetails.setVisibility(android.view.View.GONE);content.addView(actDetails);
+                    actToggle.setOnClickListener(v->{
+                        boolean show=actDetails.getVisibility()!=android.view.View.VISIBLE;
+                        actDetails.setVisibility(show?android.view.View.VISIBLE:android.view.View.GONE);
+                        actToggle.setText("Actas oficiales · "+displayedActCount+"/"+matches.size()+(show?"  ▴":"  ▾"));
+                    });
+                    standingSection(actDetails,"Actas y participación");
+                    actDetails.addView(txt(actCount+" de "+matches.size()+" partidos con alineación disponible",13,0xffd2e4ef));
+                    actDetails.addView(txt("Las alineaciones se leen automáticamente desde los PDF oficiales de cada partido.",11,0xff75e6b2));
+                    actDetails.addView(txt("Los minutos individuales se calcularán con las alineaciones, entradas, salidas y reingresos de cada acta. Sin sustituciones verificadas no se asignarán minutos estimados.",12,0xffb8d4cc));
+                    if(matches.isEmpty())actDetails.addView(txt("Todavía no hay partidos oficiales vinculados a este equipo.",12,0xffd2e4ef));
                     for(org.json.JSONObject match:matches){
                         String matchName=match.optString("home","")+"  "+match.optString("score","")+"  "+match.optString("away","");
                         org.json.JSONObject act=match.optJSONObject("acta");
-                        content.addView(txt(matchName,12,Color.WHITE));
+                        actDetails.addView(txt(matchName,12,Color.WHITE));
                         String side=teamKey(team).equals(teamKey(match.optString("home","")))?"Local":"Visitante";
                         org.json.JSONArray starters=act==null?null:act.optJSONArray("titulares"+side);
                         org.json.JSONArray substitutes=act==null?null:act.optJSONArray("suplentes"+side);
                         if(starters!=null||substitutes!=null){
                             int a=starters==null?0:starters.length(),b=substitutes==null?0:substitutes.length();
-                            content.addView(txt(a+" titulares · "+b+" suplentes · minutos pendientes de validar",11,0xff75e6b2));
-                        }else if(actCache.contains(match.optString("actUrl","")))content.addView(txt("Alineación oficial incorporada al recuento de jugadores",11,0xff75e6b2));
-                        else content.addView(txt("Alineación oficial pendiente de lectura",11,0xffa9c4d2));
+                            actDetails.addView(txt(a+" titulares · "+b+" suplentes · minutos pendientes de validar",11,0xff75e6b2));
+                        }else if(actCache.contains(match.optString("actUrl","")))actDetails.addView(txt("Alineación oficial incorporada al recuento de jugadores",11,0xff75e6b2));
+                        else actDetails.addView(txt("Alineación oficial pendiente de lectura",11,0xffa9c4d2));
                         String actUrl=match.optString("actUrl","");
                         if(actUrl.startsWith("https://farugby.matchready.es/")){
                             TextView open=txt("Consultar acta oficial ›",12,0xff75e6b2);
-                            open.setPadding(dp(8),dp(4),dp(8),dp(10));content.addView(open);
+                            open.setPadding(dp(8),dp(4),dp(8),dp(10));actDetails.addView(open);
                             open.setOnClickListener(v->{
                                 android.content.Intent intent=new android.content.Intent(this,RugbyHubActivity.class);
                                 intent.putExtra("far_act_url",actUrl);
