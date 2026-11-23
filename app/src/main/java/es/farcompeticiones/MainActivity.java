@@ -1075,8 +1075,16 @@ public class MainActivity extends Activity {
                                             String minuteLabel=minuteMatcher.find()?minuteMatcher.group(1):"?";
                                             java.util.regex.Matcher typeMatcher=java.util.regex.Pattern.compile("Tipo ([A-E])").matcher(ct);
                                             String typeLabel=typeMatcher.find()?typeMatcher.group(1):"?";
+                                            int sanctionDuration=CompetitionRules.temporarySuspensionMinutes(season,category);
+                                            String sanctionEnd="?";
+                                            if(keyName.equals("temporaryCards")&&sanctionDuration>0&&!minuteLabel.equals("?")){
+                                                int startMinute=Integer.parseInt(minuteLabel);
+                                                int matchDuration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
+                                                sanctionEnd=String.valueOf(Math.min(matchDuration,startMinute+sanctionDuration));
+                                            }
                                             sanctionDetails.add((keyName.equals("temporaryCards")?"Temporal":"Definitiva")
-                                                +" · dorsal "+dm.group(1)+" · minuto "+minuteLabel+" · código "+typeLabel);
+                                                +" · dorsal "+dm.group(1)+" · minuto "+minuteLabel+" · código "+typeLabel
+                                                +(keyName.equals("temporaryCards")&&sanctionDuration>0?" · sanción 5 min (FER M14, regla 9.29) · fin reglamentario min "+sanctionEnd:""));
                                         }else unknownSanction=true;
                                     }
                                 }
@@ -1117,7 +1125,7 @@ public class MainActivity extends Activity {
                                 minuteActDiagnostics.add("✓ "+matchLabel+" · "+CompetitionRules.matchMinutes(season,category,selectedCompetition)+" min analizados");
                             }
                             for(String detail:sanctionDetails)
-                                minuteActDiagnostics.add("    ↳ "+matchLabel+" · "+detail+" · descuento pendiente de circular");
+                                minuteActDiagnostics.add("    ↳ "+matchLabel+" · "+detail+" · reincorporación no confirmada");
                             if(perAct!=null){
                                 minuteActCount[0]++;
                                 for(java.util.Map.Entry<String,Integer> e:perAct.entrySet()){
