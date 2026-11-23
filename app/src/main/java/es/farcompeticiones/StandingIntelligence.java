@@ -147,6 +147,7 @@ final class StandingIntelligence {
                 if(home.isEmpty()||away.isEmpty()||home.equals(away))continue;
                 String id=home+"|"+away+"|"+game.optString("when","");
                 if(!unique.add(id))continue;
+                fixtures.add(new String[]{home,away});
                 pending.put(home,pending.containsKey(home)?pending.get(home)+1:1);
                 pending.put(away,pending.containsKey(away)?pending.get(away)+1:1);
             }
@@ -181,6 +182,7 @@ final class StandingIntelligence {
         java.util.HashMap<String,Integer> pending=new java.util.HashMap<>();
         java.util.HashSet<String> unique=new java.util.HashSet<>();
         int validTables=0;
+        java.util.ArrayList<String[]> fixtures=new java.util.ArrayList<>();
         for(int i=0;i<tables.length();i++){
             JSONObject table=tables.optJSONObject(i);
             if(table==null||!"matches".equals(table.optString("kind")))continue;
@@ -211,9 +213,27 @@ final class StandingIntelligence {
                 for(Team other:teams){
                     if(other==team)continue;
                     int otherRemaining=pending.containsKey(key(other.name))?pending.get(key(other.name)):0;
-                    // En igualdad de puntos, el desempate desconocido puede perjudicar al equipo.
+                    // Considerar que los dos equipos no pueden ganar a la vez
+                    // un enfrentamiento directo. Conservar un margen favorable al
+                    // rival ante posibles bonus y empates no resueltos.
+                    int shared=0;
+                    for(String[] fixture:fixtures){
+                        boolean a=fixture[0].equals(key(team.name))||fixture[1].equals(key(team.name));
+                        boolean b=fixture[0].equals(key(other.name))||fixture[1].equals(key(other.name));
+                        if(a&&b)shared++;
+                    }
+                    // Para superar al rival, este puede sumar como maximo 1 punto
+                    // en los partidos directos que gane nuestro equipo (bonus derrota).
+                    int rivalMaximumWhenTeamWins=other.points+5*(otherRemaining-shared)+shared;
+                    // Para superar al rival, nuestro equipo puede sumar como maximo
+                    // 1 punto en los partidos directos que gane el rival.
+                    int teamMaximumWhenRivalWins=team.points+5*(remaining-shared)+shared;
                     if(other.points>=maximum)best++;
+                    else if(shared>0 && other.points>rivalMaximumWhenTeamWins
+                            && other.points>=maximum)best++;
                     if(other.points+5*otherRemaining>=team.points)worst++;
+                    // Los limites siguen siendo conservadores: un partido directo
+                    // no puede computarse como victoria simultanea de ambos.
                 }
                 JSONObject line=new JSONObject();
                 line.put("team",team.name);
