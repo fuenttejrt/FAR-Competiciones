@@ -147,7 +147,7 @@ final class StandingIntelligence {
                 if(home.isEmpty()||away.isEmpty()||home.equals(away))continue;
                 String id=home+"|"+away+"|"+game.optString("when","");
                 if(!unique.add(id))continue;
-                fixtures.add(new String[]{home,away});
+
                 pending.put(home,pending.containsKey(home)?pending.get(home)+1:1);
                 pending.put(away,pending.containsKey(away)?pending.get(away)+1:1);
             }
