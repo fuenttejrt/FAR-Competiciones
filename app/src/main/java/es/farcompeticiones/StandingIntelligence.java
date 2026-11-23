@@ -213,27 +213,10 @@ final class StandingIntelligence {
                 for(Team other:teams){
                     if(other==team)continue;
                     int otherRemaining=pending.containsKey(key(other.name))?pending.get(key(other.name)):0;
-                    // Considerar que los dos equipos no pueden ganar a la vez
-                    // un enfrentamiento directo. Conservar un margen favorable al
-                    // rival ante posibles bonus y empates no resueltos.
-                    int shared=0;
-                    for(String[] fixture:fixtures){
-                        boolean a=fixture[0].equals(key(team.name))||fixture[1].equals(key(team.name));
-                        boolean b=fixture[0].equals(key(other.name))||fixture[1].equals(key(other.name));
-                        if(a&&b)shared++;
-                    }
-                    // Para superar al rival, este puede sumar como maximo 1 punto
-                    // en los partidos directos que gane nuestro equipo (bonus derrota).
-                    int rivalMaximumWhenTeamWins=other.points+5*(otherRemaining-shared)+shared;
-                    // Para superar al rival, nuestro equipo puede sumar como maximo
-                    // 1 punto en los partidos directos que gane el rival.
-                    int teamMaximumWhenRivalWins=team.points+5*(remaining-shared)+shared;
+                    // Cotas matematicas conservadoras: el calendario puede
+                    // estrecharse en fases posteriores con un solucionador exacto.
                     if(other.points>=maximum)best++;
-                    else if(shared>0 && other.points>rivalMaximumWhenTeamWins
-                            && other.points>=maximum)best++;
                     if(other.points+5*otherRemaining>=team.points)worst++;
-                    // Los limites siguen siendo conservadores: un partido directo
-                    // no puede computarse como victoria simultanea de ambos.
                 }
                 JSONObject line=new JSONObject();
                 line.put("team",team.name);
@@ -242,6 +225,32 @@ final class StandingIntelligence {
                 line.put("maximum",maximum);
                 line.put("best",best);
                 line.put("worst",worst);
+                // Escenarios compatibles: un unico resultado para cada partido
+                // actualiza simultaneamente a sus dos participantes.
+                int observedBest=teams.size(),observedWorst=1;
+                java.util.Random random=new java.util.Random(173L);
+                int[][] outcomes={{5,0},{4,0},{5,1},{4,1},{2,2},{0,5},{0,4},{1,5},{1,4}};
+                for(int trial=0;trial<3000;trial++){
+                    java.util.HashMap<String,Integer> totals=new java.util.HashMap<>();
+                    for(Team current:teams)totals.put(key(current.name),current.points);
+                    for(String[] fixture:fixtures){
+                        int[] points=outcomes[random.nextInt(outcomes.length)];
+                        if(totals.containsKey(fixture[0]))totals.put(fixture[0],totals.get(fixture[0])+points[0]);
+                        if(totals.containsKey(fixture[1]))totals.put(fixture[1],totals.get(fixture[1])+points[1]);
+                    }
+                    int own=totals.get(key(team.name));
+                    int rankLow=1,rankHigh=1;
+                    for(Team rival:teams){
+                        if(rival==team)continue;
+                        int value=totals.get(key(rival.name));
+                        if(value>own)rankLow++;
+                        if(value>=own)rankHigh++;
+                    }
+                    if(rankLow<observedBest)observedBest=rankLow;
+                    if(rankHigh>observedWorst)observedWorst=rankHigh;
+                }
+                line.put("scenarioBest",observedBest);
+                line.put("scenarioWorst",observedWorst);
                 lines.put(line);
             }
             result.put("teams",lines);
