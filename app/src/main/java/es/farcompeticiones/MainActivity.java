@@ -1067,7 +1067,7 @@ public class MainActivity extends Activity {
                                         if(rank<5&&selectedCompetition.equals("Primera División"))direct+=occurrences;
                                         message.append(rank+1).append(".º puesto: ").append(String.format(java.util.Locale.getDefault(),"%.1f",occurrences*100.0/3000.0)).append("%\\n");
                                     }
-                                    if(simCompetitionIsFirstDivision())message.append("\\nAcceso directo (1.º–5.º): ").append(String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0)).append("%");
+                                    if(selectedCompetition.equals("Primera División"))message.append("\\nAcceso directo (1.º–5.º): ").append(String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0)).append("%");
                                     message.append("\\n\\nEstimaciones de 3.000 simulaciones con resultados equiprobables y desempates aleatorios. No son probabilidades oficiales de la FAR.");
                                     new android.app.AlertDialog.Builder(this).setTitle(tappedTeam+" · Escenarios").setMessage(message.toString()).setPositiveButton("Cerrar",null).show();
                                 });
