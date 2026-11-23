@@ -651,39 +651,108 @@ public final class RugbyHubActivity extends Activity {
         label.setPadding(0,dp(15),0,dp(7));
         host.addView(label);
     }
+    private final class ThreeDChart extends android.view.View {
+        private final int[] values;
+        private final String[] labels;
+        private final int[] colors={0xff46dca0,0xff52a9f7,0xfff7b84b,0xffd47aff};
+        private final boolean pie;
+        private final android.graphics.Paint p=new android.graphics.Paint(3);
+        ThreeDChart(int[] values,String[] labels,boolean pie){
+            super(RugbyHubActivity.this);
+            this.values=values;this.labels=labels;this.pie=pie;
+            setLayerType(android.view.View.LAYER_TYPE_SOFTWARE,null);
+        }
+        private int shade(int color,float factor){
+            return android.graphics.Color.rgb(
+                Math.min(255,(int)(android.graphics.Color.red(color)*factor)),
+                Math.min(255,(int)(android.graphics.Color.green(color)*factor)),
+                Math.min(255,(int)(android.graphics.Color.blue(color)*factor)));
+        }
+        private void polygon(android.graphics.Canvas c,int color,float... xy){
+            android.graphics.Path path=new android.graphics.Path();
+            path.moveTo(xy[0],xy[1]);
+            for(int i=2;i<xy.length;i+=2)path.lineTo(xy[i],xy[i+1]);
+            path.close();p.setColor(color);p.setStyle(android.graphics.Paint.Style.FILL);
+            c.drawPath(path,p);
+        }
+        private void label(android.graphics.Canvas c,String text,float x,float y,float size,int color){
+            p.setColor(color);p.setTextSize(size);p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            p.setTextAlign(android.graphics.Paint.Align.CENTER);c.drawText(text,x,y,p);
+        }
+        @Override protected void onMeasure(int w,int h){
+            setMeasuredDimension(android.view.View.MeasureSpec.getSize(w),dp(pie?205:170));
+        }
+        @Override protected void onDraw(android.graphics.Canvas canvas){
+            super.onDraw(canvas);
+            float width=getWidth(),height=getHeight(),density=getResources().getDisplayMetrics().density;
+            canvas.save();canvas.scale(width/360f,height/(pie?205f:170f));
+            if(pie){
+                int total=0;for(int v:values)total+=Math.max(0,v);
+                if(total<=0){label(canvas,"Sin anotaciones registradas",180,95,15,0xffb6c6d1);canvas.restore();return;}
+                float start=-90;
+                android.graphics.RectF oval=new android.graphics.RectF(65,28,295,147);
+                for(int depth=18;depth>=1;depth-=2){
+                    android.graphics.RectF base=new android.graphics.RectF(65,28+depth,295,147+depth);
+                    float angle=start;
+                    for(int i=0;i<values.length;i++){
+                        float sweep=360f*Math.max(0,values[i])/total;
+                        p.setColor(shade(colors[i%colors.length],0.58f));canvas.drawArc(base,angle,sweep,true,p);
+                        angle+=sweep;
+                    }
+                }
+                for(int i=0;i<values.length;i++){
+                    float sweep=360f*Math.max(0,values[i])/total;
+                    p.setColor(colors[i%colors.length]);canvas.drawArc(oval,start,sweep,true,p);
+                    start+=sweep;
+                }
+                float step=360f/Math.max(1,labels.length);
+                for(int i=0;i<labels.length;i++){
+                    p.setColor(colors[i%colors.length]);
+                    canvas.drawCircle(15+i*115,190,5,p);
+                    label(canvas,labels[i]+": "+values[i],64+i*115,194,10,0xffe7f2f8);
+                }
+            }else{
+                int max=1;for(int v:values)max=Math.max(max,v);
+                p.setColor(0xff31495b);p.setStrokeWidth(1);
+                canvas.drawLine(24,137,335,137,p);
+                for(int i=0;i<values.length;i++){
+                    float x=75+i*160,w=65,depth=14;
+                    float h=values[i]*92f/max;
+                    float top=132-h;
+                    int color=colors[i%colors.length];
+                    polygon(canvas,shade(color,0.63f),x+w,top,x+w+depth,top-10,x+w+depth,132-10,x+w,132);
+                    polygon(canvas,shade(color,1.18f),x,top,x+depth,top-10,x+w+depth,top-10,x+w,top);
+                    p.setShader(new android.graphics.LinearGradient(x,top,x+w,top,
+                        shade(color,1.07f),shade(color,0.80f),android.graphics.Shader.TileMode.CLAMP));
+                    canvas.drawRect(x,top,x+w,132,p);p.setShader(null);
+                    label(canvas,String.valueOf(values[i]),x+w/2,Math.max(18,top-16),17,0xffffffff);
+                    label(canvas,labels[i],x+w/2+5,158,12,0xffe7f2f8);
+                }
+            }
+            canvas.restore();
+        }
+    }
     private void addStatCompare(LinearLayout host,String label,int local,int visitor,int max){
         LinearLayout box=new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12),dp(10),dp(12),dp(10));
+        box.setPadding(dp(8),dp(8),dp(8),dp(8));
         box.setBackgroundColor(0xff1b2d3f);
         LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
-        params.bottomMargin=dp(6);host.addView(box,params);
-        TextView heading=text(local+"    "+label+"    "+visitor,13,true);
+        params.bottomMargin=dp(7);host.addView(box,params);
+        TextView heading=text(label,14,true);
         heading.setGravity(Gravity.CENTER);box.addView(heading);
-        LinearLayout bars=new LinearLayout(this);
-        bars.setOrientation(LinearLayout.HORIZONTAL);
-        bars.setPadding(0,dp(7),0,0);
-        box.addView(bars);
-        int scale=Math.max(1,Math.max(max,Math.max(local,visitor)));
-        for(int i=0;i<2;i++){
-            int value=i==0?local:visitor;
-            LinearLayout track=new LinearLayout(this);
-            track.setOrientation(LinearLayout.HORIZONTAL);
-            track.setBackgroundColor(0xff101c28);
-            LinearLayout.LayoutParams trackParams=new LinearLayout.LayoutParams(0,dp(14),1);
-            if(i==0)trackParams.rightMargin=dp(4);else trackParams.leftMargin=dp(4);
-            bars.addView(track,trackParams);
-            android.view.View fill=new android.view.View(this);
-            android.graphics.drawable.GradientDrawable gradient=new android.graphics.drawable.GradientDrawable(
-                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
-                i==0?new int[]{0xffa0e8c8,0xff239568}:new int[]{0xff91c9ff,0xff29649a});
-            gradient.setCornerRadius(dp(4));
-            fill.setBackground(gradient);
-            fill.setElevation(dp(3));
-            track.addView(fill,new LinearLayout.LayoutParams(0,-1,Math.max(0.001f,value/(float)scale)));
-            android.view.View rest=new android.view.View(this);
-            track.addView(rest,new LinearLayout.LayoutParams(0,-1,Math.max(0.001f,1f-value/(float)scale)));
-        }
+        box.addView(new ThreeDChart(new int[]{local,visitor},new String[]{"Local","Visitante"},false));
+    }
+    private void addStatPie(LinearLayout host,String title,int[] values,String[] labels){
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8),dp(8),dp(8),dp(8));
+        box.setBackgroundColor(0xff1b2d3f);
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+        params.bottomMargin=dp(7);host.addView(box,params);
+        TextView heading=text(title,14,true);
+        heading.setGravity(Gravity.CENTER);box.addView(heading);
+        box.addView(new ThreeDChart(values,labels,true));
     }
     private void showActMatchStatistics(android.widget.ScrollView scroll,String scoreboard,
             String discipline,String changes,String home,String away){
@@ -710,6 +779,8 @@ public final class RugbyHubActivity extends Activity {
         addStatCompare(host,"Transformaciones",local.conversions,visitor.conversions,1);
         addStatCompare(host,"Golpes de castigo",local.penalties,visitor.penalties,1);
         addStatCompare(host,"Drops",local.drops,visitor.drops,1);
+        addStatTitle(host,"Distribución de puntos por equipo");
+        addStatPie(host,"Puntos identificados",new int[]{local.points,visitor.points},new String[]{"Local","Visitante"});
         addStatTitle(host,"Actividad del partido");
         addStatCompare(host,"Sustituciones",local.changes,visitor.changes,1);
         addStatTitle(host,"Anotadores por dorsal");
