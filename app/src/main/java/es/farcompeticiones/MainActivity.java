@@ -567,6 +567,74 @@ public class MainActivity extends Activity {
         }
         return "";
     }
+
+    private int standingNumber(String value){
+        try{return Integer.parseInt(value.trim().replaceAll("[^0-9-]",""));}
+        catch(Exception ignored){return 0;}
+    }
+    private void standingBar(LinearLayout container,String label,int value,int max,int color){
+        TextView caption=txt(label+"  ·  "+value,13,Color.WHITE);
+        container.addView(caption);
+        android.widget.FrameLayout track=new android.widget.FrameLayout(this);
+        android.graphics.drawable.GradientDrawable base=new android.graphics.drawable.GradientDrawable();
+        base.setColor(0xff152a39);base.setCornerRadius(dp(9));
+        track.setBackground(base);
+        LinearLayout.LayoutParams trackLp=new LinearLayout.LayoutParams(-1,dp(22));
+        trackLp.setMargins(dp(12),0,dp(12),dp(8));
+        container.addView(track,trackLp);
+        android.view.View fill=new android.view.View(this);
+        android.graphics.drawable.GradientDrawable shine=new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{0xffe2fff3,color,0xff165b49});
+        shine.setCornerRadius(dp(8));
+        fill.setBackground(shine);
+        fill.setElevation(dp(3));
+        track.addView(fill,new android.widget.FrameLayout.LayoutParams(0,-1));
+        track.post(()->{
+            android.view.ViewGroup.LayoutParams lp=fill.getLayoutParams();
+            lp.width=Math.max(value>0?dp(5):0,(int)((long)track.getWidth()*Math.max(0,value)/Math.max(1,max)));
+            fill.setLayoutParams(lp);
+        });
+    }
+    private void showStandingTeamStatistics(String team,String[] values){
+        android.app.Dialog dialog=new android.app.Dialog(this);
+        android.widget.ScrollView scroll=new android.widget.ScrollView(this);
+        LinearLayout content=new LinearLayout(this);
+        content.setOrientation(1);
+        content.setPadding(dp(12),dp(12),dp(12),dp(18));
+        content.setBackgroundColor(0xff203447);
+        scroll.addView(content);
+        dialog.setContentView(scroll);
+        TextView title=txt(team+" · ESTADÍSTICAS",19,0xff66e1a4);
+        title.setTypeface(null,android.graphics.Typeface.BOLD);
+        content.addView(title);
+        content.addView(txt("Temporada "+season+" · "+selectedCompetition,12,0xffb8d4cc));
+        String[] names={"Jugados","Ganados","Empatados","Perdidos","Tantos a favor",
+            "Tantos en contra","Diferencia","Ensayos a favor","Ensayos en contra",
+            "Bonus ofensivo","Bonus defensivo"};
+        for(int i=0;i<names.length;i++){
+            content.addView(txt(names[i]+": "+values[i+2],13,Color.WHITE));
+        }
+        content.addView(txt("GRÁFICOS DE TEMPORADA",16,0xff66e1a4));
+        int played=Math.max(1,standingNumber(values[2]));
+        standingBar(content,"Victorias",standingNumber(values[3]),played,0xff38c989);
+        standingBar(content,"Empates",standingNumber(values[4]),played,0xfff3c56d);
+        standingBar(content,"Derrotas",standingNumber(values[5]),played,0xffe77878);
+        int maxTantos=Math.max(1,Math.max(standingNumber(values[6]),standingNumber(values[7])));
+        standingBar(content,"Tantos a favor",standingNumber(values[6]),maxTantos,0xff38c989);
+        standingBar(content,"Tantos en contra",standingNumber(values[7]),maxTantos,0xffe77878);
+        int maxEnsayos=Math.max(1,Math.max(standingNumber(values[9]),standingNumber(values[10])));
+        standingBar(content,"Ensayos a favor",standingNumber(values[9]),maxEnsayos,0xff38c989);
+        standingBar(content,"Ensayos en contra",standingNumber(values[10]),maxEnsayos,0xffe77878);
+        TextView close=txt("CERRAR  ×",15,0xff66e1a4);
+        close.setGravity(android.view.Gravity.CENTER);
+        close.setOnClickListener(v->dialog.dismiss());
+        content.addView(close);
+        dialog.show();
+        android.view.Window window=dialog.getWindow();
+        if(window!=null)window.setLayout(getResources().getDisplayMetrics().widthPixels-dp(22),
+            getResources().getDisplayMetrics().heightPixels-dp(80));
+    }
     void addStandingTeam(LinearLayout parent,String team,String crest,int width){
         LinearLayout fixed=new LinearLayout(this);
         fixed.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -975,6 +1043,23 @@ public class MainActivity extends Activity {
                     String crest=row.optString("crest","");
                     if(!crest.startsWith("https://"))crest=crestFromMatches(data,vals[1]);
                     addStandingTeam(line,vals[1],crest,(int)(getResources().getDisplayMetrics().density*168));
+                    // The real classification is rendered by MainActivity, not RugbyHubActivity.
+                    // Attach the interaction to the exact team cell (crest AND name).
+                    final String selectedStandingTeam=vals[1];
+                    final String[] selectedStandingValues=vals.clone();
+                    android.view.View teamCell=line.getChildAt(line.getChildCount()-1);
+                    teamCell.setClickable(true);
+                    teamCell.setFocusable(true);
+                    teamCell.setContentDescription("Ver estadísticas de "+selectedStandingTeam);
+                    teamCell.setOnClickListener(v->showStandingTeamStatistics(selectedStandingTeam,selectedStandingValues));
+                    if(teamCell instanceof android.view.ViewGroup){
+                        android.view.ViewGroup teamChildren=(android.view.ViewGroup)teamCell;
+                        for(int child=0;child<teamChildren.getChildCount();child++){
+                            android.view.View target=teamChildren.getChildAt(child);
+                            target.setClickable(true);
+                            target.setOnClickListener(v->showStandingTeamStatistics(selectedStandingTeam,selectedStandingValues));
+                        }
+                    }
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
                     scroller.setHorizontalScrollBarEnabled(false);
                     scroller.setClipToPadding(true);
