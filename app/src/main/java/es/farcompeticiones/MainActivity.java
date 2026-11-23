@@ -1067,8 +1067,24 @@ public class MainActivity extends Activity {
                                         if(rank<5&&selectedCompetition.equals("Primera División"))direct+=occurrences;
                                         message.append(rank+1).append(".º puesto: ").append(String.format(java.util.Locale.getDefault(),"%.1f",occurrences*100.0/3000.0)).append("%\n");
                                     }
-                                    if(selectedCompetition.equals("Primera División"))message.append("\nAcceso directo (1.º–5.º): ").append(String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0)).append("%");
-                                    message.append("\n\nEstimaciones de 3.000 simulaciones ponderadas por puntos por partido y tanteos previos disponibles, con desempates aleatorios. Modelo orientativo, no probabilidades oficiales de la FAR.");
+                                    if(selectedCompetition.equals("Primera División")){
+                                        message.append("\\nAcceso directo estimado (1.º–5.º): ")
+                                                .append(String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0)).append("%");
+                                        // Certificacion conservadora: si menos de cinco rivales
+                                        // pueden alcanzar los puntos actuales, no puede acabar sexto.
+                                        int possibleAhead=0;
+                                        int currentPoints=option.optInt("points");
+                                        for(int rivalIndex=0;rivalIndex<options.length();rivalIndex++){
+                                            org.json.JSONObject rival=options.optJSONObject(rivalIndex);
+                                            if(rival==null||rival==option)continue;
+                                            if(rival.optInt("maximum")>=currentPoints)possibleAhead++;
+                                        }
+                                        if(possibleAhead<5)
+                                            message.append("\\nClasificación matemática: ASEGURADA por límite de puntos.");
+                                        else
+                                            message.append("\\nClasificación matemática: NO CONFIRMADA.");
+                                    }
+                                    message.append("\n\nEstimaciones de 3.000 simulaciones ponderadas por puntos por partido y tanteos previos disponibles, con desempates aleatorios. Un 100 % simulado no equivale a clasificación matemática asegurada. Modelo orientativo, no probabilidades oficiales de la FAR.");
                                     new android.app.AlertDialog.Builder(this).setTitle(tappedTeam+" · Escenarios").setMessage(message.toString()).setPositiveButton("Cerrar",null).show();
                                 });
                                 simulatedNames.add(option.optString("team"));
