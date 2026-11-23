@@ -957,12 +957,46 @@ public class MainActivity extends Activity {
                             standingColumns3D(content,chartNames,chartCounts,chartColors);
                         }
                         standingSection(content,"Plantilla · partidos y convocatorias");
+                        content.addView(txt("Pulsa un jugador para ver su ficha completa.",11,0xffa9c4d2));
                         for(java.util.Map.Entry<String,Integer> item:ranking){
                             String[] parts=item.getKey().split("\\|",2);
                             String playerName=parts.length>1?parts[1]:item.getKey();
-                            content.addView(txt(playerName,14,0xffd2e4ef));
-                            content.addView(txt("Partidos: "+item.getValue()+"   ·   Titular: "+starts.getOrDefault(item.getKey(),0)+"   ·   Suplente: "+benches.getOrDefault(item.getKey(),0),12,0xff75e6b2));
-                            content.addView(txt("Licencia: "+parts[0]+"   ·   Minutos pendientes",11,0xffa9c4d2));
+                            int playedCount=item.getValue();
+                            int starterCount=starts.getOrDefault(item.getKey(),0);
+                            int benchCount=benches.getOrDefault(item.getKey(),0);
+                            LinearLayout playerRow=new LinearLayout(this);
+                            playerRow.setOrientation(LinearLayout.HORIZONTAL);
+                            playerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                            playerRow.setPadding(dp(11),dp(8),dp(10),dp(8));
+                            android.graphics.drawable.GradientDrawable playerBg=new android.graphics.drawable.GradientDrawable();
+                            playerBg.setColor(0xff203c4f);
+                            playerBg.setCornerRadius(dp(11));
+                            playerBg.setStroke(dp(1),0xff345c6b);
+                            playerRow.setBackground(playerBg);
+                            LinearLayout.LayoutParams playerLp=new LinearLayout.LayoutParams(-1,-2);
+                            playerLp.setMargins(0,dp(3),0,dp(3));
+                            content.addView(playerRow,playerLp);
+                            LinearLayout info=new LinearLayout(this);
+                            info.setOrientation(1);
+                            playerRow.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+                            TextView nameLabel=txt(playerName,13,0xffe2f5fa);
+                            nameLabel.setTypeface(null,android.graphics.Typeface.BOLD);
+                            info.addView(nameLabel);
+                            info.addView(txt(playedCount+" partidos  ·  "+starterCount+" titular  ·  "+benchCount+" suplente",11,0xff75e6b2));
+                            playerRow.addView(txt("›",23,0xff75e6b2));
+                            playerRow.setOnClickListener(v->{
+                                LinearLayout details=new LinearLayout(this);
+                                details.setOrientation(1);
+                                details.setPadding(dp(20),dp(12),dp(20),dp(8));
+                                details.addView(txt(playerName,19,0xff75e6b2));
+                                details.addView(txt("Licencia: "+parts[0],12,0xffb8d4cc));
+                                details.addView(txt("Partidos con alineación: "+playedCount,14,0xffe2f5fa));
+                                details.addView(txt("Titularidades: "+starterCount,14,0xffe2f5fa));
+                                details.addView(txt("Convocatorias como suplente: "+benchCount,14,0xffe2f5fa));
+                                details.addView(txt("Minutos y anotaciones: pendientes de verificar en los eventos de las actas.",12,0xffa9c4d2));
+                                new android.app.AlertDialog.Builder(this)
+                                    .setView(details).setPositiveButton("Cerrar",null).show();
+                            });
                         }
                     }
                     if(!actErrors.isEmpty()){
