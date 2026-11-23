@@ -1402,26 +1402,60 @@ public class MainActivity extends Activity {
         content.setPadding(dp(6),dp(8),dp(6),dp(8));
         content.setVisibility(View.GONE);
         group.addView(content);
-        if(matches.length()==0){
+        if(matches.length()==0)
             content.addView(txt("No se han encontrado partidos pendientes en el calendario importado.",12,Color.LTGRAY));
-        }
+
+        // Mantener el orden del calendario y agrupar por jornada real,
+        // sin fusionar encuentros repetidos de distintas fechas.
+        java.util.LinkedHashMap<String,java.util.ArrayList<org.json.JSONObject>> grouped=new java.util.LinkedHashMap<>();
         for(int index=0;index<matches.length();index++){
             org.json.JSONObject match=matches.optJSONObject(index);
             if(match==null)continue;
-            LinearLayout card=new LinearLayout(this);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(dp(12),dp(10),dp(12),dp(10));
-            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
-            params.bottomMargin=dp(7);
-            content.addView(card,params);
-            card.setBackgroundColor(panel);
-            String opponent=match.optString("opponent","Rival pendiente");
-            card.addView(txt((index+1)+". "+(match.optBoolean("home")?"Local · ":"Visitante · ")+opponent,13,Color.WHITE));
-            String when=match.optString("when","").trim();
             String round=match.optString("round","").trim();
-            if(!round.isEmpty())card.addView(txt(round,11,Color.LTGRAY));
-            if(!when.isEmpty())card.addView(txt("Fecha / horario: "+when,11,Color.LTGRAY));
-            card.addView(txt("Puntos posibles en el partido: 0–5 (según resultado y bonus)",11,accent));
+            String groupKey=round.isEmpty()?"Jornada sin indicar":round;
+            if(!grouped.containsKey(groupKey))
+                grouped.put(groupKey,new java.util.ArrayList<org.json.JSONObject>());
+            grouped.get(groupKey).add(match);
+        }
+        int number=0;
+        for(java.util.Map.Entry<String,java.util.ArrayList<org.json.JSONObject>> entry:grouped.entrySet()){
+            String fullHeading=entry.getKey();
+            String roundTitle=fullHeading;
+            String organizer="";
+            java.util.regex.Matcher organizerMatch=java.util.regex.Pattern.compile(
+                    "(?i)\\\\s*[.·-]?\\\\s*Organizador\\\\s*:\\\\s*").matcher(fullHeading);
+            if(organizerMatch.find()){
+                roundTitle=fullHeading.substring(0,organizerMatch.start()).trim();
+                organizer=fullHeading.substring(organizerMatch.end()).trim();
+            }
+            LinearLayout section=new LinearLayout(this);
+            section.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams sectionParams=new LinearLayout.LayoutParams(-1,-2);
+            sectionParams.bottomMargin=dp(8);
+            content.addView(section,sectionParams);
+            TextView roundHeader=txt(roundTitle,13,accent);
+            roundHeader.setPadding(dp(8),dp(9),dp(8),dp(3));
+            section.addView(roundHeader);
+            if(!organizer.isEmpty()){
+                TextView org=txt("Organizador: "+organizer,11,Color.LTGRAY);
+                org.setPadding(dp(8),0,dp(8),dp(6));
+                section.addView(org);
+            }
+            for(org.json.JSONObject match:entry.getValue()){
+                number++;
+                LinearLayout card=new LinearLayout(this);
+                card.setOrientation(LinearLayout.VERTICAL);
+                card.setPadding(dp(10),dp(8),dp(10),dp(8));
+                LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+                params.bottomMargin=dp(3);
+                section.addView(card,params);
+                card.setBackgroundColor(panel);
+                String opponent=match.optString("opponent","Rival pendiente");
+                card.addView(txt(number+". "+(match.optBoolean("home")?"Local · ":"Visitante · ")+opponent,12,Color.WHITE));
+                String when=match.optString("when","").trim();
+                String detail=(when.isEmpty()?"Fecha pendiente":when)+"  ·  Puntos posibles: 0–5";
+                card.addView(txt(detail,11,accent));
+            }
         }
         header.setOnClickListener(v->{
             boolean open=content.getVisibility()!=View.VISIBLE;
