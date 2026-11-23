@@ -853,16 +853,24 @@ public final class RugbyHubActivity extends Activity {
             paint.setTextSize(13);paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
             paint.setColor(0xff55dba3);canvas.drawText(""+local,304,Math.max(20,145-112f*local/maxPoints-9),paint);
             paint.setColor(0xff63b9ff);canvas.drawText(""+away,304,Math.min(150,145-112f*away/maxPoints+17),paint);
-            paint.setColor(0xff55dba3);canvas.drawText("● Local",35,183,paint);
-            paint.setColor(0xff63b9ff);canvas.drawText("● Visitante",190,183,paint);
+
             canvas.restore();
         }
     }
-    private void addStatTimeline(LinearLayout host,java.util.ArrayList<int[]> events){
+    private void addTeamChartLegend(LinearLayout card,String home,String away){
+        TextView localLabel=text("●  "+(home==null||home.trim().isEmpty()?"Equipo local":home),12,true);
+        localLabel.setTextColor(0xff48dca2);localLabel.setPadding(dp(5),dp(2),dp(5),dp(2));
+        card.addView(localLabel);
+        TextView awayLabel=text("●  "+(away==null||away.trim().isEmpty()?"Equipo visitante":away),12,true);
+        awayLabel.setTextColor(0xff56aaf2);awayLabel.setPadding(dp(5),dp(2),dp(5),dp(3));
+        card.addView(awayLabel);
+    }
+    private void addStatTimeline(LinearLayout host,java.util.ArrayList<int[]> events,String home,String away){
         LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(8),dp(8),dp(8),dp(8));card.setBackgroundColor(0xff1b2d3f);
         host.addView(card,new LinearLayout.LayoutParams(-1,-2));
         card.addView(new ScoreTimeline3D(events));
+        addTeamChartLegend(card,home,away);
     }
     private void addStatScorers(LinearLayout host,String title,MatchNumbers numbers){
         addStatTitle(host,title);
@@ -918,9 +926,7 @@ public final class RugbyHubActivity extends Activity {
                 paint.setTextAlign(android.graphics.Paint.Align.CENTER);
                 c.drawText(labels[i],x+21,160,paint);
             }
-            paint.setTextSize(13);paint.setTextAlign(android.graphics.Paint.Align.LEFT);
-            paint.setColor(0xff48dca2);c.drawText("● Local",32,190,paint);
-            paint.setColor(0xff56aaf2);c.drawText("● Visitante",195,190,paint);
+
             c.restore();
         }
     }
@@ -992,13 +998,15 @@ public final class RugbyHubActivity extends Activity {
         TextView caveat=text("Puntos identificados en anotaciones del acta; consulta el marcador oficial para el resultado definitivo.",11,false);
         caveat.setGravity(Gravity.CENTER);caveat.setTextColor(0xffa8bbc9);host.addView(caveat);
         addStatTitle(host,"Comparativa de equipos");
-        statCard(host).addView(new CompactCompare3D(local,visitor));
+        LinearLayout compareCard=statCard(host);
+        compareCard.addView(new CompactCompare3D(local,visitor));
+        addTeamChartLegend(compareCard,home,away);
         java.util.ArrayList<int[]> timeline=new java.util.ArrayList<>();
         for(int[] e:local.events)timeline.add(new int[]{e[0],e[1],0});
         for(int[] e:visitor.events)timeline.add(new int[]{e[0],e[1],1});
         java.util.Collections.sort(timeline,(x,y)->Integer.compare(x[0],y[0]));
         addStatTitle(host,"Evolución del marcador");
-        addStatTimeline(host,timeline);
+        addStatTimeline(host,timeline,home,away);
         addStatTitle(host,"Distribución de anotaciones");
         addStatTypeSelector(host,local,visitor,home,away);
         addStatTitle(host,"Anotadores");
