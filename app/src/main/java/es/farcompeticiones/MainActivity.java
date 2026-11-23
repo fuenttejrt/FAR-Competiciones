@@ -707,7 +707,33 @@ public class MainActivity extends Activity {
             legend.setPadding(dp(8),dp(4),dp(8),dp(4));card.addView(legend);
         }
     }
-    private void showStandingTeamStatistics(String team,String[] values){
+    private java.util.ArrayList<org.json.JSONObject> standingTeamMatches(org.json.JSONObject data,String team){
+        java.util.ArrayList<org.json.JSONObject> found=new java.util.ArrayList<>();
+        if(data==null)return found;
+        org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return found;
+        String key=teamKey(team);
+        java.util.HashSet<String> seen=new java.util.HashSet<>();
+        for(int i=0;i<tables.length();i++){
+            org.json.JSONObject table=tables.optJSONObject(i);
+            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            org.json.JSONArray rows=table.optJSONArray("rows");if(rows==null)continue;
+            for(int j=0;j<rows.length();j++){
+                org.json.JSONObject row=rows.optJSONObject(j);if(row==null||!isPlayedMatch(row))continue;
+                if(!key.equals(teamKey(row.optString("home","")))&&!key.equals(teamKey(row.optString("away",""))))continue;
+                String id=teamKey(row.optString("home",""))+"|"+teamKey(row.optString("away",""))+"|"+row.optString("score","")+"|"+row.optString("when","");
+                if(seen.add(id))found.add(row);
+            }
+        }
+        java.util.Collections.sort(found,(a,b)->Long.compare(matchTimestamp(a,false),matchTimestamp(b,false)));
+        return found;
+    }
+    private int[] standingMatchScore(String score){
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(\\d+)\\s*[-–:]\\s*(\\d+)").matcher(score);
+        if(!m.find())return null;
+        try{return new int[]{Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2))};}
+        catch(Exception e){return null;}
+    }
+    private void showStandingTeamStatistics(String team,String[] values,org.json.JSONObject data){
         android.app.Dialog dialog=new android.app.Dialog(this);
         LinearLayout frame=new LinearLayout(this);frame.setOrientation(1);
         frame.setBackgroundColor(0xff172b3c);
@@ -766,12 +792,49 @@ public class MainActivity extends Activity {
                 standingColumns3D(content,new String[]{"Ofens.","Defens."},new int[]{bonusO,bonusD},new int[]{0xff48dca2,0xff56aaf2});
             }else{
                 standingSection(content,labels[active[0]]);
-                String message=active[0]==1?
-                    "Para mostrar la evolución real por jornada necesitamos vincular los resultados históricos de este equipo. No se inventarán posiciones ni puntuaciones.":
-                    active[0]==2?
-                    "Aquí aparecerán las comparativas por rival y como local o visitante cuando se vinculen los resultados de cada partido.":
-                    "Los ensayos y anotadores individuales se mostrarán al vincular las actas oficiales de los partidos. Los datos no disponibles no se contarán como cero.";
-                content.addView(txt(message,13,0xffd2e4ef));
+                java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
+                if(active[0]==3){
+                    content.addView(txt("Las estadísticas individuales se añadirán cuando las anotaciones de las actas estén vinculadas al equipo y a la temporada.",13,0xffd2e4ef));
+                }else if(matches.isEmpty()){
+                    content.addView(txt("No hay resultados oficiales vinculados para este equipo en los datos disponibles. No se mostrarán valores estimados.",13,0xffd2e4ef));
+                }else{
+                    int homePlayed=0,awayPlayed=0,homeWins=0,awayWins=0,homeFor=0,awayFor=0;
+                    java.util.ArrayList<Integer> pointsFor=new java.util.ArrayList<>();
+                    java.util.ArrayList<Integer> pointsAgainst=new java.util.ArrayList<>();
+                    for(org.json.JSONObject match:matches){
+                        int[] score=standingMatchScore(match.optString("score",""));if(score==null)continue;
+                        boolean home=teamKey(team).equals(teamKey(match.optString("home","")));
+                        int pf=home?score[0]:score[1],pa=home?score[1]:score[0];
+                        pointsFor.add(pf);pointsAgainst.add(pa);
+                        if(home){homePlayed++;homeFor+=pf;if(pf>pa)homeWins++;}
+                        else{awayPlayed++;awayFor+=pf;if(pf>pa)awayWins++;}
+                    }
+                    if(active[0]==1){
+                        content.addView(txt("Resultados por orden de fecha · "+pointsFor.size()+" partidos",12,0xffb8d4cc));
+                        for(int k=0;k<pointsFor.size();k++){
+                            org.json.JSONObject match=matches.get(k);
+                            String rival=teamKey(team).equals(teamKey(match.optString("home","")))?match.optString("away",""):match.optString("home","");
+                            content.addView(txt((k+1)+". "+rival+" · "+pointsFor.get(k)+"–"+pointsAgainst.get(k),12,Color.WHITE));
+                            standingColumns3D(content,new String[]{"Favor","Contra"},
+                                new int[]{pointsFor.get(k),pointsAgainst.get(k)},
+                                new int[]{0xff48dca2,0xff56aaf2});
+                        }
+                    }else{
+                        LinearLayout pair=new LinearLayout(this);content.addView(pair);
+                        standingMetric(pair,String.valueOf(homePlayed),"En casa");
+                        standingMetric(pair,String.valueOf(awayPlayed),"Fuera");
+                        standingSection(content,"Victorias · local y visitante");
+                        standingColumns3D(content,new String[]{"Local","Visit."},new int[]{homeWins,awayWins},
+                            new int[]{0xff48dca2,0xff56aaf2});
+                        standingSection(content,"Tantos anotados · local y visitante");
+                        standingColumns3D(content,new String[]{"Local","Visit."},new int[]{homeFor,awayFor},
+                            new int[]{0xff48dca2,0xff56aaf2});
+                        for(org.json.JSONObject match:matches){
+                            content.addView(txt(match.optString("home","")+"  "+match.optString("score","")+"  "+match.optString("away",""),12,Color.WHITE));
+                        }
+                    }
+                    content.addView(txt("Datos de los resultados importados disponibles; pueden no incluir todos los partidos de la temporada.",11,0xffb8d4cc));
+                }
             }
             scroll.scrollTo(0,0);
         };
@@ -1203,13 +1266,13 @@ public class MainActivity extends Activity {
                     teamCell.setClickable(true);
                     teamCell.setFocusable(true);
                     teamCell.setContentDescription("Ver estadísticas de "+selectedStandingTeam);
-                    teamCell.setOnClickListener(v->showStandingTeamStatistics(selectedStandingTeam,selectedStandingValues));
+                    teamCell.setOnClickListener(v->showStandingTeamStatistics(selectedStandingTeam,selectedStandingValues,data));
                     if(teamCell instanceof android.view.ViewGroup){
                         android.view.ViewGroup teamChildren=(android.view.ViewGroup)teamCell;
                         for(int child=0;child<teamChildren.getChildCount();child++){
                             android.view.View target=teamChildren.getChildAt(child);
                             target.setClickable(true);
-                            target.setOnClickListener(v->showStandingTeamStatistics(selectedStandingTeam,selectedStandingValues));
+                            target.setOnClickListener(v->showStandingTeamStatistics(selectedStandingTeam,selectedStandingValues,data));
                         }
                     }
                     android.widget.HorizontalScrollView scroller=new android.widget.HorizontalScrollView(this);
