@@ -859,6 +859,44 @@ public class MainActivity extends Activity {
     }
 
     /** Calculate only fully traceable playing intervals from an official act. */
+    /** Overlap of a player's documented field intervals with a temporary suspension. */
+    private int suspensionOverlap(String lineup,String changes,boolean local,String dorsal,int start,int end,int duration){
+        if(start<0||end<=start||end>duration)return -1;
+        int side=-1;boolean starter=false;boolean playing=false;boolean found=false;
+        java.util.regex.Pattern player=java.util.regex.Pattern.compile("^(\\d+)\\s*·.*");
+        for(String line:lineup.split("\\r?\\n")){
+            String t=line.trim();
+            if(t.equals("EQUIPO LOCAL"))side=0;
+            else if(t.equals("EQUIPO VISITANTE"))side=1;
+            else if(t.startsWith("TITULARES ("))starter=true;
+            else if(t.startsWith("SUPLENTES ("))starter=false;
+            else if(side==(local?0:1)){
+                java.util.regex.Matcher m=player.matcher(t);
+                if(m.matches()&&dorsal.equals(m.group(1))){found=true;playing=starter;}
+            }
+        }
+        if(!found)return -1;
+        int last=0,overlap=0;side=-1;
+        java.util.regex.Pattern change=java.util.regex.Pattern.compile("^\\d+\\. Min (\\d+) · Cambio · Entra nº (\\d+) · Sale nº (\\d+).*$");
+        for(String line:orderedSubstitutionLines(changes).split("\\r?\\n")){
+            String t=line.trim();
+            if(t.matches("(?i)Equipo local:.*"))side=0;
+            else if(t.matches("(?i)Equipo visitante:.*"))side=1;
+            else if(side==(local?0:1)){
+                java.util.regex.Matcher m=change.matcher(t);
+                if(!m.matches())continue;
+                int minute=Integer.parseInt(m.group(1));
+                if(minute<last||minute>duration)return -1;
+                if(playing)overlap+=Math.max(0,Math.min(end,minute)-Math.max(start,last));
+                if(dorsal.equals(m.group(3)))playing=false;
+                if(dorsal.equals(m.group(2)))playing=true;
+                last=minute;
+            }
+        }
+        if(playing)overlap+=Math.max(0,Math.min(end,duration)-Math.max(start,last));
+        return overlap;
+    }
+
     private java.util.Map<String,Integer> verifiedActMinutes(String lineup,String changes,boolean local,int duration){
         if(duration<=0||changes==null||changes.trim().isEmpty())return null;
         java.util.Map<String,String> byDorsal=new java.util.HashMap<>();
