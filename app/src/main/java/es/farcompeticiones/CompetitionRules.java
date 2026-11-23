@@ -15,6 +15,19 @@ final class CompetitionRules {
         return "2026/27".equals(season) && "M14".equals(category);
     }
 
+    /** Duración confirmada para el formato ordinario de esta competición; -1 = sin verificar. */
+    static int matchMinutes(String season, String category, String competition) {
+        if ("2026/27".equals(season) && "M14".equalsIgnoreCase(category)
+                && competition != null && competition.toLowerCase(Locale.ROOT).contains("andaluz")) return 36;
+        return -1;
+    }
+
+    /** Mitad de partido, solo cuando la duración oficial está verificada. */
+    static int halfMinutes(String season, String category, String competition) {
+        int total = matchMinutes(season, category, competition);
+        return total > 0 ? total / 2 : -1;
+    }
+
     /** 0: no confirmada, 1: primera fase, 2: segunda fase. */
     static int phase(String season, String category, String competition, JSONObject data, JSONObject standing) {
         if (!hasM14Rules(season, category)) return 0;
