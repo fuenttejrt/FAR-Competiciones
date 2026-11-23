@@ -853,7 +853,35 @@ public class MainActivity extends Activity {
                 standingSection(content,labels[active[0]]);
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
                 if(active[0]==3){
-                    content.addView(txt("Las estadísticas individuales se añadirán cuando las anotaciones de las actas estén vinculadas al equipo y a la temporada.",13,0xffd2e4ef));
+                    int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
+                    LinearLayout durationCards=new LinearLayout(this);content.addView(durationCards);
+                    standingMetric(durationCards,duration>0?duration+" min":"—","Partido completo");
+                    standingMetric(durationCards,duration>0?(duration/2)+" min":"—","Cada tiempo");
+                    content.addView(txt(duration>0?"Duración prevista según las reglas verificadas de esta competición.":"Duración pendiente de la circular oficial de esta categoría y temporada.",12,0xffb8d4cc));
+                    int actCount=0;
+                    for(org.json.JSONObject match:matches)if(match.optJSONObject("acta")!=null)actCount++;
+                    standingSection(content,"Actas y participación");
+                    content.addView(txt(actCount+" de "+matches.size()+" partidos con acta estructurada disponible",13,0xffd2e4ef));
+                    content.addView(txt("Los minutos individuales se calcularán con las alineaciones, entradas, salidas y reingresos de cada acta. Sin sustituciones verificadas no se asignarán minutos estimados.",12,0xffb8d4cc));
+                    if(matches.isEmpty())content.addView(txt("Todavía no hay partidos oficiales vinculados a este equipo.",12,0xffd2e4ef));
+                    for(org.json.JSONObject match:matches){
+                        String matchName=match.optString("home","")+"  "+match.optString("score","")+"  "+match.optString("away","");
+                        org.json.JSONObject act=match.optJSONObject("acta");
+                        content.addView(txt(matchName,12,Color.WHITE));
+                        String side=teamKey(team).equals(teamKey(match.optString("home","")))?"Local":"Visitante";
+                        org.json.JSONArray starters=act==null?null:act.optJSONArray("titulares"+side);
+                        org.json.JSONArray substitutes=act==null?null:act.optJSONArray("suplentes"+side);
+                        if(starters!=null||substitutes!=null){
+                            int a=starters==null?0:starters.length(),b=substitutes==null?0:substitutes.length();
+                            content.addView(txt(a+" titulares · "+b+" suplentes · minutos pendientes de validar",11,0xff75e6b2));
+                        }else content.addView(txt("Alineación no disponible en los datos importados",11,0xffa9c4d2));
+                        String actUrl=match.optString("statsUrl","");
+                        if(actUrl.startsWith("https://farugby.matchready.es/")){
+                            TextView open=txt("Consultar acta oficial ›",12,0xff75e6b2);
+                            open.setPadding(dp(8),dp(4),dp(8),dp(10));content.addView(open);
+                            open.setOnClickListener(v->startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(actUrl))));
+                        }
+                    }
                 }else if(matches.isEmpty()){
                     content.addView(txt("No hay resultados oficiales vinculados para este equipo en los datos disponibles. No se mostrarán valores estimados.",13,0xffd2e4ef));
                 }else{
