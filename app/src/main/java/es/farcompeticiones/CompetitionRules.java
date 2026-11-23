@@ -18,7 +18,7 @@ final class CompetitionRules {
     /** Duración confirmada para el formato ordinario de esta competición; -1 = sin verificar. */
     static int matchMinutes(String season, String category, String competition) {
         if ("2026/27".equals(season) && "M14".equalsIgnoreCase(category)
-                && competition != null && competition.toLowerCase(Locale.ROOT).contains("andaluz")) return 36;
+                ) return 36;
         return -1;
     }
 
