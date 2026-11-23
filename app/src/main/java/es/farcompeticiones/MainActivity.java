@@ -805,7 +805,7 @@ public class MainActivity extends Activity {
             else if(!t.isEmpty())output.add(t);
         }
         if(!block.isEmpty()){sortSubstitutionBlock(block);output.addAll(block);}
-        return android.text.TextUtils.join("\\n",output);
+        return android.text.TextUtils.join("\n",output);
     }
 
     private void sortSubstitutionBlock(java.util.ArrayList<String> block){
