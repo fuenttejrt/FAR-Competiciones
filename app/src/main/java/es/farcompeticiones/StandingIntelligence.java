@@ -198,6 +198,7 @@ final class StandingIntelligence {
                 if(home.isEmpty()||away.isEmpty()||home.equals(away))continue;
                 String id=home+"|"+away+"|"+game.optString("when","");
                 if(!unique.add(id))continue;
+                fixtures.add(new String[]{home,away});
                 pending.put(home,pending.containsKey(home)?pending.get(home)+1:1);
                 pending.put(away,pending.containsKey(away)?pending.get(away)+1:1);
             }
@@ -238,11 +239,15 @@ final class StandingIntelligence {
                         if(totals.containsKey(fixture[0]))totals.put(fixture[0],totals.get(fixture[0])+points[0]);
                         if(totals.containsKey(fixture[1]))totals.put(fixture[1],totals.get(fixture[1])+points[1]);
                     }
-                    int own=totals.get(key(team.name));
+                    Integer ownValue=totals.get(key(team.name));
+                    if(ownValue==null)continue;
+                    int own=ownValue;
                     int rankLow=1,rankHigh=1;
                     for(Team rival:teams){
                         if(rival==team)continue;
-                        int value=totals.get(key(rival.name));
+                        Integer rivalValue=totals.get(key(rival.name));
+                        if(rivalValue==null)continue;
+                        int value=rivalValue;
                         if(value>own)rankLow++;
                         if(value>=own)rankHigh++;
                     }
