@@ -374,4 +374,39 @@ final class StandingIntelligence {
         return text.length()>0?text.toString():"No se han encontrado encuentros pendientes en los datos actuales.";
     }
 
+    /** Encuentros reales pendientes, con metadatos de la fuente cuando existen. */
+    static JSONArray pendingMatches(String name,JSONObject data){
+        JSONArray result=new JSONArray();
+        JSONArray tables=data==null?null:data.optJSONArray("tables");
+        if(tables==null)return result;
+        String target=key(name);
+        java.util.HashSet<String> seen=new java.util.HashSet<>();
+        for(int i=0;i<tables.length();i++){
+            JSONObject table=tables.optJSONObject(i);
+            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            String heading=table.optString("heading","").toLowerCase(java.util.Locale.ROOT);
+            if(!heading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))continue;
+            JSONArray games=table.optJSONArray("rows");
+            if(games==null)continue;
+            for(int j=0;j<games.length();j++){
+                JSONObject game=games.optJSONObject(j);
+                if(game==null||score(game.optString("score","")))continue;
+                String home=game.optString("home",""),away=game.optString("away","");
+                boolean local=target.equals(key(home)),visitor=target.equals(key(away));
+                if(!local&&!visitor)continue;
+                String id=key(home)+"|"+key(away)+"|"+game.optString("when","");
+                if(!seen.add(id))continue;
+                try{
+                    JSONObject item=new JSONObject();
+                    item.put("opponent",local?away:home);
+                    item.put("home",local);
+                    item.put("when",game.optString("when",""));
+                    item.put("round",game.optString("round",table.optString("heading","")));
+                    result.put(item);
+                }catch(JSONException ignored){}
+            }
+        }
+        return result;
+    }
+
 }
