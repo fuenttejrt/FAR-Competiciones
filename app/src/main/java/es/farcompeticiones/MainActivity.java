@@ -940,30 +940,37 @@ public class MainActivity extends Activity {
                         standingSection(content,"Jugadores identificados · actas consultadas");
                         java.util.ArrayList<java.util.Map.Entry<String,Integer>> ranking=new java.util.ArrayList<>(appearances.entrySet());
                         java.util.Collections.sort(ranking,(a,b)->Integer.compare(b.getValue(),a.getValue()));
-                        int chartSize=Math.min(7,ranking.size());
+                        java.util.ArrayList<java.util.Map.Entry<String,Integer>> starterRanking=new java.util.ArrayList<>(ranking);
+                        java.util.Collections.sort(starterRanking,(a,b)->{
+                            int cmp=Integer.compare(starts.getOrDefault(b.getKey(),0),starts.getOrDefault(a.getKey(),0));
+                            if(cmp!=0)return cmp;
+                            cmp=Integer.compare(b.getValue(),a.getValue());
+                            return cmp!=0?cmp:a.getKey().compareToIgnoreCase(b.getKey());
+                        });
+                        int chartSize=Math.min(10,starterRanking.size());
                         if(chartSize>0){
                             String[] chartNames=new String[chartSize];
                             int[] chartCounts=new int[chartSize];
                             int[] chartColors=new int[chartSize];
                             for(int k=0;k<chartSize;k++){
-                                java.util.Map.Entry<String,Integer> entry=ranking.get(k);
+                                java.util.Map.Entry<String,Integer> entry=starterRanking.get(k);
                                 String[] parts=entry.getKey().split("\\|",2);
                                 String name=parts.length>1?parts[1]:entry.getKey();
                                 chartNames[k]=String.valueOf(k+1);
-                                chartCounts[k]=entry.getValue();
+                                chartCounts[k]=starts.getOrDefault(entry.getKey(),0);
                                 chartColors[k]=k%2==0?0xff48dca2:0xff56aaf2;
                             }
-                            standingSection(content,"Participaciones · gráfico 3D");
+                            standingSection(content,"Top 10 · más titularidades · gráfico 3D");
                             standingColumns3D(content,chartNames,chartCounts,chartColors);
                             LinearLayout legend=new LinearLayout(this);
                             legend.setOrientation(1);
                             legend.setPadding(dp(9),dp(8),dp(9),dp(9));
                             content.addView(legend);
                             for(int k=0;k<chartSize;k++){
-                                java.util.Map.Entry<String,Integer> entry=ranking.get(k);
+                                java.util.Map.Entry<String,Integer> entry=starterRanking.get(k);
                                 String[] parts=entry.getKey().split("\\|",2);
                                 String name=parts.length>1?parts[1]:entry.getKey();
-                                TextView line=txt((k+1)+".  "+name+"  ·  "+entry.getValue()+" partidos",12,0xffd2e4ef);
+                                TextView line=txt((k+1)+".  "+name+"  ·  "+starts.getOrDefault(entry.getKey(),0)+" titularidades / "+entry.getValue()+" partidos",12,0xffd2e4ef);
                                 line.setPadding(dp(3),dp(4),dp(3),dp(4));
                                 legend.addView(line);
                             }
