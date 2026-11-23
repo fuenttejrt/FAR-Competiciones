@@ -1071,7 +1071,7 @@ public class MainActivity extends Activity {
                                         java.util.regex.Matcher dm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(ct);
                                         if(dm.find()){
                                             sanctionedDorsals.add(dm.group(1));
-                                            java.util.regex.Matcher minuteMatcher=java.util.regex.Pattern.compile("Min (\\\\d+)").matcher(ct);
+                                            java.util.regex.Matcher minuteMatcher=java.util.regex.Pattern.compile("Min (\\d+)").matcher(ct);
                                             String minuteLabel=minuteMatcher.find()?minuteMatcher.group(1):"?";
                                             java.util.regex.Matcher typeMatcher=java.util.regex.Pattern.compile("Tipo ([A-E])").matcher(ct);
                                             String typeLabel=typeMatcher.find()?typeMatcher.group(1):"?";
