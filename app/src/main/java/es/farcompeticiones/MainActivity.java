@@ -816,6 +816,7 @@ public class MainActivity extends Activity {
         dialog.setContentView(frame);
         String[] labels={"Resumen","Evolución","Partidos","Jugadores"};
         final int[] active={0};
+        final boolean[] loadingActs={false};
         Runnable redraw=()->{
             content.removeAllViews();
             for(int i=0;i<tabs.getChildCount();i++){
@@ -861,6 +862,34 @@ public class MainActivity extends Activity {
                     int actCount=0;
                     java.util.Map<String,Integer> appearances=new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
                     android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
+                    if(!loadingActs[0]){
+                        java.util.ArrayList<String> missing=new java.util.ArrayList<>();
+                        for(org.json.JSONObject match:matches){
+                            String url=match.optString("statsUrl","");
+                            if(url.startsWith("https://farugby.matchready.es/")&&!actCache.contains(url)&&!missing.contains(url))missing.add(url);
+                        }
+                        if(!missing.isEmpty()){
+                            loadingActs[0]=true;
+                            content.addView(txt("Leyendo automáticamente "+missing.size()+" actas oficiales…",12,0xff75e6b2));
+                            new Thread(()->{
+                                com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());
+                                for(String url:missing){
+                                    try{
+                                        org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);
+                                        actCache.edit().putString(url,parsed.toString()).apply();
+                                    }catch(Exception ignored){}
+                                }
+                                runOnUiThread(()->{
+                                    loadingActs[0]=false;
+                                    if(dialog.isShowing()&&active[0]==3) {
+                                        // Refresh the same tab without reopening the dialog.
+                                        tabs.getChildAt(3).performClick();
+                                    }
+                                });
+                            }).start();
+                        }
+                    }
+
                     for(org.json.JSONObject match:matches){
                         String url=match.optString("statsUrl","");
                         org.json.JSONObject cached=null;
