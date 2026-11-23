@@ -1059,6 +1059,7 @@ public class MainActivity extends Activity {
                             // Sanctions affect the identified player, not the whole team.
                             java.util.HashSet<String> sanctionedDorsals=new java.util.HashSet<>();
                             boolean unknownSanction=false;
+                            java.util.ArrayList<String> sanctionDetails=new java.util.ArrayList<>();
                             for(String keyName:new String[]{"temporaryCards","definitiveCards"}){
                                 String rawCards=cached.optString(keyName,"");
                                 int cardSide=-1;
@@ -1068,8 +1069,15 @@ public class MainActivity extends Activity {
                                     else if(ct.matches("(?i)Equipo visitante:.*"))cardSide=1;
                                     else if(cardSide==(local?0:1)&&ct.matches("^\\d+\\. Min .*")){
                                         java.util.regex.Matcher dm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(ct);
-                                        if(dm.find())sanctionedDorsals.add(dm.group(1));
-                                        else unknownSanction=true;
+                                        if(dm.find()){
+                                            sanctionedDorsals.add(dm.group(1));
+                                            java.util.regex.Matcher minuteMatcher=java.util.regex.Pattern.compile("Min (\\\\d+)").matcher(ct);
+                                            String minuteLabel=minuteMatcher.find()?minuteMatcher.group(1):"?";
+                                            java.util.regex.Matcher typeMatcher=java.util.regex.Pattern.compile("Tipo ([A-E])").matcher(ct);
+                                            String typeLabel=typeMatcher.find()?typeMatcher.group(1):"?";
+                                            sanctionDetails.add((keyName.equals("temporaryCards")?"Temporal":"Definitiva")
+                                                +" · dorsal "+dm.group(1)+" · minuto "+minuteLabel+" · código "+typeLabel);
+                                        }else unknownSanction=true;
                                     }
                                 }
                             }
@@ -1108,6 +1116,8 @@ public class MainActivity extends Activity {
                             }else{
                                 minuteActDiagnostics.add("✓ "+matchLabel+" · "+CompetitionRules.matchMinutes(season,category,selectedCompetition)+" min analizados");
                             }
+                            for(String detail:sanctionDetails)
+                                minuteActDiagnostics.add("    ↳ "+matchLabel+" · "+detail+" · descuento pendiente de circular");
                             if(perAct!=null){
                                 minuteActCount[0]++;
                                 for(java.util.Map.Entry<String,Integer> e:perAct.entrySet()){
