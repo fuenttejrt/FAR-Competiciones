@@ -817,6 +817,7 @@ public class MainActivity extends Activity {
         String[] labels={"Resumen","Evolución","Partidos","Jugadores"};
         final int[] active={0};
         final boolean[] loadingActs={false};
+        final java.util.HashSet<String> attemptedActs=new java.util.HashSet<>();
         Runnable redraw=()->{
             content.removeAllViews();
             for(int i=0;i<tabs.getChildCount();i++){
@@ -866,10 +867,11 @@ public class MainActivity extends Activity {
                         java.util.ArrayList<String> missing=new java.util.ArrayList<>();
                         for(org.json.JSONObject match:matches){
                             String url=match.optString("statsUrl","");
-                            if(url.startsWith("https://farugby.matchready.es/")&&!actCache.contains(url)&&!missing.contains(url))missing.add(url);
+                            if(url.startsWith("https://farugby.matchready.es/")&&!actCache.contains(url)&&!attemptedActs.contains(url)&&!missing.contains(url))missing.add(url);
                         }
                         if(!missing.isEmpty()){
                             loadingActs[0]=true;
+                            attemptedActs.addAll(missing);
                             content.addView(txt("Leyendo automáticamente "+missing.size()+" actas oficiales…",12,0xff75e6b2));
                             new Thread(()->{
                                 com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());
