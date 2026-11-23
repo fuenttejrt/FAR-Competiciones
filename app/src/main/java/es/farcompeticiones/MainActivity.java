@@ -1114,7 +1114,7 @@ public class MainActivity extends Activity {
                                     scroll.addView(sections);
                                     addAnalysisFolder(sections,"Probabilidades por puesto",probabilities.toString(),true);
                                     addAnalysisFolder(sections,"Clasificación y acceso",qualification,false);
-                                    addPendingMatchFolder(sections,pending);
+                                    addPendingMatchFolder(sections,pending,option.optInt("points"),option.optInt("remaining"));
                                     addAnalysisFolder(sections,"Rivales directos",rivals,false);
                                     addAnalysisFolder(sections,"Cómo se calcula",
                                             "3.000 simulaciones ponderadas por puntos por partido y tanteos anteriores disponibles. Los empates se resuelven aleatoriamente. No son probabilidades oficiales ni sustituyen los desempates FAR.",false);
@@ -1389,7 +1389,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void addPendingMatchFolder(LinearLayout container,org.json.JSONArray matches){
+    private void addPendingMatchFolder(LinearLayout container,org.json.JSONArray matches,int currentPoints,int remaining){
         LinearLayout group=new LinearLayout(this);
         group.setOrientation(LinearLayout.VERTICAL);
         container.addView(group);
@@ -1469,6 +1469,44 @@ public class MainActivity extends Activity {
                 String when=match.optString("when","").trim();
                 String detail="Puntos posibles: 0–5";
                 card.addView(txt(detail,11,accent));
+                TextView toggle=txt("▸ Probar resultado",11,accent);
+                toggle.setPadding(0,dp(6),0,dp(3));
+                card.addView(toggle);
+                LinearLayout simulation=new LinearLayout(this);
+                simulation.setOrientation(LinearLayout.VERTICAL);
+                simulation.setVisibility(View.GONE);
+                card.addView(simulation);
+                TextView explanation=txt("Selecciona un resultado para ver los puntos del equipo. Es un cálculo hipotético, no modifica resultados oficiales ni los porcentajes de las 3.000 simulaciones.",11,Color.LTGRAY);
+                simulation.addView(explanation);
+                TextView impact=txt("",12,Color.WHITE);
+                impact.setPadding(0,dp(5),0,dp(6));
+                simulation.addView(impact);
+                LinearLayout choices=new LinearLayout(this);
+                choices.setOrientation(LinearLayout.HORIZONTAL);
+                simulation.addView(choices);
+                final String[] outcomes={"Victoria","Empate","Derrota"};
+                for(int k=0;k<outcomes.length;k++){
+                    final int outcome=k;
+                    TextView choice=txt(outcomes[k],11,accent);
+                    choice.setPadding(dp(5),dp(9),dp(5),dp(9));
+                    LinearLayout.LayoutParams choiceParams=new LinearLayout.LayoutParams(0,-2,1);
+                    choices.addView(choice,choiceParams);
+                    choice.setOnClickListener(v->{
+                        int earned=outcome==0?4:outcome==1?2:0;
+                        int pointsAfter=currentPoints+earned;
+                        int otherGames=Math.max(0,remaining-1);
+                        int possibleMax=pointsAfter+5*otherGames;
+                        impact.setText("Puntos: "+currentPoints+" → "+pointsAfter+
+                                " (+"+earned+")\\nMáximo restante: "+possibleMax+
+                                "\\nVictoria: 4–5 pts; empate: 2–3 pts; derrota: 0–2 pts, según bonus. "+
+                                "La selección usa el mínimo sin bonus.");
+                    });
+                }
+                toggle.setOnClickListener(v->{
+                    boolean open=simulation.getVisibility()!=View.VISIBLE;
+                    simulation.setVisibility(open?View.VISIBLE:View.GONE);
+                    toggle.setText((open?"▾ ":"▸ ")+"Probar resultado");
+                });
             }
         }
         header.setOnClickListener(v->{
