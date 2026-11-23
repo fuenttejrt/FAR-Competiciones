@@ -342,4 +342,36 @@ final class StandingIntelligence {
         }catch(org.json.JSONException ex){return null;}
     }
 
+    /** Calendario pendiente del equipo en la primera fase, sin inventar fechas. */
+    static String pendingForTeam(String name,JSONObject data){
+        JSONArray tables=data==null?null:data.optJSONArray("tables");
+        if(tables==null)return "Calendario no disponible.";
+        String target=key(name);
+        java.util.HashSet<String> seen=new java.util.HashSet<>();
+        StringBuilder text=new StringBuilder();
+        for(int i=0;i<tables.length();i++){
+            JSONObject table=tables.optJSONObject(i);
+            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            String heading=table.optString("heading","").toLowerCase(java.util.Locale.ROOT);
+            if(!heading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))continue;
+            JSONArray games=table.optJSONArray("rows");
+            if(games==null)continue;
+            for(int j=0;j<games.length();j++){
+                JSONObject game=games.optJSONObject(j);
+                if(game==null||score(game.optString("score","")))continue;
+                String home=game.optString("home",""),away=game.optString("away","");
+                boolean local=target.equals(key(home)),visitor=target.equals(key(away));
+                if(!local&&!visitor)continue;
+                String id=key(home)+"|"+key(away)+"|"+game.optString("when","");
+                if(!seen.add(id))continue;
+                String opponent=local?away:home;
+                String when=game.optString("when","").trim();
+                if(text.length()>0)text.append("\\n");
+                text.append(local?"Local vs ":"Visitante vs ").append(opponent);
+                if(!when.isEmpty())text.append(" · ").append(when);
+            }
+        }
+        return text.length()>0?text.toString():"No se han encontrado encuentros pendientes en los datos actuales.";
+    }
+
 }
