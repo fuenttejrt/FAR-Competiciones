@@ -754,6 +754,73 @@ public final class RugbyHubActivity extends Activity {
         heading.setGravity(Gravity.CENTER);box.addView(heading);
         box.addView(new ThreeDChart(values,labels,true));
     }
+    private final class ScoreTimeline3D extends android.view.View {
+        private final java.util.ArrayList<int[]> events;
+        private final android.graphics.Paint paint=new android.graphics.Paint(3);
+        ScoreTimeline3D(java.util.ArrayList<int[]> events){
+            super(RugbyHubActivity.this);this.events=events;
+            setLayerType(android.view.View.LAYER_TYPE_SOFTWARE,null);
+        }
+        @Override protected void onMeasure(int w,int h){
+            setMeasuredDimension(android.view.View.MeasureSpec.getSize(w),dp(190));
+        }
+        @Override protected void onDraw(android.graphics.Canvas canvas){
+            super.onDraw(canvas);
+            float sx=getWidth()/360f,sy=getHeight()/190f;
+            canvas.save();canvas.scale(sx,sy);
+            paint.setColor(0xff273f53);paint.setStrokeWidth(1);
+            for(int i=0;i<4;i++)canvas.drawLine(30,24+i*38,344,24+i*38,paint);
+            if(events.isEmpty()){
+                paint.setColor(0xffb7c9d5);paint.setTextSize(13);
+                canvas.drawText("Sin cronología disponible",72,90,paint);
+                canvas.restore();return;
+            }
+            int maxMinute=40,maxPoints=1,local=0,away=0;
+            for(int[] e:events){maxMinute=Math.max(maxMinute,e[0]);if(e[2]==0)local+=e[1];else away+=e[1];}
+            maxPoints=Math.max(1,Math.max(local,away));
+            for(int team=0;team<2;team++){
+                int color=team==0?0xff55dba3:0xff63b9ff;
+                int score=0;float prevX=30,prevY=145;
+                for(int i=0;i<=events.size();i++){
+                    int[] event=i<events.size()?events.get(i):null;
+                    float x=event==null?335:30+305f*event[0]/maxMinute;
+                    float y=145-112f*score/maxPoints;
+                    paint.setColor(team==0?0xff1a6853:0xff245b88);
+                    paint.setStrokeWidth(5);canvas.drawLine(prevX+4,prevY+5,x+4,prevY+5,paint);
+                    canvas.drawLine(x+4,prevY+5,x+4,y+5,paint);
+                    paint.setColor(color);paint.setStrokeWidth(3);
+                    canvas.drawLine(prevX,prevY,x,prevY,paint);canvas.drawLine(x,prevY,x,y,paint);
+                    if(event!=null&&event[2]==team)score+=event[1];
+                    prevX=x;prevY=y;
+                }
+            }
+            paint.setTextSize(11);paint.setColor(0xffaebfca);
+            canvas.drawText("0'",27,164,paint);canvas.drawText(maxMinute+"'",310,164,paint);
+            paint.setColor(0xff55dba3);canvas.drawText("● Local",35,183,paint);
+            paint.setColor(0xff63b9ff);canvas.drawText("● Visitante",190,183,paint);
+            canvas.restore();
+        }
+    }
+    private void addStatTimeline(LinearLayout host,java.util.ArrayList<int[]> events){
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(8),dp(8),dp(8),dp(8));card.setBackgroundColor(0xff1b2d3f);
+        host.addView(card,new LinearLayout.LayoutParams(-1,-2));
+        card.addView(new ScoreTimeline3D(events));
+    }
+    private void addStatScorers(LinearLayout host,String title,MatchNumbers numbers){
+        addStatTitle(host,title);
+        if(numbers.scorers.isEmpty()){host.addView(text("No hay anotadores identificados.",12,false));return;}
+        int count=Math.min(4,numbers.scorers.size());
+        int[] values=new int[count];String[] names=new String[count];int i=0;
+        java.util.ArrayList<java.util.Map.Entry<String,Integer>> ordered=
+            new java.util.ArrayList<>(numbers.scorers.entrySet());
+        java.util.Collections.sort(ordered,(a,b)->Integer.compare(b.getValue(),a.getValue()));
+        for(java.util.Map.Entry<String,Integer> e:ordered){
+            if(i>=count)break;values[i]=e.getValue();names[i]="Nº "+e.getKey();i++;
+        }
+        addStatPie(host,"Puntos por anotador",values,names);
+        addActStatBlock(host,"Desglose completo",formatScorers(numbers));
+    }
     private void showActMatchStatistics(android.widget.ScrollView scroll,String scoreboard,
             String discipline,String changes,String home,String away){
         scroll.removeAllViews();
@@ -781,16 +848,18 @@ public final class RugbyHubActivity extends Activity {
         addStatCompare(host,"Drops",local.drops,visitor.drops,1);
         addStatTitle(host,"Distribución de puntos por equipo");
         addStatPie(host,"Puntos identificados",new int[]{local.points,visitor.points},new String[]{"Local","Visitante"});
+        addStatTitle(host,"Tipos de anotaciones");
+        addStatPie(host,"Puntos por tipo",new int[]{5*(local.tries+visitor.tries),2*(local.conversions+visitor.conversions),3*(local.penalties+visitor.penalties),3*(local.drops+visitor.drops)},new String[]{"Ensayo","Transf.","Castigo","Drop"});
         addStatTitle(host,"Actividad del partido");
         addStatCompare(host,"Sustituciones",local.changes,visitor.changes,1);
-        addStatTitle(host,"Anotadores por dorsal");
-        addActStatBlock(host,home==null?"Local":home,formatScorers(local));
-        addActStatBlock(host,away==null?"Visitante":away,formatScorers(visitor));
+        addStatScorers(host,home==null?"Anotadores local":home,local);
+        addStatScorers(host,away==null?"Anotadores visitante":away,visitor);
         addStatTitle(host,"Cronología de anotaciones");
         java.util.ArrayList<int[]> timeline=new java.util.ArrayList<>();
         for(int[] event:local.events)timeline.add(new int[]{event[0],event[1],0});
         for(int[] event:visitor.events)timeline.add(new int[]{event[0],event[1],1});
         java.util.Collections.sort(timeline,(x,y)->Integer.compare(x[0],y[0]));
+        addStatTimeline(host,timeline);
         int lp=0,vp=0;
         if(timeline.isEmpty())host.addView(text("No hay anotaciones identificadas.",12,false));
         for(int[] event:timeline){
