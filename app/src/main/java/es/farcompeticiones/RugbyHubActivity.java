@@ -772,7 +772,9 @@ public final class RugbyHubActivity extends Activity {
         heading.setTextColor(0xffe7f2f8);heading.setPadding(0,dp(9),0,dp(3));card.addView(heading);
         LinearLayout graph=new LinearLayout(this);graph.setOrientation(LinearLayout.VERTICAL);
         card.addView(graph);
-        String[] choices={"Local","Visitante","Ambos"};
+        final String localName=home==null||home.trim().isEmpty()?"Local":home.trim();
+        final String visitorName=away==null||away.trim().isEmpty()?"Visitante":away.trim();
+        String[] choices={localName,visitorName,"Ambos"};
         TextView[] buttons=new TextView[3];
         final int[][] scores={
             {5*local.tries,2*local.conversions,3*local.penalties,3*local.drops},
@@ -780,12 +782,14 @@ public final class RugbyHubActivity extends Activity {
             {5*local.tries,2*local.conversions,3*local.penalties,3*local.drops,
              5*visitor.tries,2*visitor.conversions,3*visitor.penalties,3*visitor.drops}};
         final String[] kinds={"Ensayos","Transformaciones","Castigos","Drops"};
-        final String[] combined={"Local · Ensayos","Local · Transform.","Local · Castigos","Local · Drops",
-            "Visitante · Ensayos","Visitante · Transform.","Visitante · Castigos","Visitante · Drops"};
+        final String[] combined={localName+" · Ensayos",localName+" · Transform.",localName+" · Castigos",localName+" · Drops",
+            visitorName+" · Ensayos",visitorName+" · Transform.",visitorName+" · Castigos",visitorName+" · Drops"};
         for(int i=0;i<3;i++){
             final int index=i;
             TextView button=text(choices[i],12,true);button.setGravity(Gravity.CENTER);
-            button.setPadding(dp(3),dp(10),dp(3),dp(10));
+            button.setPadding(dp(3),dp(9),dp(3),dp(9));
+            button.setSingleLine(false);button.setMaxLines(2);
+            button.setEllipsize(android.text.TextUtils.TruncateAt.END);
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1f);
             lp.setMargins(dp(2),0,dp(2),0);tabs.addView(button,lp);buttons[i]=button;
             button.setOnClickListener(v->{
@@ -794,8 +798,8 @@ public final class RugbyHubActivity extends Activity {
                     buttons[j].setTextColor(j==index?0xffffffff:0xffb9cad7);
                 }
                 graph.removeAllViews();
-                heading.setText(index==0?(home==null?"Local":home):
-                    index==1?(away==null?"Visitante":away):"Ambos equipos · separados por equipo");
+                heading.setText(index==0?localName:
+                    index==1?visitorName:localName+" · "+visitorName);
                 graph.addView(new ThreeDChart(scores[index],index==2?combined:kinds,true));
                 addStatLegend(graph,scores[index],index==2?combined:kinds);
             });
