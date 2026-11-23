@@ -1115,6 +1115,7 @@ public class MainActivity extends Activity {
                                     addAnalysisFolder(sections,"Probabilidades por puesto",probabilities.toString(),true);
                                     addAnalysisFolder(sections,"Clasificación y acceso",qualification,false);
                                     addPendingMatchFolder(sections,pending,option.optInt("points"),option.optInt("remaining"));
+                                    addCombinedMatchSimulator(sections,pending,option.optInt("points"),option.optInt("remaining"));
                                     addAnalysisFolder(sections,"Rivales directos",rivals,false);
                                     addAnalysisFolder(sections,"Cómo se calcula",
                                             "3.000 simulaciones ponderadas por puntos por partido y tanteos anteriores disponibles. Los empates se resuelven aleatoriamente. No son probabilidades oficiales ni sustituyen los desempates FAR.",false);
@@ -1357,11 +1358,11 @@ public class MainActivity extends Activity {
                 String decoded=new org.json.JSONTokener(result).nextValue().toString();
                 org.json.JSONObject info=new org.json.JSONObject(decoded);
                 StringBuilder out=new StringBuilder();
-                out.append("Página: ").append(info.optString("titulo")).append("\\n");
-                out.append("URL: ").append(info.optString("url")).append("\\n");
-                out.append("Tablas: ").append(info.optJSONArray("tablas")!=null?info.optJSONArray("tablas").length():0).append("\\n");
-                out.append("Encabezados: ").append(info.optJSONArray("encabezados")).append("\\n");
-                out.append("Columnas y filas: ").append(info.optJSONArray("tablas")).append("\\n");
+                out.append("Página: ").append(info.optString("titulo")).append("\n");
+                out.append("URL: ").append(info.optString("url")).append("\n");
+                out.append("Tablas: ").append(info.optJSONArray("tablas")!=null?info.optJSONArray("tablas").length():0).append("\n");
+                out.append("Encabezados: ").append(info.optJSONArray("encabezados")).append("\n");
+                out.append("Columnas y filas: ").append(info.optJSONArray("tablas")).append("\n");
                 out.append("Marcos: ").append(info.optJSONArray("iframes"));
                 lastInspectedStructure=out.toString();
                 new android.app.AlertDialog.Builder(this).setTitle("Estructura detectada").setMessage(lastInspectedStructure).setPositiveButton("Cerrar",null).show();
@@ -1513,6 +1514,97 @@ public class MainActivity extends Activity {
             boolean open=content.getVisibility()!=View.VISIBLE;
             content.setVisibility(open?View.VISIBLE:View.GONE);
             header.setText((open?"▾ ":"▸ ")+"Partidos pendientes ("+matches.length()+")");
+        });
+    }
+
+    /** Independent what-if model: each fixture contributes 0..5 league points. */
+    private void addCombinedMatchSimulator(LinearLayout container,org.json.JSONArray matches,int currentPoints,int remaining){
+        LinearLayout group=new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        container.addView(group);
+        TextView header=txt("▸ Simular mis partidos",14,accent);
+        header.setPadding(dp(8),dp(12),dp(8),dp(12));
+        header.setBackgroundColor(panel);
+        group.addView(header);
+        LinearLayout content=new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(10),dp(10),dp(10),dp(10));
+        content.setVisibility(View.GONE);
+        group.addView(content);
+        if(matches.length()==0){
+            content.addView(txt("No hay partidos pendientes disponibles para simular.",12,Color.LTGRAY));
+        }else{
+            final int count=matches.length();
+            final int[] chosen=new int[count];
+            java.util.Arrays.fill(chosen,-1);
+            TextView summary=txt("",13,Color.WHITE);
+            summary.setPadding(0,dp(6),0,dp(10));
+            content.addView(summary);
+            Runnable update=()->{
+                int assigned=0,total=0;
+                for(int points:chosen)if(points>=0){assigned++;total+=points;}
+                int unknown=Math.max(0,remaining-assigned);
+                summary.setText("Puntos actuales: "+currentPoints+
+                    "\nPuntos simulados: +"+total+
+                    "\nTotal provisional: "+(currentPoints+total)+
+                    "\nPartidos sin simular: "+unknown+
+                    "\nMáximo alcanzable: "+(currentPoints+total+unknown*5));
+            };
+            update.run();
+            for(int index=0;index<count;index++){
+                org.json.JSONObject match=matches.optJSONObject(index);
+                if(match==null)continue;
+                final int matchIndex=index;
+                LinearLayout card=new LinearLayout(this);
+                card.setOrientation(LinearLayout.VERTICAL);
+                card.setPadding(dp(8),dp(8),dp(8),dp(8));
+                LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
+                params.bottomMargin=dp(5);
+                content.addView(card,params);
+                card.setBackgroundColor(panel);
+                card.addView(txt((index+1)+". "+(match.optBoolean("home")?"Local · ":"Visitante · ")+
+                    match.optString("opponent","Rival"),12,Color.WHITE));
+                TextView selection=txt("Sin simular · elegir puntos",11,accent);
+                selection.setPadding(0,dp(5),0,dp(5));
+                card.addView(selection);
+                LinearLayout buttons=new LinearLayout(this);
+                buttons.setOrientation(LinearLayout.HORIZONTAL);
+                card.addView(buttons);
+                for(int points=0;points<=5;points++){
+                    final int value=points;
+                    TextView button=txt(String.valueOf(points),12,accent);
+                    button.setGravity(android.view.Gravity.CENTER);
+                    button.setPadding(0,dp(8),0,dp(8));
+                    buttons.addView(button,new LinearLayout.LayoutParams(0,-2,1));
+                    button.setOnClickListener(v->{
+                        chosen[matchIndex]=value;
+                        selection.setText("Seleccionado: +"+value+" puntos");
+                        update.run();
+                    });
+                }
+            }
+            TextView reset=txt("↺ Restablecer simulación",12,accent);
+            reset.setPadding(dp(8),dp(12),dp(8),dp(12));
+            content.addView(reset);
+            reset.setOnClickListener(v->{
+                java.util.Arrays.fill(chosen,-1);
+                for(int i=0;i<content.getChildCount();i++){
+                    android.view.View child=content.getChildAt(i);
+                    if(child instanceof LinearLayout){
+                        LinearLayout card=(LinearLayout)child;
+                        if(card.getChildCount()>1&&card.getChildAt(1) instanceof TextView)
+                            ((TextView)card.getChildAt(1)).setText("Sin simular · elegir puntos");
+                    }
+                }
+                update.run();
+            });
+            content.addView(txt("Elige entre 0 y 5 puntos por partido, incluidos posibles bonus. "+
+                "La simulación es orientativa y no cambia la clasificación oficial ni las probabilidades calculadas.",11,Color.LTGRAY));
+        }
+        header.setOnClickListener(v->{
+            boolean open=content.getVisibility()!=View.VISIBLE;
+            content.setVisibility(open?View.VISIBLE:View.GONE);
+            header.setText((open?"▾ ":"▸ ")+"Simular mis partidos");
         });
     }
 
