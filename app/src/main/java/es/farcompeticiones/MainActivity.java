@@ -1115,7 +1115,7 @@ public class MainActivity extends Activity {
                                     addAnalysisFolder(sections,"Probabilidades por puesto",probabilities.toString(),true);
                                     addAnalysisFolder(sections,"Clasificación y acceso",qualification,false);
                                     addPendingMatchFolder(sections,pending,option.optInt("points"),option.optInt("remaining"));
-                                    addCombinedMatchSimulator(sections,pending,option.optInt("points"),option.optInt("remaining"));
+                                    addCombinedMatchSimulator(sections,pending,option.optInt("points"),option.optInt("remaining"),options,tappedTeam);
                                     addAnalysisFolder(sections,"Rivales directos",rivals,false);
                                     addAnalysisFolder(sections,"Cómo se calcula",
                                             "3.000 simulaciones ponderadas por puntos por partido y tanteos anteriores disponibles. Los empates se resuelven aleatoriamente. No son probabilidades oficiales ni sustituyen los desempates FAR.",false);
@@ -1518,7 +1518,7 @@ public class MainActivity extends Activity {
     }
 
     /** Independent what-if model: each fixture contributes 0..5 league points. */
-    private void addCombinedMatchSimulator(LinearLayout container,org.json.JSONArray matches,int currentPoints,int remaining){
+    private void addCombinedMatchSimulator(LinearLayout container,org.json.JSONArray matches,int currentPoints,int remaining,org.json.JSONArray standings,String teamName){
         LinearLayout group=new LinearLayout(this);
         group.setOrientation(LinearLayout.VERTICAL);
         container.addView(group);
@@ -1540,15 +1540,38 @@ public class MainActivity extends Activity {
             TextView summary=txt("",13,Color.WHITE);
             summary.setPadding(0,dp(6),0,dp(10));
             content.addView(summary);
+            TextView ranking=txt("",12,accent);
+            ranking.setPadding(0,0,0,dp(8));
+            content.addView(ranking);
             Runnable update=()->{
                 int assigned=0,total=0;
                 for(int points:chosen)if(points>=0){assigned++;total+=points;}
                 int unknown=Math.max(0,remaining-assigned);
+                int projected=currentPoints+total;
+                int ceiling=projected+unknown*5;
                 summary.setText("Puntos actuales: "+currentPoints+
                     "\nPuntos simulados: +"+total+
-                    "\nTotal provisional: "+(currentPoints+total)+
+                    "\nTotal provisional: "+projected+
                     "\nPartidos sin simular: "+unknown+
-                    "\nMáximo alcanzable: "+(currentPoints+total+unknown*5));
+                    "\nMáximo alcanzable: "+ceiling);
+                int guaranteedAhead=0,possiblyAhead=0;
+                if(standings!=null){
+                    for(int i=0;i<standings.length();i++){
+                        org.json.JSONObject rival=standings.optJSONObject(i);
+                        if(rival==null||rival.optString("team","").equalsIgnoreCase(teamName))continue;
+                        int rivalPoints=rival.optInt("points",0);
+                        int rivalMaximum=rival.optInt("maximum",rivalPoints);
+                        if(rivalPoints>ceiling)guaranteedAhead++;
+                        if(rivalMaximum>=projected)possiblyAhead++;
+                    }
+                }
+                int best=1+guaranteedAhead;
+                int worst=1+possiblyAhead;
+                ranking.setText("Posición orientativa posible: "+best+".º–"+worst+".º"+
+                    "\nAcceso entre los 5 primeros: "+(worst<=5?"compatible con todos los límites de puntos":
+                    best>5?"fuera incluso en el mejor límite de puntos":
+                    "todavía depende de los resultados rivales")+
+                    "\nNo son probabilidades recalculadas; los desempates y enfrentamientos directos pueden cambiar el intervalo.");
             };
             update.run();
             for(int index=0;index<count;index++){
@@ -1557,30 +1580,50 @@ public class MainActivity extends Activity {
                 final int matchIndex=index;
                 LinearLayout card=new LinearLayout(this);
                 card.setOrientation(LinearLayout.VERTICAL);
-                card.setPadding(dp(8),dp(8),dp(8),dp(8));
+                card.setPadding(dp(8),dp(5),dp(8),dp(5));
                 LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);
-                params.bottomMargin=dp(5);
+                params.bottomMargin=dp(3);
                 content.addView(card,params);
                 card.setBackgroundColor(panel);
                 card.addView(txt((index+1)+". "+(match.optBoolean("home")?"Local · ":"Visitante · ")+
                     match.optString("opponent","Rival"),12,Color.WHITE));
                 TextView selection=txt("Sin simular · elegir puntos",11,accent);
-                selection.setPadding(0,dp(5),0,dp(5));
+                selection.setPadding(0,dp(2),0,dp(2));
                 card.addView(selection);
                 LinearLayout buttons=new LinearLayout(this);
                 buttons.setOrientation(LinearLayout.HORIZONTAL);
                 card.addView(buttons);
+                final java.util.ArrayList<TextView> pointButtons=new java.util.ArrayList<>();
                 for(int points=0;points<=5;points++){
                     final int value=points;
                     TextView button=txt(String.valueOf(points),12,accent);
                     button.setGravity(android.view.Gravity.CENTER);
-                    button.setPadding(0,dp(8),0,dp(8));
+                    button.setPadding(0,dp(5),0,dp(5));
                     buttons.addView(button,new LinearLayout.LayoutParams(0,-2,1));
+                    pointButtons.add(button);
                     button.setOnClickListener(v->{
                         chosen[matchIndex]=value;
                         selection.setText("Seleccionado: +"+value+" puntos");
+                        for(int k=0;k<pointButtons.size();k++){
+                            TextView cell=pointButtons.get(k);
+                            cell.setTextColor(k==value?Color.BLACK:accent);
+                            cell.setBackgroundColor(k==value?accent:panel);
+                        }
                         update.run();
                     });
+                }
+            }
+            final java.util.ArrayList<java.util.ArrayList<TextView>> allButtons=new java.util.ArrayList<>();
+            for(int i=0;i<content.getChildCount();i++){
+                android.view.View child=content.getChildAt(i);
+                if(child instanceof LinearLayout){
+                    LinearLayout card=(LinearLayout)child;
+                    if(card.getChildCount()>2&&card.getChildAt(2) instanceof LinearLayout){
+                        java.util.ArrayList<TextView> cells=new java.util.ArrayList<>();
+                        LinearLayout line=(LinearLayout)card.getChildAt(2);
+                        for(int k=0;k<line.getChildCount();k++)if(line.getChildAt(k) instanceof TextView)cells.add((TextView)line.getChildAt(k));
+                        allButtons.add(cells);
+                    }
                 }
             }
             TextView reset=txt("↺ Restablecer simulación",12,accent);
@@ -1595,6 +1638,10 @@ public class MainActivity extends Activity {
                         if(card.getChildCount()>1&&card.getChildAt(1) instanceof TextView)
                             ((TextView)card.getChildAt(1)).setText("Sin simular · elegir puntos");
                     }
+                }
+                for(java.util.ArrayList<TextView> cells:allButtons)for(TextView cell:cells){
+                    cell.setTextColor(accent);
+                    cell.setBackgroundColor(panel);
                 }
                 update.run();
             });
