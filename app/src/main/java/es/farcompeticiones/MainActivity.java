@@ -868,7 +868,7 @@ public class MainActivity extends Activity {
                     if(!loadingActs[0]){
                         java.util.ArrayList<String> missing=new java.util.ArrayList<>();
                         for(org.json.JSONObject match:matches){
-                            String url=match.optString("statsUrl","");
+                            String url=match.optString("actUrl","");
                             if(url.startsWith("https://farugby.matchready.es/")&&!actCache.contains(url)&&!attemptedActs.contains(url)&&!missing.contains(url))missing.add(url);
                         }
                         if(!missing.isEmpty()){
@@ -899,7 +899,7 @@ public class MainActivity extends Activity {
                     }
 
                     for(org.json.JSONObject match:matches){
-                        String url=match.optString("statsUrl","");
+                        String url=match.optString("actUrl","");
                         org.json.JSONObject cached=null;
                         try{String raw=actCache.getString(url,null);if(raw!=null)cached=new org.json.JSONObject(raw);}catch(Exception ignored){}
                         if(cached==null){if(match.optJSONObject("acta")!=null)actCount++;continue;}
@@ -941,7 +941,7 @@ public class MainActivity extends Activity {
                     }
                     standingSection(content,"Actas y participación");
                     content.addView(txt(actCount+" de "+matches.size()+" partidos con alineación disponible",13,0xffd2e4ef));
-                    content.addView(txt("Abre las actas oficiales desde aquí para incorporar sus alineaciones; al volver, entra de nuevo en Jugadores para actualizar el recuento.",11,0xff75e6b2));
+                    content.addView(txt("Las alineaciones se leen automáticamente desde los PDF oficiales de cada partido.",11,0xff75e6b2));
                     content.addView(txt("Los minutos individuales se calcularán con las alineaciones, entradas, salidas y reingresos de cada acta. Sin sustituciones verificadas no se asignarán minutos estimados.",12,0xffb8d4cc));
                     if(matches.isEmpty())content.addView(txt("Todavía no hay partidos oficiales vinculados a este equipo.",12,0xffd2e4ef));
                     for(org.json.JSONObject match:matches){
@@ -955,7 +955,7 @@ public class MainActivity extends Activity {
                             int a=starters==null?0:starters.length(),b=substitutes==null?0:substitutes.length();
                             content.addView(txt(a+" titulares · "+b+" suplentes · minutos pendientes de validar",11,0xff75e6b2));
                         }else content.addView(txt("Alineación no disponible en los datos importados",11,0xffa9c4d2));
-                        String actUrl=match.optString("statsUrl","");
+                        String actUrl=match.optString("actUrl","");
                         if(actUrl.startsWith("https://farugby.matchready.es/")){
                             TextView open=txt("Consultar acta oficial ›",12,0xff75e6b2);
                             open.setPadding(dp(8),dp(4),dp(8),dp(10));content.addView(open);
