@@ -656,34 +656,55 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(205));
         lp.setMargins(dp(4),dp(5),dp(4),dp(12));target.addView(chart,lp);
     }
+    private int standingShade(int color,float factor){
+        return android.graphics.Color.rgb(
+            Math.min(255,(int)(android.graphics.Color.red(color)*factor)),
+            Math.min(255,(int)(android.graphics.Color.green(color)*factor)),
+            Math.min(255,(int)(android.graphics.Color.blue(color)*factor)));
+    }
     private void standingPie(LinearLayout target,int[] values,int[] colors,String[] names){
-        final int sum=Math.max(0,values[0])+Math.max(0,values[1])+Math.max(0,values[2]);
+        int sum=0;for(int v:values)sum+=Math.max(0,v);
+        final int total=sum;
+        LinearLayout card=new LinearLayout(this);card.setOrientation(1);
+        card.setPadding(dp(8),dp(6),dp(8),dp(10));card.setBackgroundColor(0xff1b2d3f);
+        LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);
+        cp.setMargins(dp(4),dp(4),dp(4),dp(10));target.addView(card,cp);
         android.view.View chart=new android.view.View(this){
-            final android.graphics.Paint paint=new android.graphics.Paint(3);
+            final android.graphics.Paint p=new android.graphics.Paint(3);
             @Override protected void onDraw(android.graphics.Canvas canvas){
                 super.onDraw(canvas);
-                float w=getWidth(),h=getHeight(),radius=Math.min(w*.36f,h*.38f);
-                float cx=w*.5f,cy=h*.45f;
-                android.graphics.RectF oval=new android.graphics.RectF(cx-radius,cy-radius*.64f,cx+radius,cy+radius*.64f);
-                paint.setStyle(android.graphics.Paint.Style.FILL);
-                paint.setColor(0xff0b1b29);
-                canvas.drawOval(cx-radius,cy-radius*.64f+dp(15),cx+radius,cy+radius*.64f+dp(15),paint);
-                float start=-90f;
+                canvas.save();canvas.scale(getWidth()/360f,getHeight()/170f);
+                if(total<=0){
+                    p.setColor(0xffb6c6d1);p.setTextSize(14);
+                    canvas.drawText("Sin resultados registrados",70,90,p);
+                    canvas.restore();return;
+                }
+                android.graphics.RectF oval=new android.graphics.RectF(65,15,295,135);
+                for(int depth=18;depth>=1;depth-=2){
+                    android.graphics.RectF base=new android.graphics.RectF(65,15+depth,295,135+depth);
+                    float angle=-90;
+                    for(int i=0;i<values.length;i++){
+                        float sweep=360f*Math.max(0,values[i])/total;
+                        p.setColor(standingShade(colors[i%colors.length],0.58f));
+                        canvas.drawArc(base,angle,sweep,true,p);angle+=sweep;
+                    }
+                }
+                float start=-90;
                 for(int i=0;i<values.length;i++){
-                    if(values[i]<=0||sum==0)continue;
-                    float sweep=360f*values[i]/sum;
-                    paint.setColor(colors[i]);canvas.drawArc(oval,start,sweep,true,paint);
+                    float sweep=360f*Math.max(0,values[i])/total;
+                    p.setColor(colors[i%colors.length]);canvas.drawArc(oval,start,sweep,true,p);
+                    android.graphics.RectF shine=new android.graphics.RectF(78,20,282,115);
+                    p.setColor(0x22ffffff);canvas.drawArc(shine,start,sweep,true,p);
                     start+=sweep;
                 }
-                paint.setColor(0x55ffffff);
-                paint.setStyle(android.graphics.Paint.Style.STROKE);paint.setStrokeWidth(dp(2));
-                canvas.drawOval(oval,paint);paint.setStyle(android.graphics.Paint.Style.FILL);
+                canvas.restore();
             }
         };
-        target.addView(chart,new LinearLayout.LayoutParams(-1,dp(185)));
+        chart.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE,null);
+        card.addView(chart,new LinearLayout.LayoutParams(-1,dp(175)));
         for(int i=0;i<values.length;i++){
-            TextView legend=txt("●  "+names[i]+": "+values[i]+(sum>0?"  ("+Math.round(values[i]*100f/sum)+" %)":""),12,colors[i]);
-            target.addView(legend);
+            TextView legend=txt("●  "+names[i]+": "+values[i]+(total>0?"  ("+Math.round(values[i]*100f/total)+" %)":""),12,colors[i]);
+            legend.setPadding(dp(8),dp(4),dp(8),dp(4));card.addView(legend);
         }
     }
     private void showStandingTeamStatistics(String team,String[] values){
@@ -698,8 +719,15 @@ public class MainActivity extends Activity {
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
         content.setPadding(dp(8),dp(4),dp(8),dp(12));
         scroll.addView(content);frame.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        TextView close=txt("CERRAR  ×",14,0xff75e6b2);close.setGravity(android.view.Gravity.CENTER);
-        close.setOnClickListener(v->dialog.dismiss());frame.addView(close);
+        TextView close=txt("Cerrar",14,Color.WHITE);
+        close.setGravity(android.view.Gravity.CENTER);
+        close.setTypeface(null,android.graphics.Typeface.BOLD);
+        android.graphics.drawable.GradientDrawable closeBg=new android.graphics.drawable.GradientDrawable();
+        closeBg.setColor(0xff606066);closeBg.setCornerRadius(dp(4));
+        close.setBackground(closeBg);
+        LinearLayout.LayoutParams closeLp=new LinearLayout.LayoutParams(-1,dp(43));
+        closeLp.setMargins(dp(14),dp(6),dp(14),dp(10));
+        close.setOnClickListener(v->dialog.dismiss());frame.addView(close,closeLp);
         dialog.setContentView(frame);
         String[] labels={"Resumen","Evolución","Partidos","Jugadores"};
         final int[] active={0};
