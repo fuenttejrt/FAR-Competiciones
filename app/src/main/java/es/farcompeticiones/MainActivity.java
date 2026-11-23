@@ -1030,6 +1030,7 @@ public class MainActivity extends Activity {
                             addStandingFixed(columns,"Pts",dp(45),accent);
                             addStandingFixed(columns,"Máx.",dp(45),accent);
                             addStandingFixed(columns,"Puesto*",dp(72),accent);
+                            final org.json.JSONObject detailData=data;
                             final java.util.ArrayList<TextView> simulatedCells=new java.util.ArrayList<>();
                             final java.util.ArrayList<LinearLayout> simulatedRows=new java.util.ArrayList<>();
                             final java.util.HashMap<String,org.json.JSONObject> teamSimulations=new java.util.HashMap<>();
@@ -1067,7 +1068,7 @@ public class MainActivity extends Activity {
                                         if(rank<5&&selectedCompetition.equals("Primera División"))direct+=occurrences;
                                         probabilities.append(rank+1).append(".º puesto: ")
                                                 .append(String.format(java.util.Locale.getDefault(),"%.1f",occurrences*100.0/3000.0))
-                                                .append("%\\n");
+                                                .append("%\n");
                                     }
                                     String estimated=String.format(java.util.Locale.getDefault(),"%.1f",direct*100.0/3000.0);
                                     int possibleAhead=0;
@@ -1078,7 +1079,7 @@ public class MainActivity extends Activity {
                                         if(rival==null||rival==option)continue;
                                         if(rival.optInt("maximum")>=currentPoints){
                                             possibleAhead++;
-                                            if(rivals.length()>0)rivals.append("\\n");
+                                            if(rivals.length()>0)rivals.append("\n");
                                             rivals.append("• ").append(rival.optString("team"))
                                                   .append(" · ").append(rival.optInt("points"))
                                                   .append(" pts, máximo ").append(rival.optInt("maximum"));
@@ -1086,11 +1087,11 @@ public class MainActivity extends Activity {
                                     }
                                     boolean assured=selectedCompetition.equals("Primera División")&&possibleAhead<5;
                                     String qualification=selectedCompetition.equals("Primera División")?
-                                            "Acceso directo estimado: "+estimated+"%\\nClasificación matemática: "+
+                                            "Acceso directo estimado: "+estimated+"%\nClasificación matemática: "+
                                             (assured?"ASEGURADA por límite de puntos.":"NO CONFIRMADA.")+
-                                            "\\n\\nEl 100 % en simulaciones no implica garantía matemática.":
+                                            "\n\nEl 100 % en simulaciones no implica garantía matemática.":
                                             "Los porcentajes son estimaciones, no plazas matemáticamente confirmadas.";
-                                    String pending=StandingIntelligence.pendingForTeam(tappedTeam,simData);
+                                    String pending=StandingIntelligence.pendingForTeam(tappedTeam,detailData);
                                     android.widget.ScrollView scroll=new android.widget.ScrollView(this);
                                     LinearLayout sections=new LinearLayout(this);
                                     sections.setOrientation(LinearLayout.VERTICAL);
