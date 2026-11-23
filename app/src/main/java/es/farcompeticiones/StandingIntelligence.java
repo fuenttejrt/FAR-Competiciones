@@ -239,4 +239,76 @@ final class StandingIntelligence {
         }catch(org.json.JSONException ex){return null;}
     }
 
+    /** Simula calendarios completos fuera del hilo principal. Los intervalos son
+     * observados, no cotas matematicas exhaustivas ni desempates oficiales. */
+    static JSONObject simulatedPositions(String season,String category,String competition,int phase,
+                                         JSONArray standings,JSONObject data) {
+        JSONObject baseline=compactAnalysis(season,category,competition,phase,standings,data);
+        if(baseline==null)return null;
+        ArrayList<Team> teams=teams(standings);
+        JSONArray tables=data.optJSONArray("tables");
+        if(tables==null)return null;
+        java.util.ArrayList<int[]> fixtures=new java.util.ArrayList<>();
+        java.util.HashSet<String> seen=new java.util.HashSet<>();
+        java.util.HashMap<String,Integer> indexes=new java.util.HashMap<>();
+        for(int i=0;i<teams.size();i++)indexes.put(key(teams.get(i).name),i);
+        for(int i=0;i<tables.length();i++){
+            JSONObject table=tables.optJSONObject(i);
+            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            String heading=table.optString("heading","").toLowerCase(java.util.Locale.ROOT);
+            if(!heading.matches("(?s).*(?:1[.ªº ]*fase|primera fase).*"))continue;
+            JSONArray games=table.optJSONArray("rows");
+            if(games==null)continue;
+            for(int j=0;j<games.length();j++){
+                JSONObject game=games.optJSONObject(j);
+                if(game==null||score(game.optString("score","")))continue;
+                String home=key(game.optString("home","")),away=key(game.optString("away",""));
+                Integer h=indexes.get(home),a=indexes.get(away);
+                if(h==null||a==null||h.equals(a))continue;
+                String id=home+"|"+away+"|"+game.optString("when","");
+                if(seen.add(id))fixtures.add(new int[]{h,a});
+            }
+        }
+        if(fixtures.isEmpty())return null;
+        int count=teams.size();
+        int[] best=new int[count],worst=new int[count];
+        java.util.Arrays.fill(best,count);
+        java.util.Arrays.fill(worst,1);
+        int[][] outcomes={{5,0},{4,0},{5,1},{4,1},{2,2},{0,5},{0,4},{1,5},{1,4}};
+        java.util.Random random=new java.util.Random(173L);
+        for(int trial=0;trial<3000;trial++){
+            if(Thread.currentThread().isInterrupted())return null;
+            int[] totals=new int[count];
+            for(int i=0;i<count;i++)totals[i]=teams.get(i).points;
+            for(int[] fixture:fixtures){
+                int[] result=outcomes[random.nextInt(outcomes.length)];
+                totals[fixture[0]]+=result[0];
+                totals[fixture[1]]+=result[1];
+            }
+            for(int i=0;i<count;i++){
+                int low=1,high=1;
+                for(int j=0;j<count;j++){
+                    if(i==j)continue;
+                    if(totals[j]>totals[i])low++;
+                    if(totals[j]>=totals[i])high++;
+                }
+                best[i]=Math.min(best[i],low);
+                worst[i]=Math.max(worst[i],high);
+            }
+        }
+        JSONObject result=new JSONObject();
+        try{
+            JSONArray output=new JSONArray();
+            for(int i=0;i<count;i++){
+                JSONObject row=new JSONObject();
+                row.put("team",teams.get(i).name);
+                row.put("best",best[i]);
+                row.put("worst",worst[i]);
+                output.put(row);
+            }
+            result.put("teams",output);
+            return result;
+        }catch(org.json.JSONException ex){return null;}
+    }
+
 }
