@@ -990,8 +990,9 @@ public class MainActivity extends Activity {
                             }
                         }
                         if(!thisMatch.isEmpty()){
-                            // Until sanctions can be timed reliably, never label a match with expulsions as fully verified.
-                            boolean hasDiscipline=false;
+                            // Sanctions affect the identified player, not the whole team.
+                            java.util.HashSet<String> sanctionedDorsals=new java.util.HashSet<>();
+                            boolean unknownSanction=false;
                             for(String keyName:new String[]{"temporaryCards","definitiveCards"}){
                                 String rawCards=cached.optString(keyName,"");
                                 int cardSide=-1;
@@ -999,17 +1000,45 @@ public class MainActivity extends Activity {
                                     String ct=cardLine.trim();
                                     if(ct.matches("(?i)Equipo local:.*"))cardSide=0;
                                     else if(ct.matches("(?i)Equipo visitante:.*"))cardSide=1;
-                                    else if(cardSide==(local?0:1)&&ct.matches("^\\d+\\. Min .*"))hasDiscipline=true;
+                                    else if(cardSide==(local?0:1)&&ct.matches("^\\d+\\. Min .*")){
+                                        java.util.regex.Matcher dm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(ct);
+                                        if(dm.find())sanctionedDorsals.add(dm.group(1));
+                                        else unknownSanction=true;
+                                    }
                                 }
                             }
-                            java.util.Map<String,Integer> perAct=hasDiscipline?null:verifiedActMinutes(lineup,cached.optString("changes",""),local,
+                            java.util.Map<String,Integer> perAct=verifiedActMinutes(lineup,cached.optString("changes",""),local,
                                 CompetitionRules.matchMinutes(season,category,selectedCompetition));
+                            int excludedPlayers=0;
+                            if(perAct!=null&&!sanctionedDorsals.isEmpty()){
+                                java.util.HashMap<String,String> dorsalIds=new java.util.HashMap<>();
+                                int lineSide=-1;
+                                java.util.regex.Pattern dorsalPlayer=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$");
+                                for(String rawLine:lineup.split("\\r?\\n")){
+                                    String t=rawLine.trim();
+                                    if(t.equals("EQUIPO LOCAL"))lineSide=0;
+                                    else if(t.equals("EQUIPO VISITANTE"))lineSide=1;
+                                    else if(lineSide==(local?0:1)){
+                                        java.util.regex.Matcher pm=dorsalPlayer.matcher(t);
+                                        if(pm.matches())dorsalIds.put(pm.group(1),pm.group(3)+"|"+pm.group(2).trim());
+                                    }
+                                }
+                                for(String dorsal:sanctionedDorsals){
+                                    String id=dorsalIds.get(dorsal);
+                                    if(id==null)unknownSanction=true;
+                                    else if(perAct.remove(id)!=null)excludedPlayers++;
+                                }
+                            }
+                            // If a card has no identifiable player, no minute count can be certified.
+                            if(unknownSanction)perAct=null;
                             String matchLabel=match.optString("home","")+" - "+match.optString("away","");
                             if(perAct==null){
-                                String reason=hasDiscipline?"Expulsión registrada: tiempo fuera de juego pendiente de verificar":
+                                String reason=unknownSanction?"Expulsión sin dorsal identificable":
                                     cached.optString("changes","").trim().isEmpty()?"Sin tabla de cambios legible":
                                     "Sustituciones no conciliadas con la alineación";
                                 minuteActDiagnostics.add("⚠ "+matchLabel+" · "+reason);
+                            }else if(excludedPlayers>0){
+                                minuteActDiagnostics.add("◐ "+matchLabel+" · Minutos calculados para "+perAct.size()+" jugadores; "+excludedPlayers+" sancionado(s) pendientes");
                             }else{
                                 minuteActDiagnostics.add("✓ "+matchLabel+" · "+CompetitionRules.matchMinutes(season,category,selectedCompetition)+" min analizados");
                             }
