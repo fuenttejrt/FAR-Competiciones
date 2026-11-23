@@ -954,7 +954,8 @@ public class MainActivity extends Activity {
                         if(starters!=null||substitutes!=null){
                             int a=starters==null?0:starters.length(),b=substitutes==null?0:substitutes.length();
                             content.addView(txt(a+" titulares · "+b+" suplentes · minutos pendientes de validar",11,0xff75e6b2));
-                        }else content.addView(txt("Alineación no disponible en los datos importados",11,0xffa9c4d2));
+                        }else if(actCache.contains(match.optString("actUrl","")))content.addView(txt("Alineación oficial incorporada al recuento de jugadores",11,0xff75e6b2));
+                        else content.addView(txt("Alineación oficial pendiente de lectura",11,0xffa9c4d2));
                         String actUrl=match.optString("actUrl","");
                         if(actUrl.startsWith("https://farugby.matchready.es/")){
                             TextView open=txt("Consultar acta oficial ›",12,0xff75e6b2);
