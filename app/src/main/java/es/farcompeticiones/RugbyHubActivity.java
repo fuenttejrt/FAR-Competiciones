@@ -579,6 +579,18 @@ public final class RugbyHubActivity extends Activity {
                         status.setText("Lectura adaptada al móvil");
                         java.util.LinkedHashMap<String,String> parsed=structuredActSections(content);
                         if(safeLineups!=null)parsed.put("Alineaciones",safeLineups);
+                        // Cache only extracted official data, keyed by the exact act URL.
+                        try{
+                            org.json.JSONObject cached=new org.json.JSONObject();
+                            cached.put("home",homeName==null?"":homeName);
+                            cached.put("away",awayName==null?"":awayName);
+                            cached.put("lineups",safeLineups==null?"":safeLineups);
+                            cached.put("changes",safeChanges==null?"":safeChanges);
+                            cached.put("scoreboard",safeScoreboard==null?"":safeScoreboard);
+                            getSharedPreferences("far_official_acts",MODE_PRIVATE).edit()
+                                .putString(url,cached.toString()).apply();
+                        }catch(Exception ignored){}
+
                         if(safeDiscipline!=null)parsed.put("Expulsiones",safeDiscipline);
                         if(safeScoreboard!=null)parsed.put("Marcador",safeScoreboard);
                         if(safeChanges!=null)parsed.put("Cambios",safeChanges);
