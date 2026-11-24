@@ -561,12 +561,13 @@ public class MainActivity extends Activity {
         if(tables==null)return "";
         for(int i=0;i<tables.length();i++){
             org.json.JSONObject table=tables.optJSONObject(i);
-            if(table==null||!"matches".equals(table.optString("kind")))continue;
+            if(table==null)continue;
             org.json.JSONArray rows=table.optJSONArray("rows");
             if(rows==null)continue;
             for(int j=0;j<rows.length();j++){
                 org.json.JSONObject row=rows.optJSONObject(j);
                 if(row==null)continue;
+                if(key.equals(normalizedTeamKey(row.optString("team",row.optString("name",""))))){String crest=row.optString("crest","");if(crest.startsWith("https://"))return crest;}
                 if(key.equals(normalizedTeamKey(row.optString("home","")))){
                     String crest=row.optString("homeCrest","");
                     if(crest.startsWith("https://"))return crest;
@@ -2380,7 +2381,9 @@ public class MainActivity extends Activity {
     private void competitionResultColumns(LinearLayout target,java.util.ArrayList<String> teams,java.util.Map<String,int[]> stats){
         final int[] colors={0xff48dca2,0xff56aaf2,0xffed7979};
         android.widget.HorizontalScrollView scroll=new android.widget.HorizontalScrollView(this);target.addView(scroll);
-        View chart=new View(this){@Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);
+        View chart=new View(this){
+            @Override protected void onMeasure(int w,int h){setMeasuredDimension(Math.max(getResources().getDisplayMetrics().widthPixels-dp(28),dp(64)*teams.size()+dp(32)),dp(215));}
+            @Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);
             android.graphics.Paint p=new android.graphics.Paint(3);float base=getHeight()-dp(42),top=dp(28),left=dp(24),slot=(getWidth()-left-dp(8))/Math.max(1,teams.size());int max=1;for(int[] a:stats.values())max=Math.max(max,a[0]);
             p.setTextSize(dp(10));p.setTextAlign(android.graphics.Paint.Align.RIGHT);
             for(int tick=0;tick<=4;tick++){float y=base-(base-top)*tick/4f;p.setColor(0xff45677d);c.drawLine(left,y,getWidth()-dp(5),y,p);p.setColor(0xffb8d4cc);c.drawText(String.format(java.util.Locale.getDefault(),"%.0f",max*tick/4f),left-dp(3),y,p);}
@@ -2393,14 +2396,14 @@ public class MainActivity extends Activity {
             }
         }};
         chart.setBackground(gradient(0xff203e50,0xff172b3c,0xff45677d));scroll.addView(chart,new android.widget.FrameLayout.LayoutParams(Math.max(getResources().getDisplayMetrics().widthPixels-dp(28),dp(72)*teams.size()+dp(32)),dp(215)));
-        target.addView(txt("● Victorias     ● Empates     ● Derrotas",12,0xffb8d4cc));
+        LinearLayout keyRow=new LinearLayout(this);target.addView(keyRow);for(int z=0;z<3;z++){TextView key=txt("● "+new String[]{"Victorias","Empates","Derrotas"}[z],12,colors[z]);keyRow.addView(key,new LinearLayout.LayoutParams(0,-2,1));}
         for(int i=0;i<teams.size();i++)target.addView(txt((i+1)+". "+teams.get(i),11,0xffb8d4cc));
     }
     private void competitionVenueDonut(LinearLayout target,String label,int[] v){
         TextView title=txt(label,13,Color.WHITE);title.setGravity(android.view.Gravity.CENTER);target.addView(title);
         final int[] colors={0xff48dca2,0xff56aaf2,0xffed7979};
         View chart=new View(this){@Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);android.graphics.Paint p=new android.graphics.Paint(3);float cx=getWidth()/2f,cy=getHeight()/2f-dp(4),radius=Math.min(getWidth(),getHeight())*.31f;p.setStyle(android.graphics.Paint.Style.STROKE);p.setStrokeWidth(radius*.44f);android.graphics.RectF oval=new android.graphics.RectF(cx-radius,cy-radius,cx+radius,cy+radius);
-            if(v[0]==0){p.setColor(0xff45677d);c.drawOval(oval,p);}else{for(int depth=dp(7);depth>=0;depth-=Math.max(1,dp(1))){android.graphics.RectF ring=new android.graphics.RectF(oval);ring.offset(0,depth);float angle=-90;for(int i=0;i<3;i++){float sweep=360f*v[i+1]/v[0];p.setColor(depth==0?colors[i]:standingShade(colors[i],.55f));c.drawArc(ring,angle,sweep,false,p);angle+=sweep;}}}
+            if(v[0]==0){p.setColor(0xff45677d);c.drawOval(oval,p);}else{for(int depth=dp(10);depth>=0;depth-=Math.max(1,dp(1))){android.graphics.RectF ring=new android.graphics.RectF(oval);ring.offset(0,depth);float angle=-90;for(int i=0;i<3;i++){float sweep=360f*v[i+1]/v[0];p.setColor(depth==0?colors[i]:standingShade(colors[i],.55f));if(depth==0)p.setShader(new android.graphics.LinearGradient(0,cy-radius,0,cy+radius,standingShade(colors[i],1.55f),colors[i],android.graphics.Shader.TileMode.CLAMP));c.drawArc(ring,angle,sweep,false,p);p.setShader(null);angle+=sweep;}}}
             p.setStyle(android.graphics.Paint.Style.FILL);p.setTextAlign(android.graphics.Paint.Align.CENTER);p.setColor(Color.WHITE);p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(dp(21));c.drawText(""+v[0],cx,cy+dp(3),p);p.setTypeface(Typeface.DEFAULT);p.setTextSize(dp(10));c.drawText("Partidos",cx,cy+dp(16),p);
         }};target.addView(chart,new LinearLayout.LayoutParams(-1,dp(125)));
         LinearLayout legend=new LinearLayout(this);legend.setGravity(android.view.Gravity.CENTER);target.addView(legend);for(int i=0;i<3;i++){TextView t=txt(v[i+1]+new String[]{" V"," E"," D"}[i],12,colors[i]);t.setPadding(dp(4),0,dp(4),0);legend.addView(t);}
