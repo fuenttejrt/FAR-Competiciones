@@ -1594,7 +1594,7 @@ public class MainActivity extends Activity {
                                     tab.setBackgroundColor(k==0?0xff28566b:0xff1b3446);
                                     playerTabs.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
                                     playerPanels[k].setVisibility(k==0?android.view.View.VISIBLE:android.view.View.GONE);
-                                    tab.setOnClickListener(v->{for(int j=0;j<4;j++){playerPanels[j].setVisibility(j==selected?android.view.View.VISIBLE:android.view.View.GONE);tabViews[j].setBackgroundColor(j==selected?0xff28566b:0xff1b3446);}});
+                                    tab.setOnClickListener(tabView->{for(int j=0;j<4;j++){playerPanels[j].setVisibility(j==selected?android.view.View.VISIBLE:android.view.View.GONE);tabViews[j].setBackgroundColor(j==selected?0xff28566b:0xff1b3446);}});
                                 }
                                 String statId=item.getKey();
                                 int playedActual=actualPlayed.getOrDefault(statId,0), known=participationKnown.getOrDefault(statId,0);
