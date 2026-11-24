@@ -2452,7 +2452,7 @@ public class MainActivity extends Activity {
 
             }else if(activeSection[0]==2){
         standingSection(section,"Evolución conjunta");
-        Spinner evolutionPicker=new Spinner(this);evolutionPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Tantos a favor","Tantos en contra","Diferencia de tantos","Victorias acumuladas"}));chartHost.addView(evolutionPicker);
+        Spinner evolutionPicker=new Spinner(this);evolutionPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Tantos a favor","Tantos en contra","Diferencia de tantos","Victorias acumuladas"}));section.addView(evolutionPicker);
         LinearLayout chartHost=new LinearLayout(this);chartHost.setOrientation(1);section.addView(chartHost);
         Runnable drawEvolution=()->{chartHost.removeAllViews();int metric=evolutionPicker.getSelectedItemPosition();
         final java.util.ArrayList<int[]> curves=new java.util.ArrayList<>();
