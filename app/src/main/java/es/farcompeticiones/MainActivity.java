@@ -621,22 +621,22 @@ public class MainActivity extends Activity {
             final android.graphics.Paint p=new android.graphics.Paint(3);
             @Override protected void onDraw(android.graphics.Canvas c){
                 super.onDraw(c);
-                c.save();c.scale(getWidth()/360f,getHeight()/225f);
+                c.save();c.scale(getWidth()/360f,getHeight()/300f);
                 int max=1;
                 for(int i=0;i<verified.length;i++)max=Math.max(max,verified[i]+estimated[i]);
-                p.setColor(0xff456073);p.setStrokeWidth(1);c.drawLine(10,171,350,171,p);
+                p.setColor(0xff456073);p.setStrokeWidth(1);c.drawLine(10,192,350,192,p);
                 float slot=340f/Math.max(1,names.length);
                 for(int i=0;i<names.length;i++){
                     float x=12+i*slot+slot*.20f;
                     float w=Math.min(25,slot*.54f);
-                    float h=140f*(verified[i]+estimated[i])/max;
+                    float h=158f*(verified[i]+estimated[i])/max;
                     float estimatedH=140f*estimated[i]/max;
-                    float top=167-h;
+                    float top=188-h;
                     android.graphics.Path side=new android.graphics.Path();
                     side.moveTo(x+w,top);side.lineTo(x+w+6,top-6);
-                    side.lineTo(x+w+6,165);side.lineTo(x+w,171);side.close();
+                    side.lineTo(x+w+6,186);side.lineTo(x+w,192);side.close();
                     p.setColor(0xff254b60);c.drawPath(side,p);
-                    p.setColor(0xff50dca9);c.drawRect(x,top+estimatedH,x+w,171,p);
+                    p.setColor(0xff50dca9);c.drawRect(x,top+estimatedH,x+w,192,p);
                     if(estimatedH>0){p.setColor(0xffeeb57d);c.drawRect(x,top,x+w,top+estimatedH,p);}
                     android.graphics.Path cap=new android.graphics.Path();
                     cap.moveTo(x,top);cap.lineTo(x+6,top-6);cap.lineTo(x+w+6,top-6);cap.lineTo(x+w,top);cap.close();
@@ -645,24 +645,25 @@ public class MainActivity extends Activity {
                     p.setTextSize(12);p.setTextAlign(android.graphics.Paint.Align.CENTER);
                     c.drawText(String.valueOf(verified[i]+estimated[i]),x+w/2,Math.max(13,top-10),p);
                     p.setTextSize(11);p.setTypeface(android.graphics.Typeface.DEFAULT);
-                    c.drawText(String.valueOf(i+1),x+w/2,194,p);
+                    String surname=names[i].split(",")[0].trim();
+                    if(surname.contains(" "))surname=surname.split(" ")[0];
+                    if(surname.length()>9)surname=surname.substring(0,8)+"…";
+                    p.setTextSize(10);p.setTextAlign(android.graphics.Paint.Align.LEFT);
+                    c.save();c.rotate(-48,x+w/2,214);
+                    c.drawText(surname,x+w/2,214,p);c.restore();
                 }
                 c.restore();
             }
         };
         chart.setBackgroundColor(0xff1b2d3f);
-        target.addView(chart,new LinearLayout.LayoutParams(-1,dp(225)));
-        chart.setOnClickListener(v->{
-            // The chart and the numbered legend share the same left-to-right ranking.
-            android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(this);
-            String[] options=new String[names.length];
-            for(int i=0;i<names.length;i++)
-                options[i]=(i+1)+". "+names[i]+" · "+(verified[i]+estimated[i])+" min";
-            dialog.setTitle("Abrir ficha del jugador");
-            dialog.setItems(options,(d,which)->{
-                android.view.View card=playerCards.get(names[which]);
-                if(card!=null)card.performClick();
-            }).show();
+        target.addView(chart,new LinearLayout.LayoutParams(-1,dp(300)));
+        chart.setOnTouchListener((v,event)->{
+            if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
+            float logicalX=event.getX()*360f/Math.max(1,v.getWidth());
+            int index=Math.max(0,Math.min(names.length-1,(int)((logicalX-12)/(340f/Math.max(1,names.length)))));
+            android.view.View card=playerCards.get(names[index]);
+            if(card!=null)card.performClick();
+            return true;
         });
     }
 
