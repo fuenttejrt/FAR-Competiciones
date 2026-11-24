@@ -500,13 +500,17 @@ public class MainActivity extends Activity {
                 ap.setMargins(8,0,8,10);actions.addView(control,ap);
                 control.setOnClickListener(v->{if(update)refreshNative(official);else openBrowser(official);});
             }
-            TextView globalStats=txt("",12,Color.WHITE);
-            globalStats.setSingleLine(true);
-            globalStats.setText(iconLabel("results","Estadísticas de la competición"));
-            globalStats.setGravity(android.view.Gravity.CENTER);globalStats.setTypeface(null,Typeface.BOLD);
-            android.graphics.drawable.GradientDrawable globalBg=new android.graphics.drawable.GradientDrawable();globalBg.setColor(tab.equals("Estadísticas")?0xff08643d:0xff173c3b);globalBg.setCornerRadius(dp(22));globalBg.setStroke(dp(1),tab.equals("Estadísticas")?0xff178e5a:0xff396a60);globalStats.setBackground(globalBg);
-            LinearLayout.LayoutParams globalLp=new LinearLayout.LayoutParams(-1,dp(39));globalLp.setMargins(8,0,8,10);body.addView(globalStats,globalLp);
-            globalStats.setOnClickListener(v->showCompetitionTab("Estadísticas"));
+            LinearLayout statsActions=new LinearLayout(this);statsActions.setOrientation(LinearLayout.HORIZONTAL);body.addView(statsActions);
+            for(String statsTab:new String[]{"Estadísticas","Ranking global"}){
+                boolean players=statsTab.equals("Ranking global");
+                TextView control=txt("",12,Color.WHITE);
+                control.setText(iconLabel("results",players?"Ranking jugadores":"Estadísticas equipos"));
+                control.setGravity(android.view.Gravity.CENTER);control.setTypeface(null,Typeface.BOLD);
+                android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+                bg.setColor(tab.equals(statsTab)?0xff08643d:0xff173c3b);bg.setCornerRadius(dp(22));bg.setStroke(dp(1),tab.equals(statsTab)?0xff178e5a:0xff396a60);control.setBackground(bg);
+                LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(43),1);lp.setMargins(8,0,8,10);statsActions.addView(control,lp);
+                control.setOnClickListener(v->showCompetitionTab(statsTab));
+            }
             showCachedNative();
             // Al abrir la clasificación M14, comprobar periódicamente si MatchReady ha publicado una fase nueva.
             // El intervalo evita descargas continuas al cambiar de pestaña y al terminar una importación.
@@ -2378,6 +2382,12 @@ public class MainActivity extends Activity {
         }
         java.util.ArrayList<String> teams=new java.util.ArrayList<>(names.values());
         if(teams.isEmpty()){body.addView(txt("Sin equipos importados",14,Color.WHITE));return;}
+        if(selectedTab.equals("Ranking global")){
+        standingSection(body,"Ranking global de jugadores");
+        LinearLayout ranking=new LinearLayout(this);ranking.setOrientation(1);body.addView(ranking);
+        competitionPlayerRanking(ranking,data,teams);
+            return;
+        }
         java.util.LinkedHashMap<String,int[]> stats=new java.util.LinkedHashMap<>();
         int games=0,points=0,draws=0;
         for(String team:teams){
@@ -2396,9 +2406,7 @@ public class MainActivity extends Activity {
         standingMetric(top,""+teams.size(),"Equipos");standingMetric(top,""+games,"Partidos");standingMetric(top,""+points,"Tantos");
         LinearLayout averages=new LinearLayout(this);body.addView(averages);
         standingMetric(averages,games>0?String.format(java.util.Locale.getDefault(),"%.1f",points/(double)games):"—","Tantos / partido");standingMetric(averages,""+draws,"Empates");
-        standingSection(body,"Ranking global de jugadores");
-        LinearLayout ranking=new LinearLayout(this);ranking.setOrientation(1);body.addView(ranking);
-        competitionPlayerRanking(ranking,data,teams);
+
         standingSection(body,"Ataque y defensa");
         java.util.ArrayList<String> ordered=new java.util.ArrayList<>(teams);
         ordered.sort((a,b)->Integer.compare(stats.get(b)[1],stats.get(a)[1]));
@@ -2428,7 +2436,7 @@ public class MainActivity extends Activity {
         body.addView(txt("Totales de marcadores importados. Los equipos pueden tener distinto número de partidos.",12,0xffb8d4cc));
     }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
-        if(selectedTab.equals("Estadísticas")){competitionStatistics(data);return;}
+        if(selectedTab.equals("Estadísticas")||selectedTab.equals("Ranking global")){competitionStatistics(data);return;}
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
         if(!selectedTab.equals("Clasificación")){
