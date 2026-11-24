@@ -1020,7 +1020,7 @@ public class MainActivity extends Activity {
         TextView title=txt(team+" · ESTADÍSTICAS",18,0xff75e6b2);
         title.setTypeface(null,android.graphics.Typeface.BOLD);frame.addView(title);
         frame.addView(txt("Temporada "+season+" · "+selectedCompetition,11,0xffb8d4cc));
-        LinearLayout tabs=new LinearLayout(this);frame.addView(tabs);
+        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(1);tabs.setPadding(dp(6),dp(4),dp(6),dp(4));frame.addView(tabs); final TextView[] tabButtons=new TextView[6];
         android.widget.ScrollView scroll=new android.widget.ScrollView(this);
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
         content.setPadding(dp(8),dp(4),dp(8),dp(12));
@@ -1035,7 +1035,7 @@ public class MainActivity extends Activity {
         closeLp.setMargins(dp(14),dp(6),dp(14),dp(10));
         close.setOnClickListener(v->dialog.dismiss());frame.addView(close,closeLp);
         dialog.setContentView(frame);
-        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ata./Def.","Ranking"};
+        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ataque/Def.","Ranking"};
         final int[] active={0};
         final boolean[] loadingActs={false};
         final java.util.HashSet<String> attemptedActs=new java.util.HashSet<>();
@@ -1043,10 +1043,10 @@ public class MainActivity extends Activity {
         final Runnable[] redrawRef=new Runnable[1];
         Runnable redraw=()->{
             content.removeAllViews();
-            for(int i=0;i<tabs.getChildCount();i++){
-                TextView tab=(TextView)tabs.getChildAt(i);
+            for(int i=0;i<tabButtons.length;i++){
+                TextView tab=tabButtons[i];
                 tab.setTextColor(i==active[0]?0xff75e6b2:0xffb0c6d1);
-                tab.setBackgroundColor(i==active[0]?0xff28546a:0xff1a3447);
+                android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{i==active[0]?0xff356477:0xff28495b,i==active[0]?0xff204658:0xff172e40});tabBg.setCornerRadius(dp(10));tabBg.setStroke(dp(1),i==active[0]?0xff75e6b2:0xff406575);tab.setBackground(tabBg);
             }
             if(active[0]==4){
                 java.util.ArrayList<org.json.JSONObject> games=standingTeamMatches(data,team);
@@ -1909,10 +1909,13 @@ public class MainActivity extends Activity {
             }
             scroll.scrollTo(0,0);
         };
+        LinearLayout tabRow=null;
+        String[] tabIcons={"▦","↗","▤","♟","⚔","★"};
         for(int i=0;i<labels.length;i++){
-            final int index=i;TextView tab=txt(labels[i],11,Color.WHITE);
-            tab.setGravity(android.view.Gravity.CENTER);tab.setPadding(dp(2),dp(13),dp(2),dp(13));
-            tabs.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
+            if(i%3==0){tabRow=new LinearLayout(this);tabs.addView(tabRow,new LinearLayout.LayoutParams(-1,-2));}
+            final int index=i;TextView tab=txt(tabIcons[i]+"\n"+labels[i],12,Color.WHITE);tabButtons[i]=tab;
+            tab.setGravity(android.view.Gravity.CENTER);tab.setPadding(dp(2),dp(5),dp(2),dp(5));tab.setMaxLines(2);
+            LinearLayout.LayoutParams tabLp=new LinearLayout.LayoutParams(0,dp(54),1);tabLp.setMargins(dp(3),dp(3),dp(3),dp(3));tabRow.addView(tab,tabLp);
             tab.setOnClickListener(v->{active[0]=index;redraw.run();});
         }
         redrawRef[0]=redraw;
