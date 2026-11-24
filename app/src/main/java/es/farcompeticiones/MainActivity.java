@@ -500,6 +500,12 @@ public class MainActivity extends Activity {
                 ap.setMargins(8,0,8,10);actions.addView(control,ap);
                 control.setOnClickListener(v->{if(update)refreshNative(official);else openBrowser(official);});
             }
+            TextView globalStats=txt("",14,Color.WHITE);
+            globalStats.setText(iconLabel("results","Estadísticas de la competición"));
+            globalStats.setGravity(android.view.Gravity.CENTER);globalStats.setTypeface(null,Typeface.BOLD);
+            android.graphics.drawable.GradientDrawable globalBg=new android.graphics.drawable.GradientDrawable();globalBg.setColor(tab.equals("Estadísticas")?0xff08643d:0xff244f86);globalBg.setCornerRadius(dp(12));globalBg.setStroke(dp(1),0xff507eb1);globalStats.setBackground(globalBg);
+            LinearLayout.LayoutParams globalLp=new LinearLayout.LayoutParams(-1,dp(44));globalLp.setMargins(dp(4),0,dp(4),dp(8));body.addView(globalStats,globalLp);
+            globalStats.setOnClickListener(v->showCompetitionTab("Estadísticas"));
             showCachedNative();
             // Al abrir la clasificación M14, comprobar periódicamente si MatchReady ha publicado una fase nueva.
             // El intervalo evita descargas continuas al cambiar de pestaña y al terminar una importación.
@@ -2238,7 +2244,69 @@ public class MainActivity extends Activity {
             parent.addView(txt(value,14,Color.WHITE));
         }
     }
+    private void competitionStatistics(org.json.JSONObject data){
+        java.util.TreeMap<String,String> names=new java.util.TreeMap<>();
+        org.json.JSONArray tables=data.optJSONArray("tables");
+        if(tables==null)return;
+        for(int i=0;i<tables.length();i++){
+            org.json.JSONObject t=tables.optJSONObject(i);
+            if(t==null||!"matches".equals(t.optString("kind")))continue;
+            org.json.JSONArray rows=t.optJSONArray("rows");if(rows==null)continue;
+            for(int j=0;j<rows.length();j++){
+                org.json.JSONObject g=rows.optJSONObject(j);if(g==null)continue;
+                for(String side:new String[]{"home","away"}){String n=g.optString(side).trim();if(!n.isEmpty())names.put(teamKey(n),n);}
+            }
+        }
+        java.util.ArrayList<String> teams=new java.util.ArrayList<>(names.values());
+        if(teams.isEmpty()){body.addView(txt("Sin equipos importados",14,Color.WHITE));return;}
+        java.util.LinkedHashMap<String,int[]> stats=new java.util.LinkedHashMap<>();
+        int games=0,points=0,draws=0;
+        for(String team:teams){
+            int[] a=new int[5];
+            for(org.json.JSONObject g:standingTeamMatches(data,team)){
+                int[] score=standingMatchScore(g.optString("score"));if(score==null)continue;
+                boolean home=teamKey(team).equals(teamKey(g.optString("home")));
+                int f=score[home?0:1],c=score[home?1:0];
+                a[0]++;a[1]+=f;a[2]+=c;if(f>c)a[3]++;if(f==c)a[4]++;
+                if(home){games++;points+=f+c;if(f==c)draws++;}
+            }
+            stats.put(team,a);
+        }
+        standingSection(body,"Estadísticas de la competición");
+        LinearLayout top=new LinearLayout(this);body.addView(top);
+        standingMetric(top,""+teams.size(),"Equipos");standingMetric(top,""+games,"Partidos");standingMetric(top,""+points,"Tantos");
+        LinearLayout averages=new LinearLayout(this);body.addView(averages);
+        standingMetric(averages,games>0?String.format(java.util.Locale.getDefault(),"%.1f",points/(double)games):"—","Tantos / partido");standingMetric(averages,""+draws,"Empates");
+        standingSection(body,"Ataque y defensa");
+        java.util.ArrayList<String> ordered=new java.util.ArrayList<>(teams);
+        ordered.sort((a,b)->Integer.compare(stats.get(b)[1],stats.get(a)[1]));
+        int max=1;for(int[] a:stats.values())max=Math.max(max,Math.max(a[1],a[2]));
+        for(String team:ordered){int[] a=stats.get(team);standingSection(body,team+" · "+a[0]+" PJ");standingBar(body,"Favor",a[1],max,0xff48dca2);standingBar(body,"Contra",a[2],max,0xffed7979);}
+        standingSection(body,"Comparador y evolución");
+        Spinner first=new Spinner(this),second=new Spinner(this);
+        first.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teams));
+        second.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teams));
+        body.addView(first);body.addView(second);second.setSelection(Math.min(1,teams.size()-1));
+        LinearLayout comparison=new LinearLayout(this);comparison.setOrientation(1);body.addView(comparison);
+        Runnable redraw=()->{
+            comparison.removeAllViews();
+            int i=first.getSelectedItemPosition(),j=second.getSelectedItemPosition();if(i<0||j<0)return;
+            String x=teams.get(i),y=teams.get(j);int[] a=stats.get(x),b=stats.get(y);
+            comparison.addView(txt(x+" (A) · "+y+" (B)",13,0xffb8d4cc));
+            standingColumns3D(comparison,new String[]{"A favor","B favor","A contra","B contra"},new int[]{a[1],b[1],a[2],b[2]},new int[]{0xff48dca2,0xff56aaf2,0xff48dca2,0xff56aaf2});
+            for(String team:new String[]{x,y}){
+                standingSection(comparison,team);
+                java.util.ArrayList<Integer> f=new java.util.ArrayList<>(),c=new java.util.ArrayList<>();
+                for(org.json.JSONObject g:standingTeamMatches(data,team)){int[] score=standingMatchScore(g.optString("score"));if(score==null)continue;boolean home=teamKey(team).equals(teamKey(g.optString("home")));f.add(score[home?0:1]);c.add(score[home?1:0]);}
+                if(!f.isEmpty())standingEvolutionChart(comparison,f,c);
+            }
+        };
+        AdapterView.OnItemSelectedListener listener=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){redraw.run();}};
+        first.setOnItemSelectedListener(listener);second.setOnItemSelectedListener(listener);redraw.run();
+        body.addView(txt("Totales de marcadores importados. Los equipos pueden tener distinto número de partidos.",12,0xffb8d4cc));
+    }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
+        if(selectedTab.equals("Estadísticas")){competitionStatistics(data);return;}
         org.json.JSONArray tables=data.optJSONArray("tables");if(tables==null)return;
         int count=0;
         if(!selectedTab.equals("Clasificación")){
