@@ -2245,6 +2245,75 @@ public class MainActivity extends Activity {
             parent.addView(txt(value,14,Color.WHITE));
         }
     }
+    private void competitionPlayerRanking(LinearLayout panel,org.json.JSONObject data,java.util.ArrayList<String> teams){
+        android.content.SharedPreferences cache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
+        java.util.LinkedHashMap<String,org.json.JSONObject> matches=new java.util.LinkedHashMap<>();
+        for(String team:teams)for(org.json.JSONObject g:standingTeamMatches(data,team)){
+            if("Descanso".equalsIgnoreCase(g.optString("home").trim())||"Descanso".equalsIgnoreCase(g.optString("away").trim()))continue;
+            String url=g.optString("actUrl");if(url.startsWith("https://farugby.matchready.es/"))matches.put(url,g);
+        }
+        panel.addView(txt("Consultando "+matches.size()+" actas oficiales…",13,0xff75e6b2));
+        new Thread(()->{
+            com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());
+            java.util.Map<String,int[]> totals=new java.util.LinkedHashMap<>();
+            java.util.Map<String,String> labels=new java.util.HashMap<>();
+            int coverage=0,scoreCoverage=0;
+            for(java.util.Map.Entry<String,org.json.JSONObject> entry:matches.entrySet()){
+                try{
+                    String url=entry.getKey();org.json.JSONObject g=entry.getValue();
+                    org.json.JSONObject act=new org.json.JSONObject(cache.getString(url,"{}"));
+                    if(act.optString("lineups").isEmpty()){act=RugbyHubActivity.extractOfficialAct(url);if(!act.optString("lineups").isEmpty())cache.edit().putString(url,act.toString()).apply();}
+                    java.util.Map<String,String> dorsals=new java.util.HashMap<>();
+                    java.util.Set<String> seen=new java.util.HashSet<>();int side=-1;boolean starter=false;
+                    for(String raw:act.optString("lineups").split("\\r?\\n")){
+                        String line=raw.trim();
+                        if(line.equals("EQUIPO LOCAL")){side=0;continue;}
+                        if(line.equals("EQUIPO VISITANTE")){side=1;continue;}
+                        if(line.startsWith("JUGADORES SIN EQUIPO")){side=-1;continue;}
+                        if(line.startsWith("TITULARES (")){starter=true;continue;}
+                        if(line.startsWith("SUPLENTES (")){starter=false;continue;}
+                        if(side<0)continue;
+                        java.util.regex.Matcher m=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$").matcher(line);
+                        if(!m.matches())continue;
+                        String team=g.optString(side==0?"home":"away"),id=m.group(3)+"|"+teamKey(team);
+                        labels.put(id,m.group(2).trim().replaceFirst("\\s+\\d+(?:\\s+\\d+)*$","")+" · "+team);
+                        dorsals.put(side+":"+m.group(1),id);
+                        if(seen.add(id)){int[] a=totals.computeIfAbsent(id,k->new int[9]);a[0]++;if(starter)a[1]++;}
+                    }
+                    if(seen.isEmpty())continue;coverage++;
+                    int[] score=standingMatchScore(g.optString("score"));int[] sums=new int[2];boolean valid=score!=null;boolean[] sides=new boolean[2];
+                    java.util.ArrayList<String[]> events=new java.util.ArrayList<>();side=-1;
+                    for(String raw:act.optString("scoreboard").split("\\r?\\n")){
+                        String line=raw.trim();
+                        if(line.startsWith("Equipo local:")){side=0;sides[0]=true;continue;}
+                        if(line.startsWith("Equipo visitante:")){side=1;sides[1]=true;continue;}
+                        if(side<0)continue;
+                        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)\\s*[-·]\\s*Dorsal\\s*(\\d+)").matcher(line);
+                        if(m.find()){String id=dorsals.get(side+":"+m.group(4));if(id==null){valid=false;continue;}sums[side]+=Integer.parseInt(m.group(3));events.add(new String[]{id,m.group(2).toLowerCase(java.util.Locale.ROOT),m.group(3)});}
+                        else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))valid=false;
+                    }
+                    if(valid&&sides[0]&&sides[1]&&sums[0]==score[0]&&sums[1]==score[1]){scoreCoverage++;for(String[] e:events){int[] a=totals.get(e[0]);a[2]+=Integer.parseInt(e[2]);String k=e[1];if(k.contains("ensayo"))a[3]++;else if(k.contains("transform"))a[4]++;else if(k.contains("castigo")||k.contains("penal"))a[5]++;else if(k.contains("drop"))a[6]++;}}
+                    for(String key:new String[]{"temporaryCards","definitiveCards"}){side=-1;for(String raw:act.optString(key).split("\\r?\\n")){String line=raw.trim();if(line.matches("(?i)Equipo local:.*"))side=0;else if(line.matches("(?i)Equipo visitante:.*"))side=1;else if(side>=0&&line.matches("^\\d+\\. Min .*")){java.util.regex.Matcher m=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(line);if(m.find()){String id=dorsals.get(side+":"+m.group(1));if(id!=null)totals.get(id)[key.equals("temporaryCards")?7:8]++;}}}}
+                }catch(Exception ignored){}
+            }
+            final int checked=coverage,scored=scoreCoverage;
+            runOnUiThread(()->{
+                if(!panel.isAttachedToWindow())return;
+                panel.removeAllViews();panel.addView(txt("Alineaciones: "+checked+"/"+matches.size()+" actas · Anotaciones conciliadas: "+scored+"/"+matches.size(),12,0xffb8d4cc));
+                String[] metrics={"Convocatorias","Titularidades","Puntos","Ensayos","Transformaciones","Castigos","Drops","Amarillas","Rojas"};
+                Spinner picker=new Spinner(this);picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,metrics));panel.addView(picker);
+                LinearLayout results=new LinearLayout(this);results.setOrientation(1);panel.addView(results);
+                picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){
+                    results.removeAllViews();java.util.ArrayList<String> ids=new java.util.ArrayList<>(totals.keySet());ids.removeIf(k->totals.get(k)[position]<=0);ids.sort((a,b)->{int c=Integer.compare(totals.get(b)[position],totals.get(a)[position]);return c!=0?c:labels.get(a).compareTo(labels.get(b));});
+                    if(ids.isEmpty()){results.addView(txt("Sin registros positivos en las actas analizadas",13,0xffb8d4cc));return;}
+                    int n=Math.min(10,ids.size());String[] names=new String[n];int[] values=new int[n],colors=new int[n];for(int i=0;i<n;i++){String k=ids.get(i);names[i]=""+(i+1);values[i]=totals.get(k)[position];colors[i]=position==7?0xffffc365:position==8?0xffed7979:0xff48dca2;}
+                    standingColumns3D(results,names,values,colors);
+                    for(int i=0;i<ids.size();i++){String k=ids.get(i);results.addView(txt((i+1)+". "+labels.get(k)+" · "+totals.get(k)[position],13,0xffe2f5fa));}
+                }});picker.setSelection(2);
+                panel.addView(txt("Registros disponibles; las actas incompletas no equivalen a cero. Minutos y sustituciones pendientes de integrar.",11,0xffb8d4cc));
+            });
+        }).start();
+    }
     private void competitionStatistics(org.json.JSONObject data){
         java.util.TreeMap<String,String> names=new java.util.TreeMap<>();
         org.json.JSONArray tables=data.optJSONArray("tables");
@@ -2278,6 +2347,9 @@ public class MainActivity extends Activity {
         standingMetric(top,""+teams.size(),"Equipos");standingMetric(top,""+games,"Partidos");standingMetric(top,""+points,"Tantos");
         LinearLayout averages=new LinearLayout(this);body.addView(averages);
         standingMetric(averages,games>0?String.format(java.util.Locale.getDefault(),"%.1f",points/(double)games):"—","Tantos / partido");standingMetric(averages,""+draws,"Empates");
+        standingSection(body,"Ranking global de jugadores");
+        LinearLayout ranking=new LinearLayout(this);ranking.setOrientation(1);body.addView(ranking);
+        competitionPlayerRanking(ranking,data,teams);
         standingSection(body,"Ataque y defensa");
         java.util.ArrayList<String> ordered=new java.util.ArrayList<>(teams);
         ordered.sort((a,b)->Integer.compare(stats.get(b)[1],stats.get(a)[1]));
