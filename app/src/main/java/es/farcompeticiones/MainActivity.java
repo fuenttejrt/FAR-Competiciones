@@ -500,11 +500,12 @@ public class MainActivity extends Activity {
                 ap.setMargins(8,0,8,10);actions.addView(control,ap);
                 control.setOnClickListener(v->{if(update)refreshNative(official);else openBrowser(official);});
             }
-            TextView globalStats=txt("",14,Color.WHITE);
+            TextView globalStats=txt("",12,Color.WHITE);
+            globalStats.setSingleLine(true);
             globalStats.setText(iconLabel("results","Estadísticas de la competición"));
             globalStats.setGravity(android.view.Gravity.CENTER);globalStats.setTypeface(null,Typeface.BOLD);
-            android.graphics.drawable.GradientDrawable globalBg=new android.graphics.drawable.GradientDrawable();globalBg.setColor(tab.equals("Estadísticas")?0xff08643d:0xff244f86);globalBg.setCornerRadius(dp(12));globalBg.setStroke(dp(1),0xff507eb1);globalStats.setBackground(globalBg);
-            LinearLayout.LayoutParams globalLp=new LinearLayout.LayoutParams(-1,dp(44));globalLp.setMargins(dp(4),0,dp(4),dp(8));body.addView(globalStats,globalLp);
+            android.graphics.drawable.GradientDrawable globalBg=new android.graphics.drawable.GradientDrawable();globalBg.setColor(tab.equals("Estadísticas")?0xff08643d:0xff173c3b);globalBg.setCornerRadius(dp(22));globalBg.setStroke(dp(1),tab.equals("Estadísticas")?0xff178e5a:0xff396a60);globalStats.setBackground(globalBg);
+            LinearLayout.LayoutParams globalLp=new LinearLayout.LayoutParams(-1,dp(39));globalLp.setMargins(8,0,8,10);body.addView(globalStats,globalLp);
             globalStats.setOnClickListener(v->showCompetitionTab("Estadísticas"));
             showCachedNative();
             // Al abrir la clasificación M14, comprobar periódicamente si MatchReady ha publicado una fase nueva.
@@ -2254,7 +2255,7 @@ public class MainActivity extends Activity {
             org.json.JSONArray rows=t.optJSONArray("rows");if(rows==null)continue;
             for(int j=0;j<rows.length();j++){
                 org.json.JSONObject g=rows.optJSONObject(j);if(g==null)continue;
-                for(String side:new String[]{"home","away"}){String n=g.optString(side).trim();if(!n.isEmpty())names.put(teamKey(n),n);}
+                for(String side:new String[]{"home","away"}){String n=g.optString(side).trim();if(!n.isEmpty()&&!n.equalsIgnoreCase("Descanso"))names.put(teamKey(n),n);}
             }
         }
         java.util.ArrayList<String> teams=new java.util.ArrayList<>(names.values());
@@ -2263,7 +2264,7 @@ public class MainActivity extends Activity {
         int games=0,points=0,draws=0;
         for(String team:teams){
             int[] a=new int[5];
-            for(org.json.JSONObject g:standingTeamMatches(data,team)){
+            for(org.json.JSONObject g:standingTeamMatches(data,team)){if("Descanso".equalsIgnoreCase(g.optString("home").trim())||"Descanso".equalsIgnoreCase(g.optString("away").trim()))continue;
                 int[] score=standingMatchScore(g.optString("score"));if(score==null)continue;
                 boolean home=teamKey(team).equals(teamKey(g.optString("home")));
                 int f=score[home?0:1],c=score[home?1:0];
