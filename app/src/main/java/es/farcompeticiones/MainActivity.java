@@ -1049,6 +1049,7 @@ public class MainActivity extends Activity {
             for(int i=0;i<tabButtons.length;i++){
                 TextView tab=tabButtons[i];
                 tab.setTextColor(i==active[0]?0xff092c25:0xffd9eaff);
+                tab.setCompoundDrawables(null,standingNavIcon(i,i==active[0]?0xff092c25:0xffd9eaff),null,null);
                 android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{i==active[0]?0xff83e9bf:0xff244f86,i==active[0]?0xff40bc92:0xff17365c});tabBg.setCornerRadius(dp(7));tabBg.setStroke(dp(1),i==active[0]?0xffa5f6d4:0xff507eb1);tab.setBackground(tabBg);
             }
             if(active[0]==4){
@@ -1913,11 +1914,11 @@ public class MainActivity extends Activity {
             scroll.scrollTo(0,0);
         };
         LinearLayout tabRow=null;
-        String[] tabIcons={"▦","↗","▤","♟","⚔","★"};
         for(int i=0;i<labels.length;i++){
             if(i%3==0){tabRow=new LinearLayout(this);tabs.addView(tabRow,new LinearLayout.LayoutParams(-1,-2));}
-            final int index=i;TextView tab=txt(tabIcons[i]+"\n"+labels[i],12,Color.WHITE);tabButtons[i]=tab;
-            android.text.SpannableString navText=new android.text.SpannableString(tabIcons[i]+"\n"+labels[i]);navText.setSpan(new android.text.style.RelativeSizeSpan(1.4f),0,tabIcons[i].length(),0);tab.setText(navText);tab.setTypeface(null,android.graphics.Typeface.BOLD);
+            final int index=i;TextView tab=txt(labels[i],12,Color.WHITE);tabButtons[i]=tab;
+            tab.setTypeface(null,android.graphics.Typeface.BOLD);
+            tab.setCompoundDrawablePadding(dp(3));
             tab.setGravity(android.view.Gravity.CENTER);tab.setPadding(dp(2),dp(5),dp(2),dp(5));tab.setMaxLines(2);
             LinearLayout.LayoutParams tabLp=new LinearLayout.LayoutParams(0,dp(58),1);tabLp.setMargins(dp(3),dp(3),dp(3),dp(3));tabRow.addView(tab,tabLp);
             tab.setOnClickListener(v->{active[0]=index;redraw.run();});
@@ -1928,6 +1929,29 @@ public class MainActivity extends Activity {
         android.view.Window window=dialog.getWindow();
         if(window!=null)window.setLayout(getResources().getDisplayMetrics().widthPixels-dp(20),
             getResources().getDisplayMetrics().heightPixels-dp(65));
+    }
+    android.graphics.drawable.Drawable standingNavIcon(int kind,int color){
+        int size=dp(24);
+        android.graphics.Bitmap b=android.graphics.Bitmap.createBitmap(size,size,android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c=new android.graphics.Canvas(b);c.scale(size/24f,size/24f);
+        android.graphics.Paint p=new android.graphics.Paint(3);p.setColor(color);p.setStyle(android.graphics.Paint.Style.STROKE);p.setStrokeWidth(1.7f);p.setStrokeCap(android.graphics.Paint.Cap.ROUND);p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        android.graphics.Path q=new android.graphics.Path();
+        switch(kind){
+            case 0:
+                c.drawRoundRect(3,3,10,10,1,1,p);c.drawRoundRect(14,3,21,10,1,1,p);c.drawRoundRect(3,14,10,21,1,1,p);c.drawRoundRect(14,14,21,21,1,1,p);break;
+            case 1:
+                c.drawLine(3,3,3,21,p);c.drawLine(3,21,22,21,p);q.moveTo(6,16);q.lineTo(11,11);q.lineTo(15,14);q.lineTo(21,5);c.drawPath(q,p);c.drawLine(16,5,21,5,p);c.drawLine(21,5,21,10,p);break;
+            case 2:
+                c.drawRoundRect(3,5,21,21,2,2,p);c.drawLine(3,10,21,10,p);c.drawLine(8,3,8,7,p);c.drawLine(16,3,16,7,p);c.drawLine(7,14,10,14,p);c.drawLine(14,14,17,14,p);c.drawLine(7,18,10,18,p);break;
+            case 3:
+                c.drawCircle(9,7,3,p);c.drawCircle(17,8,2.5f,p);c.drawRoundRect(3,13,15,21,3,3,p);q.moveTo(17,13);q.quadTo(22,13,22,20);q.lineTo(17,20);c.drawPath(q,p);break;
+            case 4:
+                q.moveTo(12,2);q.lineTo(21,5);q.lineTo(20,13);q.quadTo(18,19,12,22);q.quadTo(6,19,4,13);q.lineTo(3,5);q.close();c.drawPath(q,p);
+                c.save();c.rotate(-38,11,12);c.drawOval(5,9,17,15,p);c.drawLine(8,12,14,12,p);c.drawLine(10,10.5f,10,13.5f,p);c.drawLine(12,10.5f,12,13.5f,p);c.restore();c.drawLine(15,7,19,7,p);c.drawLine(19,7,19,11,p);break;
+            case 5:
+                q.moveTo(7,3);q.lineTo(17,3);q.lineTo(17,10);q.quadTo(17,15,12,15);q.quadTo(7,15,7,10);q.close();c.drawPath(q,p);q.reset();q.moveTo(7,5);q.lineTo(3,5);q.quadTo(3,12,8,12);q.moveTo(17,5);q.lineTo(21,5);q.quadTo(21,12,16,12);c.drawPath(q,p);c.drawLine(12,15,12,20,p);c.drawLine(7,21,17,21,p);break;
+        }
+        android.graphics.drawable.BitmapDrawable d=new android.graphics.drawable.BitmapDrawable(getResources(),b);d.setBounds(0,0,size,size);return d;
     }
     void addStandingTeam(LinearLayout parent,String team,String crest,int width){
         LinearLayout fixed=new LinearLayout(this);
