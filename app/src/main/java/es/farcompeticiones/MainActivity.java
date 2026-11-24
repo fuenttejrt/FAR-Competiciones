@@ -1294,13 +1294,30 @@ public class MainActivity extends Activity {
                             int cmp=Integer.compare(tb,ta);
                             return cmp!=0?cmp:a.compareToIgnoreCase(b);
                         });
+                        LinearLayout minuteRankingPanel=new LinearLayout(this);
+                        minuteRankingPanel.setOrientation(1);
+                        LinearLayout starterRankingPanel=new LinearLayout(this);
+                        starterRankingPanel.setOrientation(1);
+                        TextView rankingSelector=txt("Ranking: Minutos  ▾",15,0xff75e6b2);
+                        rankingSelector.setPadding(dp(10),dp(10),dp(10),dp(10));
+                        content.addView(rankingSelector);
+                        content.addView(minuteRankingPanel);
+                        content.addView(starterRankingPanel);
+                        starterRankingPanel.setVisibility(android.view.View.GONE);
+                        rankingSelector.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
+                            .setTitle("Seleccionar ranking")
+                            .setItems(new String[]{"Minutos","Titularidades"},(dialog,choice)->{
+                                minuteRankingPanel.setVisibility(choice==0?android.view.View.VISIBLE:android.view.View.GONE);
+                                starterRankingPanel.setVisibility(choice==1?android.view.View.VISIBLE:android.view.View.GONE);
+                                rankingSelector.setText("Ranking: "+(choice==0?"Minutos":"Titularidades")+"  ▾");
+                            }).show());
                         int minuteChartSize=Math.min(10,minuteRank.size());
                         if(minuteChartSize>0){
                             String[] minuteNames=new String[minuteChartSize];
                             int[] minuteVerified=new int[minuteChartSize];
                             int[] minuteEstimated=new int[minuteChartSize];
-                            standingSection(content,"Top 10 · más minutos · gráfico 3D");
-                            content.addView(txt("Verde: verificados  ·  Naranja: estimados por amarilla. Pulsa el gráfico o un jugador para abrir su ficha.",11,0xffa9c4d2));
+                            standingSection(minuteRankingPanel,"Top 10 · más minutos · gráfico 3D");
+                            minuteRankingPanel.addView(txt("Verde: verificados  ·  Naranja: estimados por amarilla. Pulsa el gráfico o un jugador para abrir su ficha.",11,0xffa9c4d2));
                             for(int k=0;k<minuteChartSize;k++){
                                 String key=minuteRank.get(k);
                                 String[] parts=key.split("\\|",2);
@@ -1308,7 +1325,7 @@ public class MainActivity extends Activity {
                                 minuteVerified[k]=verifiedMinutes.getOrDefault(key,0);
                                 minuteEstimated[k]=estimatedMinutes.getOrDefault(key,0);
                             }
-                            standingMinuteRanking3D(content,minuteNames,minuteVerified,minuteEstimated,playerCardLookup);
+                            standingMinuteRanking3D(minuteRankingPanel,minuteNames,minuteVerified,minuteEstimated,playerCardLookup);
                             for(int k=0;k<minuteChartSize;k++){
                                 final String playerName=minuteNames[k];
                                 TextView legendLine=txt((k+1)+". "+playerName+" · "+minuteVerified[k]+" min verificados"
@@ -1318,12 +1335,13 @@ public class MainActivity extends Activity {
                                     android.view.View card=playerCardLookup.get(playerName);
                                     if(card!=null)card.performClick();
                                 });
-                                content.addView(legendLine);
+                                minuteRankingPanel.addView(legendLine);
                             }
                         }
                         int chartSize=Math.min(10,starterRanking.size());
                         if(chartSize>0){
                             String[] chartNames=new String[chartSize];
+                            String[] chartFullNames=new String[chartSize];
                             int[] chartCounts=new int[chartSize];
                             int[] chartColors=new int[chartSize];
                             for(int k=0;k<chartSize;k++){
@@ -1331,15 +1349,16 @@ public class MainActivity extends Activity {
                                 String[] parts=entry.getKey().split("\\|",2);
                                 String name=parts.length>1?parts[1]:entry.getKey();
                                 chartNames[k]=String.valueOf(k+1);
+                                chartFullNames[k]=name;
                                 chartCounts[k]=starts.getOrDefault(entry.getKey(),0);
                                 chartColors[k]=k%2==0?0xff48dca2:0xff56aaf2;
                             }
-                            standingSection(content,"Top 10 · más titularidades · gráfico 3D");
-                            standingColumns3D(content,chartNames,chartCounts,chartColors);
+                            standingSection(starterRankingPanel,"Top 10 · más titularidades · gráfico 3D");
+                            standingMinuteRanking3D(starterRankingPanel,chartFullNames,chartCounts,new int[chartSize],playerCardLookup);
                             LinearLayout legend=new LinearLayout(this);
                             legend.setOrientation(1);
                             legend.setPadding(dp(9),dp(8),dp(9),dp(9));
-                            content.addView(legend);
+                            starterRankingPanel.addView(legend);
                             for(int k=0;k<chartSize;k++){
                                 java.util.Map.Entry<String,Integer> entry=starterRanking.get(k);
                                 String[] parts=entry.getKey().split("\\|",2);
