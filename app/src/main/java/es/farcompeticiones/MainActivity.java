@@ -1035,7 +1035,7 @@ public class MainActivity extends Activity {
         closeLp.setMargins(dp(14),dp(6),dp(14),dp(10));
         close.setOnClickListener(v->dialog.dismiss());frame.addView(close,closeLp);
         dialog.setContentView(frame);
-        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ataque/Def."};
+        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ata./Def."};
         final int[] active={0};
         final boolean[] loadingActs={false};
         final java.util.HashSet<String> attemptedActs=new java.util.HashSet<>();
@@ -1060,19 +1060,19 @@ public class MainActivity extends Activity {
                 }
                 if(loadingActs[0])content.addView(txt("Consultando actas oficiales…",12,0xff75e6b2));
                 int pfTotal=0,paTotal=0,checked=0,playedGames=0;
-                int[][] totals=new int[2][4];
+                int[][] totals=new int[2][4], venue=new int[2][3], typePoints=new int[2][4]; int bestF=-1,worstF=Integer.MAX_VALUE,bestD=Integer.MAX_VALUE,worstD=-1; String bf="",wf="",bd="",wd="";
                 java.util.ArrayList<Integer> pfSeries=new java.util.ArrayList<>(),paSeries=new java.util.ArrayList<>();
                 LinearLayout history=new LinearLayout(this);history.setOrientation(1);
                 for(org.json.JSONObject game:games){
                     int[] result=standingMatchScore(game.optString("score",""));if(result==null)continue;
                     boolean local=teamKey(team).equals(teamKey(game.optString("home","")));
                     int pf=result[local?0:1],pa=result[local?1:0];pfTotal+=pf;paTotal+=pa;playedGames++;pfSeries.add(pf);paSeries.add(pa);
-                    int[][] counts=new int[2][4];int[] sums=new int[2];boolean valid=true;boolean[] sides=new boolean[2];int side=-1;
+                    String opponent=game.optString(local?"away":"home"); int v=local?0:1;venue[v][0]++;venue[v][1]+=pf;venue[v][2]+=pa; if(pf>bestF){bestF=pf;bf=opponent;}if(pf<worstF){worstF=pf;wf=opponent;}if(pa<bestD){bestD=pa;bd=opponent;}if(pa>worstD){worstD=pa;wd=opponent;} int[][] counts=new int[2][4], eventPoints=new int[2][4];int[] sums=new int[2];boolean valid=true;boolean[] sides=new boolean[2];int side=-1;
                     try{org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl",""),"{}"));
                     for(String raw:act.optString("scoreboard","").split("\\r?\\n")){
                         String line=raw.trim();if(line.startsWith("Equipo local:")){side=0;sides[0]=true;continue;}if(line.startsWith("Equipo visitante:")){side=1;sides[1]=true;continue;}if(side<0)continue;
                         java.util.regex.Matcher event=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)").matcher(line);
-                        if(event.find()){String kind=event.group(2).toLowerCase(java.util.Locale.ROOT);int pts=Integer.parseInt(event.group(3));sums[side]+=pts;int k=kind.contains("ensayo")?0:kind.contains("transform")?1:kind.contains("castigo")||kind.contains("penal")?2:kind.contains("drop")?3:-1;if(k>=0)counts[side][k]++;else valid=false;}
+                        if(event.find()){String kind=event.group(2).toLowerCase(java.util.Locale.ROOT);int pts=Integer.parseInt(event.group(3));sums[side]+=pts;int k=kind.contains("ensayo")?0:kind.contains("transform")?1:kind.contains("castigo")||kind.contains("penal")?2:kind.contains("drop")?3:-1;if(k>=0){counts[side][k]++;eventPoints[side][k]+=pts;}else valid=false;}
                         else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))valid=false;
                     }}catch(Exception e){valid=false;}
                     valid=valid&&sides[0]&&sides[1]&&sums[0]==result[0]&&sums[1]==result[1];
@@ -1080,18 +1080,33 @@ public class MainActivity extends Activity {
                     android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(0xff203b4c);bg.setCornerRadius(dp(9));card.setBackground(bg);
                     LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(4),0,dp(4));history.addView(card,lp);
                     card.addView(txt(game.optString("home")+" – "+game.optString("away"),13,0xffe2f5fa));
-                    card.addView(txt(pf+" a favor · "+pa+" en contra",14,0xff75e6b2));
-                    if(valid){checked++;for(int k=0;k<4;k++){totals[0][k]+=counts[local?0:1][k];totals[1][k]+=counts[local?1:0][k];}
+                    card.addView(txt((local?"LOCAL":"VISITANTE")+" · "+(pf>pa?"Victoria":pf==pa?"Empate":"Derrota"),12,pf>pa?0xff75e6b2:pf==pa?0xffffc365:0xffed7979)); LinearLayout matchRow=new LinearLayout(this);card.addView(matchRow);standingMetric(matchRow,""+pf,"Favor");standingMetric(matchRow,""+pa,"Contra");
+                    if(valid){checked++;for(int k=0;k<4;k++){totals[0][k]+=counts[local?0:1][k];totals[1][k]+=counts[local?1:0][k];typePoints[0][k]+=eventPoints[local?0:1][k];typePoints[1][k]+=eventPoints[local?1:0][k];}
                     card.addView(txt("Ensayos: "+counts[local?0:1][0]+" a favor / "+counts[local?1:0][0]+" en contra",12,0xffd2e4ef));card.addView(txt("Acta conciliada con marcador",11,0xff75e6b2));}
                     else card.addView(txt("Desglose del acta pendiente de conciliación",11,0xffffc365));
                 }
                 standingSection(content,"Ataque y defensa · "+playedGames+" resultados");
-                LinearLayout row=new LinearLayout(this);content.addView(row);standingMetric(row,""+pfTotal,"Tantos a favor");standingMetric(row,""+paTotal,"Tantos en contra");
+                LinearLayout row=new LinearLayout(this);content.addView(row);standingMetric(row,""+pfTotal,"Tantos a favor");standingMetric(row,""+paTotal,"Tantos en contra");standingMetric(row,String.format(java.util.Locale.ROOT,"%+d",pfTotal-paTotal),"Diferencia");
                 LinearLayout avg=new LinearLayout(this);content.addView(avg);standingMetric(avg,playedGames>0?String.format(java.util.Locale.getDefault(),"%.1f",pfTotal/(double)playedGames):"—","Media anotada");standingMetric(avg,playedGames>0?String.format(java.util.Locale.getDefault(),"%.1f",paTotal/(double)playedGames):"—","Media recibida");
                 standingColumns3D(content,new String[]{"Favor","Contra"},new int[]{pfTotal,paTotal},new int[]{0xff48dca2,0xffed7979});
                 standingSection(content,"Evolución de tantos");if(playedGames>0)standingEvolutionChart(content,pfSeries,paSeries);
                 standingSection(content,"Anotaciones · "+checked+"/"+playedGames+" actas conciliadas");
-                if(checked>0){String[] types={"Ensayos","Transf.","Castigos","Drops"};for(int k=0;k<4;k++){standingSection(content,types[k]);standingColumns3D(content,new String[]{"Favor","Contra"},new int[]{totals[0][k],totals[1][k]},new int[]{0xff48dca2,0xffed7979});}}
+                if(checked>0){
+                    standingColumns3D(content,new String[]{"E+","E−","T+","T−","C+","C−","D+","D−"},new int[]{totals[0][0],totals[1][0],totals[0][1],totals[1][1],totals[0][2],totals[1][2],totals[0][3],totals[1][3]},new int[]{0xff48dca2,0xffed7979,0xff48dca2,0xffed7979,0xff48dca2,0xffed7979,0xff48dca2,0xffed7979});
+                    content.addView(txt("E: ensayos · T: transformaciones · C: castigos · D: drops. + favor / − contra",11,0xffb8d4cc));
+                    standingSection(content,"Origen de los puntos a favor");
+                    if(java.util.Arrays.stream(typePoints[0]).sum()>0)standingPie(content,typePoints[0],new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff9b8be8},new String[]{"Ensayos","Transformaciones","Castigos","Drops"});
+                }
+                if(playedGames>0){
+                    standingSection(content,"Mejores y peores partidos");
+                    content.addView(txt("Mejor ataque · "+bf+" · "+bestF+" puntos",14,0xff75e6b2));
+                    content.addView(txt("Menor anotación · "+wf+" · "+worstF+" puntos",14,0xffffc365));
+                    content.addView(txt("Mejor defensa · "+bd+" · "+bestD+" recibidos",14,0xff75e6b2));
+                    content.addView(txt("Más puntos recibidos · "+wd+" · "+worstD,14,0xffffc365));
+                    standingSection(content,"Local y visitante");
+                    for(int v=0;v<2;v++){standingSection(content,(v==0?"Local":"Visitante")+" · "+venue[v][0]+" partidos");if(venue[v][0]>0){LinearLayout vr=new LinearLayout(this);content.addView(vr);standingMetric(vr,String.format(java.util.Locale.getDefault(),"%.1f",venue[v][1]/(double)venue[v][0]),"Media favor");standingMetric(vr,String.format(java.util.Locale.getDefault(),"%.1f",venue[v][2]/(double)venue[v][0]),"Media contra");}}
+                    standingColumns3D(content,new String[]{"Local +","Local −","Fuera +","Fuera −"},new int[]{venue[0][1],venue[0][2],venue[1][1],venue[1][2]},new int[]{0xff48dca2,0xffed7979,0xff48dca2,0xffed7979});
+                }
                 content.addView(txt("El desglose incluye únicamente actas cuyo total de anotaciones coincide con ambos marcadores oficiales.",11,0xffb8d4cc));
                 standingSection(content,"Comprobación por partido");content.addView(history);
             }else if(active[0]==0){
