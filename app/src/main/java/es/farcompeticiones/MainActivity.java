@@ -1275,6 +1275,32 @@ public class MainActivity extends Activity {
                             for(String id:matchBenches)benches.put(id,benches.getOrDefault(id,0)+1);
                         }
                     }
+                    // Canonical identity is the federation licence, not the PDF name spelling.
+                    java.util.Map<String,String> canonicalPlayers=new java.util.HashMap<>();
+                    for(String id:appearances.keySet()){
+                        String[] fields=id.split("\\|",2);
+                        if(fields.length!=2)continue;
+                        String clean=fields[1].replaceAll("(?:\\s+\\d+)+\\s*$","").trim();
+                        String candidate=fields[0]+"|"+clean;
+                        String prior=canonicalPlayers.get(fields[0]);
+                        if(prior==null||candidate.length()<prior.length())canonicalPlayers.put(fields[0],candidate);
+                    }
+                    for(java.util.Map<String,Integer> counts:java.util.Arrays.asList(appearances,starts,benches,verifiedMinutes,verifiedMatches,estimatedMinutes,estimatedMatches)){
+                        java.util.Map<String,Integer> merged=new java.util.HashMap<>();
+                        for(java.util.Map.Entry<String,Integer> entry:counts.entrySet()){
+                            String id=entry.getKey();
+                            String canonical=canonicalPlayers.getOrDefault(id.split("\\|",2)[0],id);
+                            merged.put(canonical,merged.getOrDefault(canonical,0)+entry.getValue());
+                        }
+                        counts.clear();counts.putAll(merged);
+                    }
+                    java.util.Map<String,java.util.ArrayList<String>> mergedBreakdown=new java.util.HashMap<>();
+                    for(java.util.Map.Entry<String,java.util.ArrayList<String>> entry:playerMinuteBreakdown.entrySet()){
+                        String id=entry.getKey();
+                        String canonical=canonicalPlayers.getOrDefault(id.split("\\|",2)[0],id);
+                        mergedBreakdown.computeIfAbsent(canonical,k->new java.util.ArrayList<>()).addAll(entry.getValue());
+                    }
+                    playerMinuteBreakdown.clear();playerMinuteBreakdown.putAll(mergedBreakdown);
                     if(!appearances.isEmpty()){
                         standingSection(content,"Jugadores identificados · actas consultadas");
                         java.util.ArrayList<java.util.Map.Entry<String,Integer>> ranking=new java.util.ArrayList<>(appearances.entrySet());
