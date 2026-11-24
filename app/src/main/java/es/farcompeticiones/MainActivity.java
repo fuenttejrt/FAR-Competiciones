@@ -2340,19 +2340,27 @@ public class MainActivity extends Activity {
                 String[] metrics={"Convocatorias","Titularidades","Puntos","Ensayos","Transformaciones","Castigos","Drops","Amarillas","Rojas","Minutos verificados","Partidos jugados"};
                 java.util.ArrayList<String> teamOptions=new java.util.ArrayList<>();teamOptions.add("Todos los equipos");teamOptions.addAll(teams);
                 Spinner teamPicker=new Spinner(this);teamPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teamOptions));panel.addView(teamPicker);
-                Spinner picker=new Spinner(this);picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,metrics));panel.addView(picker);
+                LinearLayout nav=new LinearLayout(this);nav.setOrientation(1);panel.addView(nav,0);
+                String[] sections={"Anotación","Participación","Disciplina","Jugadores"};
+                int[][] groups={{2,3,4,5,6},{0,1,10,9},{7,8},{0}};
+                final int[] active={0};TextView[] tabs=new TextView[4];
+                Spinner picker=new Spinner(this);panel.addView(picker);
+                android.widget.EditText search=new android.widget.EditText(this);search.setSingleLine(true);search.setHint("Buscar jugador");search.setTextColor(Color.WHITE);search.setHintTextColor(0xffb8d4cc);panel.addView(search);search.setVisibility(View.GONE);
+                Runnable selectGroup=()->{java.util.ArrayList<String> options=new java.util.ArrayList<>();for(int m:groups[active[0]])options.add(metrics[m]);picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));picker.setVisibility(active[0]==3?View.GONE:View.VISIBLE);search.setVisibility(active[0]==3?View.VISIBLE:View.GONE);for(int z=0;z<4;z++){android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(z==active[0]?0xff08643d:0xff203e50);bg.setCornerRadius(dp(12));bg.setStroke(dp(1),0xff45677d);tabs[z].setBackground(bg);}};
+                for(int z=0;z<4;z++){final int index=z;LinearLayout row;if(z%2==0){row=new LinearLayout(this);nav.addView(row);}else row=(LinearLayout)nav.getChildAt(nav.getChildCount()-1);TextView tab=txt(sections[z],14,Color.WHITE);tabs[z]=tab;tab.setGravity(android.view.Gravity.CENTER);tab.setTypeface(null,Typeface.BOLD);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(42),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(tab,lp);tab.setOnClickListener(v->{active[0]=index;selectGroup.run();});}
+                selectGroup.run();
                 LinearLayout results=new LinearLayout(this);results.setOrientation(1);panel.addView(results);
                 Runnable redraw=()->{
-                    int position=picker.getSelectedItemPosition();if(position<0)return;
+                    int choice=picker.getSelectedItemPosition();if(choice<0||choice>=groups[active[0]].length)return;final int position=groups[active[0]][choice];final boolean directory=active[0]==3;final String term=search.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
                     int selectedTeam=teamPicker.getSelectedItemPosition();
-                    results.removeAllViews();java.util.ArrayList<String> ids=new java.util.ArrayList<>(totals.keySet());ids.removeIf(k->totals.get(k)[position]<=0||(selectedTeam>0&&!teamKey(teamOptions.get(selectedTeam)).equals(teamKey(playerTeams.get(k)))));ids.sort((a,b)->{int c=Integer.compare(totals.get(b)[position],totals.get(a)[position]);return c!=0?c:labels.get(a).compareTo(labels.get(b));});
+                    results.removeAllViews();java.util.ArrayList<String> ids=new java.util.ArrayList<>(totals.keySet());ids.removeIf(k->(!directory&&totals.get(k)[position]<=0)||(directory&&!labels.get(k).toLowerCase(java.util.Locale.ROOT).contains(term))||(selectedTeam>0&&!teamKey(teamOptions.get(selectedTeam)).equals(teamKey(playerTeams.get(k)))));ids.sort((a,b)->{int c=Integer.compare(totals.get(b)[position],totals.get(a)[position]);return !directory&&c!=0?c:labels.get(a).compareTo(labels.get(b));});
                     if(ids.isEmpty()){results.addView(txt("Sin registros positivos en las actas analizadas",13,0xffb8d4cc));return;}
-                    int n=Math.min(10,ids.size());String[] names=new String[n];int[] values=new int[n],colors=new int[n];for(int i=0;i<n;i++){String k=ids.get(i);names[i]=""+(i+1);values[i]=totals.get(k)[position];colors[i]=position==7?0xffffc365:position==8?0xffed7979:0xff48dca2;}
-                    standingColumns3D(results,names,values,colors);
+                    int n=Math.min(5,ids.size());String[] names=new String[n];int[] values=new int[n],colors=new int[n];for(int i=0;i<n;i++){String k=ids.get(i);names[i]=""+(i+1);values[i]=totals.get(k)[position];colors[i]=i==0?0xffeac36a:i==1?0xffaebfcd:i==2?0xffc48e61:position==7?0xffffc365:position==8?0xffed7979:0xff48dca2;}
+                    if(!directory)standingColumns3D(results,names,values,colors);
                     for(int i=0;i<ids.size();i++){
                         String k=ids.get(i);int[] a=totals.get(k);
-                        TextView row=txt((i==0?"🥇 ":i==1?"🥈 ":i==2?"🥉 ":(i+1)+". ")+labels.get(k)+" · "+a[position]+"  ›",14,0xffe2f5fa);
-                        row.setPadding(dp(10),dp(12),dp(10),dp(12));row.setBackgroundColor(i%2==0?0xff203e50:0xff172b3c);results.addView(row);
+                        LinearLayout playerCard=new LinearLayout(this);playerCard.setOrientation(1);playerCard.setBackground(gradient(0xff203e50,0xff172b3c,0xff45677d));LinearLayout.LayoutParams cardLp=new LinearLayout.LayoutParams(-1,-2);cardLp.setMargins(dp(2),dp(3),dp(2),dp(3));results.addView(playerCard,cardLp);addStandingTeam(playerCard,playerTeams.get(k),crestFromMatches(data,playerTeams.get(k)),-1);TextView row=txt((directory?"":i==0?"🥇 ":i==1?"🥈 ":i==2?"🥉 ":(i+1)+". ")+labels.get(k)+" · "+a[position]+"  ›",14,0xffe2f5fa);
+                        row.setPadding(dp(10),dp(12),dp(10),dp(12));playerCard.addView(row);
                         row.setOnClickListener(v->{
                             StringBuilder detail=new StringBuilder();
                             for(int j=0;j<metrics.length;j++)detail.append(metrics[j]).append(": ").append(a[j]).append("\n");
@@ -2363,7 +2371,7 @@ public class MainActivity extends Activity {
                     }
                 };
                 AdapterView.OnItemSelectedListener filterListener=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){redraw.run();}};
-                picker.setOnItemSelectedListener(filterListener);teamPicker.setOnItemSelectedListener(filterListener);picker.setSelection(2);
+                picker.setOnItemSelectedListener(filterListener);teamPicker.setOnItemSelectedListener(filterListener);picker.setSelection(0);search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){redraw.run();}public void afterTextChanged(android.text.Editable e){}});redraw.run();
                 panel.addView(txt("Registros disponibles; las actas incompletas no equivalen a cero. Minutos parciales verificados; se excluyen sanciones y cambios no verificables. Partidos jugados según cambios legibles.",11,0xffb8d4cc));
             });
         }).start();
