@@ -1035,7 +1035,7 @@ public class MainActivity extends Activity {
         closeLp.setMargins(dp(14),dp(6),dp(14),dp(10));
         close.setOnClickListener(v->dialog.dismiss());frame.addView(close,closeLp);
         dialog.setContentView(frame);
-        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ata./Def."};
+        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ata./Def.","Ranking"};
         final int[] active={0};
         final boolean[] loadingActs={false};
         final java.util.HashSet<String> attemptedActs=new java.util.HashSet<>();
@@ -1138,7 +1138,7 @@ public class MainActivity extends Activity {
             }else{
                 standingSection(content,labels[active[0]]);
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
-                if(active[0]==3){
+                if(active[0]==3||active[0]==5){
                     int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
                     LinearLayout durationCards=new LinearLayout(this);content.addView(durationCards);
                     standingMetric(durationCards,duration>0?duration+" min":"—","Partido completo");
@@ -1184,7 +1184,7 @@ public class MainActivity extends Activity {
                                 }
                                 runOnUiThread(()->{
                                     loadingActs[0]=false;
-                                    if(dialog.isShowing()&&active[0]==3) {
+                                    if(dialog.isShowing()&&(active[0]==3||active[0]==5)) {
                                         // Refresh the same tab without reopening the dialog.
                                         if(redrawRef[0]!=null)redrawRef[0].run();
                                     }
@@ -1490,23 +1490,43 @@ public class MainActivity extends Activity {
                                 }
                             }
                         }
+                        String[] rankLabels={"Minutos","Titularidades","Puntos","Ensayos","Transformaciones","Participación %","Partidos disputados","Entradas","Salidas","Reingresos","Amarillas","Rojas"};
+                        java.util.ArrayList<LinearLayout> rankPanels=new java.util.ArrayList<>();
+                        rankPanels.add(minuteRankingPanel);rankPanels.add(starterRankingPanel);rankPanels.add(pointsPanel);rankPanels.add(triesPanel);
+                        java.util.Map<String,Integer> percentages=new java.util.HashMap<>();
+                        for(String id:appearances.keySet()){
+                            int known=verifiedMatches.getOrDefault(id,0)+estimatedMatches.getOrDefault(id,0);
+                            if(duration>0&&known>0&&known==appearances.get(id))percentages.put(id,Math.round(100f*(verifiedMinutes.getOrDefault(id,0)+estimatedMinutes.getOrDefault(id,0))/(duration*known)));
+                        }
+                        java.util.List<java.util.Map<String,Integer>> extraMetrics=java.util.Arrays.asList(conversions,percentages,actualPlayed,entries,exits,returns,yellows,reds);
+                        for(int ri=0;ri<extraMetrics.size();ri++){
+                            final int kind=ri;
+                            java.util.Map<String,Integer> metric=extraMetrics.get(ri);
+                            LinearLayout panel=new LinearLayout(this);panel.setOrientation(1);rankPanels.add(panel);
+                            standingSection(panel,"Top 10 · "+rankLabels[ri+4]);
+                            panel.addView(txt(ri==1?"Porcentaje sobre minutos posibles en convocatorias analizadas completas; incluye estimaciones por amarilla.":"Datos registrados en las actas analizadas; la ausencia de datos no equivale a cero.",11,0xffa9c4d2));
+                            java.util.ArrayList<String> ids=new java.util.ArrayList<>(metric.keySet());
+                            ids.removeIf(k->metric.getOrDefault(k,0)<=0);
+                            ids.sort((x,y)->{int c=Integer.compare(metric.get(y),metric.get(x));return c!=0?c:x.compareToIgnoreCase(y);});
+                            int n=Math.min(10,ids.size());
+                            if(n==0){panel.addView(txt("Sin registros positivos disponibles",12,0xffb8d4cc));continue;}
+                            String[] names=new String[n];int[] nums=new int[n];
+                            for(int k=0;k<n;k++){String id=ids.get(k);names[k]=id.substring(id.indexOf('|')+1);nums[k]=metric.get(id);}
+                            standingMinuteRanking3D(panel,names,nums,new int[n],playerCardLookup);
+                            for(int k=0;k<ids.size();k++){
+                                String id=ids.get(k),name=id.substring(id.indexOf('|')+1);
+                                TextView line=txt((k+1)+". "+name+" · "+metric.get(id)+(kind==1?" %"+(estimatedMatches.getOrDefault(id,0)>0?" (orientativo)":""):""),13,0xffd2e4ef);
+                                line.setPadding(dp(8),dp(7),dp(8),dp(7));panel.addView(line);
+                                line.setOnClickListener(v->{android.view.View card=playerCardLookup.get(name);if(card!=null)card.performClick();});
+                            }
+                        }
                         TextView rankingSelector=txt("Ranking: Minutos  ▾",15,0xff75e6b2);
-                        rankingSelector.setPadding(dp(10),dp(10),dp(10),dp(10));
-                        content.addView(rankingSelector);
-                        content.addView(minuteRankingPanel);
-                        content.addView(starterRankingPanel);
-                        content.addView(pointsPanel);content.addView(triesPanel);
-                        pointsPanel.setVisibility(android.view.View.GONE);triesPanel.setVisibility(android.view.View.GONE);
-                        starterRankingPanel.setVisibility(android.view.View.GONE);
-                        rankingSelector.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
-                            .setTitle("Seleccionar ranking")
-                            .setItems(new String[]{"Minutos","Titularidades","Puntos","Ensayos"},(rankingDialog,choice)->{
-                                minuteRankingPanel.setVisibility(choice==0?android.view.View.VISIBLE:android.view.View.GONE);
-                                starterRankingPanel.setVisibility(choice==1?android.view.View.VISIBLE:android.view.View.GONE);
-                                pointsPanel.setVisibility(choice==2?android.view.View.VISIBLE:android.view.View.GONE);
-                                triesPanel.setVisibility(choice==3?android.view.View.VISIBLE:android.view.View.GONE);
-                                rankingSelector.setText("Ranking: "+new String[]{"Minutos","Titularidades","Puntos","Ensayos"}[choice]+"  ▾");
-                            }).show());
+                        rankingSelector.setPadding(dp(10),dp(10),dp(10),dp(10));content.addView(rankingSelector);
+                        for(int ri=0;ri<rankPanels.size();ri++){LinearLayout panel=rankPanels.get(ri);content.addView(panel);panel.setVisibility(ri==0?android.view.View.VISIBLE:android.view.View.GONE);}
+                        rankingSelector.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Seleccionar ranking").setItems(rankLabels,(rd,choice)->{
+                            for(int ri=0;ri<rankPanels.size();ri++)rankPanels.get(ri).setVisibility(ri==choice?android.view.View.VISIBLE:android.view.View.GONE);
+                            rankingSelector.setText("Ranking: "+rankLabels[choice]+"  ▾");
+                        }).show());
                         int minuteChartSize=Math.min(10,minuteRank.size());
                         if(minuteChartSize>0){
                             String[] minuteNames=new String[minuteChartSize];
@@ -1561,7 +1581,7 @@ public class MainActivity extends Activity {
                                 String name=parts.length>1?parts[1]:entry.getKey();
                                 TextView line=txt((k+1)+".  "+name+"  ·  "+starts.getOrDefault(entry.getKey(),0)+" titularidades / "+entry.getValue()+" partidos",12,0xffd2e4ef);
                                 line.setPadding(dp(3),dp(4),dp(3),dp(4));
-                                legend.addView(line);
+                                legend.addView(line);line.setOnClickListener(v->{android.view.View card=playerCardLookup.get(name);if(card!=null)card.performClick();});
                             }
                         }
                         content.addView(txt("Minutos comprobados: "+minuteActCount[0]+" de "+actCount+" actas. Los minutos mostrados son parciales.",11,0xffa9c4d2));
@@ -1592,7 +1612,7 @@ public class MainActivity extends Activity {
                         String[] playerFilters={"Todos","Titulares","Suplentes","Todos los partidos","Mayor participación","Más minutos (top 10)"};
                         playerFilter.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,playerFilters));
                         content.addView(playerFilter);
-                        LinearLayout rosterList=new LinearLayout(this);rosterList.setOrientation(1);content.addView(rosterList);
+                        LinearLayout rosterList=new LinearLayout(this);rosterList.setOrientation(1);content.addView(rosterList);if(active[0]==5){rosterList.setVisibility(android.view.View.GONE);searchPlayer.setVisibility(android.view.View.GONE);playerFilter.setVisibility(android.view.View.GONE);}
                         java.util.ArrayList<android.view.View> playerRows=new java.util.ArrayList<>();
                         java.util.ArrayList<String> playerSearchKeys=new java.util.ArrayList<>();
                         java.util.ArrayList<Integer> playerStartCounts=new java.util.ArrayList<>();
