@@ -2257,6 +2257,8 @@ public class MainActivity extends Activity {
             com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());
             java.util.Map<String,int[]> totals=new java.util.LinkedHashMap<>();
             java.util.Map<String,String> labels=new java.util.HashMap<>();
+            java.util.Map<String,java.util.ArrayList<String>> history=new java.util.HashMap<>();
+            java.util.Map<String,String> playerTeams=new java.util.HashMap<>();
             int coverage=0,scoreCoverage=0;
             for(java.util.Map.Entry<String,org.json.JSONObject> entry:matches.entrySet()){
                 try{
@@ -2277,10 +2279,40 @@ public class MainActivity extends Activity {
                         if(!m.matches())continue;
                         String team=g.optString(side==0?"home":"away"),id=m.group(3)+"|"+teamKey(team);
                         labels.put(id,m.group(2).trim().replaceFirst("\\s+\\d+(?:\\s+\\d+)*$","")+" · "+team);
-                        dorsals.put(side+":"+m.group(1),id);
-                        if(seen.add(id)){int[] a=totals.computeIfAbsent(id,k->new int[9]);a[0]++;if(starter)a[1]++;}
+                        dorsals.put(side+":"+m.group(1),id);playerTeams.put(id,team);
+                        if(seen.add(id)){int[] a=totals.computeIfAbsent(id,k->new int[12]);a[0]++;if(starter)a[1]++;}
                     }
                     if(seen.isEmpty())continue;coverage++;
+                    java.util.Set<String> sanctioned=new java.util.HashSet<>();
+                    boolean unknownCard=false;
+                    for(String key:new String[]{"temporaryCards","definitiveCards"}){
+                        int cardSide=-1;
+                        for(String raw:act.optString(key).split("\\r?\\n")){
+                            String line=raw.trim();
+                            if(line.matches("(?i)Equipo local:.*"))cardSide=0;
+                            else if(line.matches("(?i)Equipo visitante:.*"))cardSide=1;
+                            else if(line.matches("^\\d+\\. Min .*")){
+                                java.util.regex.Matcher cm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(line);
+                                String who=cm.find()?dorsals.get(cardSide+":"+cm.group(1)):null;
+                                if(who==null)unknownCard=true;else sanctioned.add(who);
+                            }
+                        }
+                    }
+                    java.util.Map<String,Integer> matchMinutes=new java.util.HashMap<>();
+                    for(int sideIndex=0;sideIndex<2;sideIndex++){
+                        java.util.Map<String,java.util.ArrayList<String>> trace=new java.util.HashMap<>();
+                        java.util.Map<String,Integer> mins=verifiedActMinutes(act.optString("lineups"),act.optString("changes"),sideIndex==0,CompetitionRules.matchMinutes(season,category,selectedCompetition),trace);
+                        if(mins==null)continue;
+                        String team=g.optString(sideIndex==0?"home":"away");
+                        for(java.util.Map.Entry<String,Integer> me:mins.entrySet()){
+                            String id=me.getKey().split("\\|",2)[0]+"|"+teamKey(team);
+                            if(!seen.contains(id))continue;
+                            int[] a=totals.get(id);
+                            if(me.getValue()>0||trace.getOrDefault(me.getKey(),new java.util.ArrayList<>()).stream().anyMatch(e->e.startsWith("Entra")))a[10]++;
+                            if(!unknownCard&&!sanctioned.contains(id)){a[9]+=me.getValue();a[11]++;matchMinutes.put(id,me.getValue());}
+                        }
+                    }
+                    for(String id:seen)history.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(g.optString("home")+" – "+g.optString("away")+" · "+(matchMinutes.containsKey(id)?matchMinutes.get(id)+" min verificados":"Minutos no verificados"));
                     int[] score=standingMatchScore(g.optString("score"));int[] sums=new int[2];boolean valid=score!=null;boolean[] sides=new boolean[2];
                     java.util.ArrayList<String[]> events=new java.util.ArrayList<>();side=-1;
                     for(String raw:act.optString("scoreboard").split("\\r?\\n")){
@@ -2300,17 +2332,34 @@ public class MainActivity extends Activity {
             runOnUiThread(()->{
                 if(!panel.isAttachedToWindow())return;
                 panel.removeAllViews();panel.addView(txt("Alineaciones: "+checked+"/"+matches.size()+" actas · Anotaciones conciliadas: "+scored+"/"+matches.size(),12,0xffb8d4cc));
-                String[] metrics={"Convocatorias","Titularidades","Puntos","Ensayos","Transformaciones","Castigos","Drops","Amarillas","Rojas"};
+                String[] metrics={"Convocatorias","Titularidades","Puntos","Ensayos","Transformaciones","Castigos","Drops","Amarillas","Rojas","Minutos verificados","Partidos jugados"};
+                java.util.ArrayList<String> teamOptions=new java.util.ArrayList<>();teamOptions.add("Todos los equipos");teamOptions.addAll(teams);
+                Spinner teamPicker=new Spinner(this);teamPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teamOptions));panel.addView(teamPicker);
                 Spinner picker=new Spinner(this);picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,metrics));panel.addView(picker);
                 LinearLayout results=new LinearLayout(this);results.setOrientation(1);panel.addView(results);
-                picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){
-                    results.removeAllViews();java.util.ArrayList<String> ids=new java.util.ArrayList<>(totals.keySet());ids.removeIf(k->totals.get(k)[position]<=0);ids.sort((a,b)->{int c=Integer.compare(totals.get(b)[position],totals.get(a)[position]);return c!=0?c:labels.get(a).compareTo(labels.get(b));});
+                Runnable redraw=()->{
+                    int position=picker.getSelectedItemPosition();if(position<0)return;
+                    int selectedTeam=teamPicker.getSelectedItemPosition();
+                    results.removeAllViews();java.util.ArrayList<String> ids=new java.util.ArrayList<>(totals.keySet());ids.removeIf(k->totals.get(k)[position]<=0||(selectedTeam>0&&!teamKey(teamOptions.get(selectedTeam)).equals(teamKey(playerTeams.get(k)))));ids.sort((a,b)->{int c=Integer.compare(totals.get(b)[position],totals.get(a)[position]);return c!=0?c:labels.get(a).compareTo(labels.get(b));});
                     if(ids.isEmpty()){results.addView(txt("Sin registros positivos en las actas analizadas",13,0xffb8d4cc));return;}
                     int n=Math.min(10,ids.size());String[] names=new String[n];int[] values=new int[n],colors=new int[n];for(int i=0;i<n;i++){String k=ids.get(i);names[i]=""+(i+1);values[i]=totals.get(k)[position];colors[i]=position==7?0xffffc365:position==8?0xffed7979:0xff48dca2;}
                     standingColumns3D(results,names,values,colors);
-                    for(int i=0;i<ids.size();i++){String k=ids.get(i);results.addView(txt((i+1)+". "+labels.get(k)+" · "+totals.get(k)[position],13,0xffe2f5fa));}
-                }});picker.setSelection(2);
-                panel.addView(txt("Registros disponibles; las actas incompletas no equivalen a cero. Minutos y sustituciones pendientes de integrar.",11,0xffb8d4cc));
+                    for(int i=0;i<ids.size();i++){
+                        String k=ids.get(i);int[] a=totals.get(k);
+                        TextView row=txt((i==0?"🥇 ":i==1?"🥈 ":i==2?"🥉 ":(i+1)+". ")+labels.get(k)+" · "+a[position]+"  ›",14,0xffe2f5fa);
+                        row.setPadding(dp(10),dp(12),dp(10),dp(12));row.setBackgroundColor(i%2==0?0xff203e50:0xff172b3c);results.addView(row);
+                        row.setOnClickListener(v->{
+                            StringBuilder detail=new StringBuilder();
+                            for(int j=0;j<metrics.length;j++)detail.append(metrics[j]).append(": ").append(a[j]).append("\n");
+                            detail.append("Actas con minutos verificados: ").append(a[11]).append("/").append(a[0]).append("\n\nHistorial de actas\n");
+                            for(String match:history.getOrDefault(k,new java.util.ArrayList<>()))detail.append(match).append("\n");
+                            new android.app.AlertDialog.Builder(this).setTitle(labels.get(k)).setMessage(detail.toString()).setPositiveButton("Cerrar",null).show();
+                        });
+                    }
+                };
+                AdapterView.OnItemSelectedListener filterListener=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){redraw.run();}};
+                picker.setOnItemSelectedListener(filterListener);teamPicker.setOnItemSelectedListener(filterListener);picker.setSelection(2);
+                panel.addView(txt("Registros disponibles; las actas incompletas no equivalen a cero. Minutos parciales verificados; se excluyen sanciones y cambios no verificables. Partidos jugados según cambios legibles.",11,0xffb8d4cc));
             });
         }).start();
     }
