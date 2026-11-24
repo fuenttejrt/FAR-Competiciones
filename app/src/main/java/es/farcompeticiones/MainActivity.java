@@ -1306,7 +1306,7 @@ public class MainActivity extends Activity {
                         starterRankingPanel.setVisibility(android.view.View.GONE);
                         rankingSelector.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
                             .setTitle("Seleccionar ranking")
-                            .setItems(new String[]{"Minutos","Titularidades"},(dialog,choice)->{
+                            .setItems(new String[]{"Minutos","Titularidades"},(rankingDialog,choice)->{
                                 minuteRankingPanel.setVisibility(choice==0?android.view.View.VISIBLE:android.view.View.GONE);
                                 starterRankingPanel.setVisibility(choice==1?android.view.View.VISIBLE:android.view.View.GONE);
                                 rankingSelector.setText("Ranking: "+(choice==0?"Minutos":"Titularidades")+"  ▾");
