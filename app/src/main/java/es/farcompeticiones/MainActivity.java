@@ -1444,8 +1444,14 @@ public class MainActivity extends Activity {
                                 standingColumns3D(details,new String[]{"Partidos","Titular","Suplente"},
                                     new int[]{playedCount,starterCount,benchCount},
                                     new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
+                                android.widget.ScrollView playerScroll=new android.widget.ScrollView(this);
+                                playerScroll.setFillViewport(false);
+                                playerScroll.addView(details);
+                                android.widget.FrameLayout playerFrame=new android.widget.FrameLayout(this);
+                                playerFrame.addView(playerScroll,new android.widget.FrameLayout.LayoutParams(
+                                    -1,Math.min(dp(630),(int)(getResources().getDisplayMetrics().heightPixels*.72f))));
                                 new android.app.AlertDialog.Builder(this)
-                                    .setView(details).setPositiveButton("Cerrar",null).show();
+                                    .setView(playerFrame).setPositiveButton("Cerrar",null).show();
                             });
                         }
                         Runnable applyPlayerFilter=()->{
