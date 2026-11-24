@@ -2372,6 +2372,11 @@ public class MainActivity extends Activity {
         View chart=new View(this){@Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);float mid=getWidth()/2f,extent=(mid-dp(4))*Math.abs(value)/Math.max(1,max);android.graphics.Paint p=new android.graphics.Paint(3);p.setColor(0xff203e50);c.drawRoundRect(0,dp(3),getWidth(),getHeight()-dp(3),dp(6),dp(6),p);if(value!=0){p.setShader(new android.graphics.LinearGradient(0,0,0,getHeight(),value>0?0xffb2ffe2:0xffffc2c2,value>0?0xff159b70:0xffb94a4a,android.graphics.Shader.TileMode.CLAMP));c.drawRoundRect(value<0?mid-extent:mid,dp(3),value<0?mid:mid+extent,getHeight()-dp(3),dp(5),dp(5),p);p.setShader(null);}p.setColor(0xffe2f5fa);p.setStrokeWidth(dp(1));c.drawLine(mid,0,mid,getHeight(),p);}};
         target.addView(chart,new LinearLayout.LayoutParams(-1,dp(22)));
     }
+    private android.graphics.drawable.GradientDrawable statGloss(int color){
+        int light=android.graphics.Color.rgb((android.graphics.Color.red(color)+255)/2,(android.graphics.Color.green(color)+255)/2,(android.graphics.Color.blue(color)+255)/2);
+        int dark=android.graphics.Color.rgb(android.graphics.Color.red(color)*2/3,android.graphics.Color.green(color)*2/3,android.graphics.Color.blue(color)*2/3);
+        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{light,color,dark});bg.setCornerRadius(dp(5));return bg;
+    }
     private void competitionStatistics(org.json.JSONObject data){
         java.util.TreeMap<String,String> names=new java.util.TreeMap<>();
         org.json.JSONArray tables=data.optJSONArray("tables");
@@ -2414,7 +2419,7 @@ public class MainActivity extends Activity {
         final int totalGames=games,totalPoints=points,totalDraws=draws;
         Runnable renderSection=()->{
             section.removeAllViews();
-            for(int z=0;z<4;z++)buttons[z].setBackgroundColor(z==activeSection[0]?0xff08643d:0xff173c3b);
+            for(int z=0;z<4;z++){android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(z==activeSection[0]?0xff08643d:0xff203e50);bg.setCornerRadius(dp(12));bg.setStroke(dp(1),z==activeSection[0]?0xff48dca2:0xff45677d);buttons[z].setBackground(bg);}
             if(activeSection[0]==0){
         standingSection(section,"Estadísticas de la competición");
         LinearLayout top=new LinearLayout(this);section.addView(top);
@@ -2428,7 +2433,7 @@ public class MainActivity extends Activity {
         for(String team:teams){int[] a=stats.get(team);section.addView(txt(team+" · "+a[0]+" PJ",13,0xff75e6b2));
             LinearLayout bars=new LinearLayout(this);section.addView(bars,new LinearLayout.LayoutParams(-1,dp(24)));
             int[] counts={a[3],a[4],a[0]-a[3]-a[4]};int[] colors={0xff48dca2,0xff56aaf2,0xffed7979};
-            for(int z=0;z<3;z++){if(counts[z]==0)continue;TextView cell=txt(""+counts[z],12,0xff102233);cell.setGravity(android.view.Gravity.CENTER);cell.setBackgroundColor(colors[z]);bars.addView(cell,new LinearLayout.LayoutParams(0,-1,counts[z]));}
+            for(int z=0;z<3;z++){if(counts[z]==0)continue;TextView cell=txt(""+counts[z],12,0xff102233);cell.setGravity(android.view.Gravity.CENTER);cell.setBackground(statGloss(colors[z]));cell.setElevation(dp(2));bars.addView(cell,new LinearLayout.LayoutParams(0,-1,counts[z]));}
             if(a[0]<maxPlayed)bars.addView(new View(this),new LinearLayout.LayoutParams(0,-1,maxPlayed-a[0]));
         }
         section.addView(txt("Verde: victorias · Azul: empates · Rojo: derrotas",11,0xffb8d4cc));
@@ -2436,7 +2441,7 @@ public class MainActivity extends Activity {
         for(String team:teams){int[][] venue=new int[2][4];
             for(org.json.JSONObject g:standingTeamMatches(data,team)){int[] score=standingMatchScore(g.optString("score"));if(score==null)continue;boolean home=teamKey(team).equals(teamKey(g.optString("home")));int[] v=venue[home?0:1];int f=score[home?0:1],c=score[home?1:0];v[0]++;if(f>c)v[1]++;if(f==c)v[2]++;if(f<c)v[3]++;}
             section.addView(txt(team,13,0xff75e6b2));
-            for(int z=0;z<2;z++){int[] v=venue[z];section.addView(txt((z==0?"Local: ":"Visitante: ")+v[0]+" PJ · "+v[1]+" V / "+v[2]+" E / "+v[3]+" D",12,0xffb8d4cc));}
+            for(int z=0;z<2;z++){int[] v=venue[z];section.addView(txt((z==0?"Local: ":"Visitante: ")+v[0]+" PJ · "+v[1]+" V / "+v[2]+" E / "+v[3]+" D",12,0xffb8d4cc));LinearLayout bar=new LinearLayout(this);section.addView(bar,new LinearLayout.LayoutParams(-1,dp(18)));int[] colors={0xff48dca2,0xff56aaf2,0xffed7979};for(int n=1;n<=3;n++){if(v[n]==0)continue;TextView cell=txt(""+v[n],11,0xff102233);cell.setGravity(android.view.Gravity.CENTER);cell.setBackground(statGloss(colors[n-1]));bar.addView(cell,new LinearLayout.LayoutParams(0,-1,v[n]));}if(v[0]==0)bar.addView(txt("Sin partidos",11,0xffb8d4cc));}
         }
 
             }else if(activeSection[0]==1){
@@ -2447,13 +2452,14 @@ public class MainActivity extends Activity {
             ordered.sort((x,y)->Integer.compare(mode==0?stats.get(y)[1]:mode==1?stats.get(x)[2]:stats.get(y)[1]-stats.get(y)[2],mode==0?stats.get(x)[1]:mode==1?stats.get(y)[2]:stats.get(x)[1]-stats.get(x)[2]));
             int max=1;for(String team:ordered){int[] a=stats.get(team);max=Math.max(max,Math.abs(mode==0?a[1]:mode==1?a[2]:a[1]-a[2]));}
             for(int i=0;i<ordered.size();i++){String team=ordered.get(i);int[] a=stats.get(team);int value=mode==0?a[1]:mode==1?a[2]:a[1]-a[2];
-                if(mode==2){standingSignedDifference(section,(i+1)+". "+team,value,max);continue;} standingBar(section,(i+1)+". "+team+(mode==2?" ("+(value>0?"+":"")+value+")":""),Math.abs(value),max,mode==1?0xff56aaf2:value<0?0xffed7979:0xff48dca2);}
+                addStandingTeam(section,(i+1)+". "+team,crestFromMatches(data,team),-1);if(mode==2){standingSignedDifference(section,"Diferencia",value,max);continue;} standingBar(section,mode==0?"Tantos a favor":"Tantos en contra",Math.abs(value),max,mode==1?0xff56aaf2:value<0?0xffed7979:0xff48dca2);}
         }
 
             }else if(activeSection[0]==2){
         standingSection(section,"Evolución conjunta");
         Spinner evolutionPicker=new Spinner(this);evolutionPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Tantos a favor","Tantos en contra","Diferencia de tantos","Victorias acumuladas"}));section.addView(evolutionPicker);
         LinearLayout chartHost=new LinearLayout(this);chartHost.setOrientation(1);section.addView(chartHost);
+        final java.util.Set<Integer> hidden=new java.util.HashSet<>();
         Runnable drawEvolution=()->{chartHost.removeAllViews();int metric=evolutionPicker.getSelectedItemPosition();
         final java.util.ArrayList<int[]> curves=new java.util.ArrayList<>();
         final int[] palette={0xff48dca2,0xff56aaf2,0xffffc365,0xffed7979,0xffc4a0ff,0xfff4a6d7,0xff9de2e2,0xffe5e5e5};
@@ -2468,19 +2474,19 @@ public class MainActivity extends Activity {
                 android.graphics.Paint p=new android.graphics.Paint(3);float left=dp(38),right=getWidth()-dp(12),top=dp(15),bottom=getHeight()-dp(28);
                 p.setTextSize(dp(10));for(int i=0;i<=4;i++){float y=bottom-(bottom-top)*i/4f;p.setColor(0xff45677d);p.setStrokeWidth(dp(1));canvas.drawLine(left,y,right,y,p);p.setColor(0xffb8d4cc);canvas.drawText(""+Math.round(yMin+(yMax-yMin)*i/4f),dp(2),y,p);}
                 for(int i=0;i<=xMax;i++){if(xMax>12&&i%((xMax+11)/12)!=0&&i!=xMax)continue;float x=left+(right-left)*i/xMax;p.setColor(0xffb8d4cc);canvas.drawText(""+i,x-dp(3),bottom+dp(16),p);}
-                for(int k=0;k<curves.size();k++){int[] c=curves.get(k);p.setColor(palette[k%palette.length]);p.setStrokeWidth(dp(2));for(int i=0;i<c.length;i++){float x=left+(right-left)*i/xMax,y=bottom-(bottom-top)*(c[i]-yMin)/(yMax-yMin);if(i>0)canvas.drawLine(left+(right-left)*(i-1)/xMax,bottom-(bottom-top)*(c[i-1]-yMin)/(yMax-yMin),x,y,p);canvas.drawCircle(x,y,dp(3),p);}}
+                for(int k=0;k<curves.size();k++){if(hidden.contains(k))continue;int[] c=curves.get(k);p.setColor(palette[k%palette.length]);p.setStrokeWidth(dp(2));for(int i=0;i<c.length;i++){float x=left+(right-left)*i/xMax,y=bottom-(bottom-top)*(c[i]-yMin)/(yMax-yMin);if(i>0)canvas.drawLine(left+(right-left)*(i-1)/xMax,bottom-(bottom-top)*(c[i-1]-yMin)/(yMax-yMin),x,y,p);canvas.drawCircle(x,y,dp(3),p);}}
             }
         };chartHost.addView(evolution,new LinearLayout.LayoutParams(-1,dp(220)));
-        for(int i=0;i<teams.size();i++)chartHost.addView(txt("● "+teams.get(i),12,palette[i%palette.length]));
+        TextView pointDetail=txt("Pulsa un punto para consultar su valor",12,0xffb8d4cc);chartHost.addView(pointDetail);
+        evolution.setOnTouchListener((view,event)->{if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;float left=dp(38),right=view.getWidth()-dp(12),top=dp(15),bottom=view.getHeight()-dp(28);double best=dp(24);String detail=null;for(int k=0;k<curves.size();k++){if(hidden.contains(k))continue;int[] c=curves.get(k);for(int i=0;i<c.length;i++){float x=left+(right-left)*i/xMax,y=bottom-(bottom-top)*(c[i]-yMin)/(yMax-yMin);double d=Math.hypot(x-event.getX(),y-event.getY());if(d<best){best=d;detail=teams.get(k)+" · Partido "+i+" · "+c[i];}}}if(detail!=null)pointDetail.setText(detail);view.performClick();return true;});
+        for(int i=0;i<teams.size();i++){final int index=i;TextView legend=txt((hidden.contains(i)?"○ ":"● ")+teams.get(i),12,palette[i%palette.length]);legend.setPadding(dp(4),dp(6),dp(4),dp(6));chartHost.addView(legend);legend.setOnClickListener(v->{if(!hidden.add(index))hidden.remove(index);legend.setAlpha(hidden.contains(index)?0.45f:1f);legend.setText((hidden.contains(index)?"○ ":"● ")+teams.get(index));evolution.invalidate();});}
         chartHost.addView(txt("Eje horizontal: número de partidos disputados por cada equipo.",11,0xffb8d4cc));
         };
         evolutionPicker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){drawEvolution.run();}});drawEvolution.run();
 
             }else{
-        TextView compareButton=txt("Comparar dos equipos  ›",15,Color.WHITE);compareButton.setGravity(android.view.Gravity.CENTER);compareButton.setPadding(dp(8),dp(12),dp(8),dp(12));compareButton.setBackgroundColor(0xff173c3b);section.addView(compareButton);
-        compareButton.setOnClickListener(v->{
-        android.widget.ScrollView compareScroll=new android.widget.ScrollView(this);
-        LinearLayout comparisonHost=new LinearLayout(this);comparisonHost.setOrientation(1);comparisonHost.setPadding(dp(12),dp(8),dp(12),dp(8));compareScroll.addView(comparisonHost);
+        LinearLayout comparisonHost=section;
+        standingSection(section,"Comparador de equipos");
         Spinner first=new Spinner(this),second=new Spinner(this);
         first.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teams));
         second.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teams));
@@ -2489,7 +2495,7 @@ public class MainActivity extends Activity {
         Runnable redraw=()->{
             comparison.removeAllViews();
             int i=first.getSelectedItemPosition(),j=second.getSelectedItemPosition();if(i<0||j<0)return;
-            String x=teams.get(i),y=teams.get(j);int[] a=stats.get(x),b=stats.get(y);
+            if(i==j){comparison.addView(txt("Selecciona dos equipos diferentes.",13,0xffb8d4cc));return;}String x=teams.get(i),y=teams.get(j);int[] a=stats.get(x),b=stats.get(y);
             comparison.addView(txt(x+" (A) · "+y+" (B)",13,0xffb8d4cc));
             standingColumns3D(comparison,new String[]{"A favor","B favor","A contra","B contra"},new int[]{a[1],b[1],a[2],b[2]},new int[]{0xff48dca2,0xff56aaf2,0xff48dca2,0xff56aaf2});
             for(String team:new String[]{x,y}){
@@ -2502,13 +2508,12 @@ public class MainActivity extends Activity {
         AdapterView.OnItemSelectedListener listener=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){redraw.run();}};
         first.setOnItemSelectedListener(listener);second.setOnItemSelectedListener(listener);redraw.run();
 
-        new android.app.AlertDialog.Builder(this).setTitle("Comparador de equipos").setView(compareScroll).setPositiveButton("Cerrar",null).show();
-        });
+
 
             }
         };
         for(int z=0;z<4;z++){final int index=z;LinearLayout row;if(z%2==0){row=new LinearLayout(this);nav.addView(row);}else row=(LinearLayout)nav.getChildAt(nav.getChildCount()-1);
-            TextView button=txt(sections[z],14,Color.WHITE);buttons[z]=button;button.setGravity(android.view.Gravity.CENTER);button.setTypeface(null,Typeface.BOLD);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(42),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(button,lp);button.setOnClickListener(v->{activeSection[0]=index;renderSection.run();});}
+            TextView button=txt("",14,Color.WHITE);button.setText(iconLabel(new String[]{"results","standings","results","refresh"}[z],sections[z]));buttons[z]=button;button.setGravity(android.view.Gravity.CENTER);button.setTypeface(null,Typeface.BOLD);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(42),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(button,lp);button.setOnClickListener(v->{activeSection[0]=index;renderSection.run();});}
         body.addView(section);renderSection.run();
         body.addView(txt("Totales de marcadores importados. Los equipos pueden tener distinto número de partidos.",12,0xffb8d4cc));
     }
