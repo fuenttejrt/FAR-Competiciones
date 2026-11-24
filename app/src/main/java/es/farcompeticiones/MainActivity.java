@@ -1285,6 +1285,41 @@ public class MainActivity extends Activity {
                             cmp=Integer.compare(b.getValue(),a.getValue());
                             return cmp!=0?cmp:a.getKey().compareToIgnoreCase(b.getKey());
                         });
+                        java.util.Map<String,android.view.View> playerCardLookup=new java.util.HashMap<>();
+                        java.util.ArrayList<String> minuteRank=new java.util.ArrayList<>(appearances.keySet());
+                        java.util.Collections.sort(minuteRank,(a,b)->{
+                            int ta=verifiedMinutes.getOrDefault(a,0)+estimatedMinutes.getOrDefault(a,0);
+                            int tb=verifiedMinutes.getOrDefault(b,0)+estimatedMinutes.getOrDefault(b,0);
+                            int cmp=Integer.compare(tb,ta);
+                            return cmp!=0?cmp:a.compareToIgnoreCase(b);
+                        });
+                        int minuteChartSize=Math.min(10,minuteRank.size());
+                        if(minuteChartSize>0){
+                            String[] minuteNames=new String[minuteChartSize];
+                            int[] minuteVerified=new int[minuteChartSize];
+                            int[] minuteEstimated=new int[minuteChartSize];
+                            standingSection(content,"Top 10 · más minutos · gráfico 3D");
+                            content.addView(txt("Verde: verificados  ·  Naranja: estimados por amarilla. Pulsa el gráfico o un jugador para abrir su ficha.",11,0xffa9c4d2));
+                            for(int k=0;k<minuteChartSize;k++){
+                                String key=minuteRank.get(k);
+                                String[] parts=key.split("\\|",2);
+                                minuteNames[k]=parts.length>1?parts[1]:key;
+                                minuteVerified[k]=verifiedMinutes.getOrDefault(key,0);
+                                minuteEstimated[k]=estimatedMinutes.getOrDefault(key,0);
+                            }
+                            standingMinuteRanking3D(content,minuteNames,minuteVerified,minuteEstimated,playerCardLookup);
+                            for(int k=0;k<minuteChartSize;k++){
+                                final String playerName=minuteNames[k];
+                                TextView legendLine=txt((k+1)+". "+playerName+" · "+minuteVerified[k]+" min verificados"
+                                    +(minuteEstimated[k]>0?" + "+minuteEstimated[k]+" estimados":""),12,0xffd2e4ef);
+                                legendLine.setPadding(dp(8),dp(5),dp(8),dp(5));
+                                legendLine.setOnClickListener(v->{
+                                    android.view.View card=playerCardLookup.get(playerName);
+                                    if(card!=null)card.performClick();
+                                });
+                                content.addView(legendLine);
+                            }
+                        }
                         int chartSize=Math.min(10,starterRanking.size());
                         if(chartSize>0){
                             String[] chartNames=new String[chartSize];
@@ -1338,7 +1373,7 @@ public class MainActivity extends Activity {
                         searchPlayer.setTextColor(0xffe2f5fa);
                         content.addView(searchPlayer);
                         android.widget.Spinner playerFilter=new android.widget.Spinner(this);
-                        String[] playerFilters={"Todos","Titulares","Suplentes","Todos los partidos","Mayor participación"};
+                        String[] playerFilters={"Todos","Titulares","Suplentes","Todos los partidos","Mayor participación","Más minutos (top 10)"};
                         playerFilter.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,playerFilters));
                         content.addView(playerFilter);
                         LinearLayout rosterList=new LinearLayout(this);rosterList.setOrientation(1);content.addView(rosterList);
@@ -1380,6 +1415,7 @@ public class MainActivity extends Activity {
                             if(estimatedMatches.getOrDefault(item.getKey(),0)>0)
                                 info.addView(txt(estimatedMinutes.getOrDefault(item.getKey(),0)+" min estimados · "+estimatedMatches.get(item.getKey())+" acta(s) con amarilla",11,0xffffc38c));
                             playerRow.addView(txt("›",23,0xff75e6b2));
+                            playerCardLookup.put(playerName,playerRow);
                             playerRow.setOnClickListener(v->{
                                 LinearLayout details=new LinearLayout(this);
                                 details.setOrientation(1);
@@ -1421,6 +1457,13 @@ public class MainActivity extends Activity {
                                 else if(mode==2)show&=playerBenchCounts.get(k)>0;
                                 else if(mode==3)show&=playerMatchCounts.get(k)==matches.size();
                                 else if(mode==4)show&=playerMatchCounts.get(k)>=Math.max(1,matches.size()-1);
+                                else if(mode==5){
+                                    String name=playerSearchKeys.get(k);
+                                    boolean top=false;
+                                    for(int rank=0;rank<Math.min(10,minuteRank.size());rank++)
+                                        if(name.equals(minuteRank.get(rank).toLowerCase(java.util.Locale.ROOT)))top=true;
+                                    show&=top;
+                                }
                                 playerRows.get(k).setVisibility(show?android.view.View.VISIBLE:android.view.View.GONE);
                             }
                         };
