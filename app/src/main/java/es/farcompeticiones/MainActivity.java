@@ -699,7 +699,7 @@ public class MainActivity extends Activity {
                 for(int i=0;i<values.length;i++){
                     float x=17+i*slot+slot*.24f;
                     float barWidth=Math.min(35,slot*.5f);
-                    float height=values[i]*110f/max,top=147-height;
+                    float height=Math.max(0,values[i])*110f/max,top=147-height;
                     int color=colors[i%colors.length];
                     if(values[i]>0){
                     android.graphics.Path side=new android.graphics.Path();
@@ -717,7 +717,7 @@ public class MainActivity extends Activity {
                     p.setColor(0xfff1f7fc);p.setTextSize(14);
                     p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
                     p.setTextAlign(android.graphics.Paint.Align.CENTER);
-                    c.drawText(String.valueOf(values[i]),x+barWidth*.5f,Math.max(18,top-13),p);
+                    if(values[i]<0){p.setColor(0xff84929e);p.setStyle(android.graphics.Paint.Style.STROKE);c.drawRect(x,45,x+barWidth,151,p);p.setStyle(android.graphics.Paint.Style.FILL);c.drawText("N/V",x+barWidth*.5f,100,p);}else c.drawText(String.valueOf(values[i]),x+barWidth*.5f,Math.max(18,top-13),p);
                     p.setTextSize(12);p.setTypeface(android.graphics.Typeface.DEFAULT);
                     c.drawText(labels[i],x+barWidth*.5f,174,p);
                 }
@@ -971,6 +971,17 @@ public class MainActivity extends Activity {
         return overlap;
     }
 
+    private int confirmedBeforeCard(String lineup,String temporary,String definitive,boolean local,String id,java.util.List<String> trace,int duration,int base){
+        int side=-1;boolean starter=false,initial=false;String dorsal=null;
+        for(String raw:lineup.split("\\r?\\n")){String t=raw.trim();if(t.equals("EQUIPO LOCAL"))side=0;else if(t.equals("EQUIPO VISITANTE"))side=1;else if(t.startsWith("TITULARES ("))starter=true;else if(t.startsWith("SUPLENTES ("))starter=false;else if(side==(local?0:1)){java.util.regex.Matcher m=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$").matcher(t);if(m.matches()&&id.startsWith(m.group(3)+"|")){dorsal=m.group(1);initial=starter;}}}
+        if(dorsal==null)return -1;
+        int cutoff=duration;boolean found=false;
+        for(String cards:new String[]{temporary,definitive}){side=-1;for(String raw:cards.split("\\r?\\n")){String t=raw.trim();if(t.matches("(?i)Equipo local:.*"))side=0;else if(t.matches("(?i)Equipo visitante:.*"))side=1;else if(side==(local?0:1)&&t.matches("^\\d+\\. Min .*")){java.util.regex.Matcher dm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(t),mm=java.util.regex.Pattern.compile("Min (\\d+)").matcher(t);if(dm.find()&&dorsal.equals(dm.group(1))){if(!mm.find())return -1;int minute=Integer.parseInt(mm.group(1));if(minute>duration)return -1;cutoff=Math.min(cutoff,minute);found=true;}}}}
+        if(!found)return base;
+        int entered=initial?0:-1,total=0;
+        for(String event:trace){java.util.regex.Matcher m=java.util.regex.Pattern.compile("(Entra|Sale) min (\\d+)").matcher(event);if(!m.matches())continue;int minute=Integer.parseInt(m.group(2));if(minute>=cutoff)break;if(m.group(1).equals("Entra"))entered=minute;else if(entered>=0){total+=minute-entered;entered=-1;}}
+        if(entered>=0)total+=cutoff-entered;return Math.max(0,total);
+    }
     private java.util.Map<String,Integer> verifiedActMinutes(String lineup,String changes,boolean local,int duration){
         return verifiedActMinutes(lineup,changes,local,duration,new java.util.HashMap<>());
     }
@@ -1368,34 +1379,7 @@ public class MainActivity extends Activity {
                                 for(String dorsal:sanctionedDorsals){
                                     String id=dorsalIds.get(dorsal);
                                     if(id==null){unknownSanction=true;continue;}
-                                    Integer base=perAct.remove(id);
-                                    if(base==null)continue;
-                                    excludedPlayers++;
-                                    if(redDorsals.contains(dorsal))continue; // Definitive cards require separate handling.
-                                    java.util.ArrayList<int[]> intervals=yellowIntervals.get(dorsal);
-                                    if(intervals==null||intervals.isEmpty())continue;
-                                    // Avoid double-counting overlapping yellow-card intervals.
-                                    java.util.Collections.sort(intervals,(a,b)->Integer.compare(a[0],b[0]));
-                                    int deducted=0,previousEnd=-1;
-                                    boolean calculable=true;
-                                    for(int[] interval:intervals){
-                                        int from=Math.max(interval[0],previousEnd);
-                                        if(from<interval[1]){
-                                            int overlap=suspensionOverlap(lineup,cached.optString("changes",""),local,dorsal,from,interval[1],
-                                                CompetitionRules.matchMinutes(season,category,selectedCompetition));
-                                            if(overlap<0){calculable=false;break;}
-                                            deducted+=overlap;
-                                        }
-                                        previousEnd=Math.max(previousEnd,interval[1]);
-                                    }
-                                    if(calculable){
-                                        int estimate=Math.max(0,base-deducted);
-                                        estimatedMinutes.put(id,estimatedMinutes.getOrDefault(id,0)+estimate);
-                                        estimatedMatches.put(id,estimatedMatches.getOrDefault(id,0)+1);
-                                        playerMinuteBreakdown.computeIfAbsent(id,k->new java.util.ArrayList<>())
-                                            .add(match.optString("home","")+" – "+match.optString("away","")+" · "+estimate
-                                                +" min estimados (amarilla: "+deducted+" min de juego descontados; regreso no confirmado)");
-                                    }
+                                    Integer base=perAct.get(id);if(base==null)continue;int confirmed=confirmedBeforeCard(lineup,cached.optString("temporaryCards"),cached.optString("definitiveCards"),local,id,trace.getOrDefault(id,new java.util.ArrayList<>()),CompetitionRules.matchMinutes(season,category,selectedCompetition),base);if(confirmed<0){perAct.remove(id);excludedPlayers++;}else perAct.put(id,confirmed);
                                 }
                             }
                             // If a card has no identifiable player, no minute count can be certified.
@@ -2319,7 +2303,7 @@ public class MainActivity extends Activity {
                             if(!seen.contains(id))continue;
                             int[] a=totals.get(id);
                             if(me.getValue()>0||trace.getOrDefault(me.getKey(),new java.util.ArrayList<>()).stream().anyMatch(e->e.startsWith("Entra")))a[10]++;
-                            if(!unknownCard&&!sanctioned.contains(id)){a[9]+=me.getValue();a[11]++;matchMinutes.put(id,me.getValue());}
+                            if(!unknownCard){int confirmed=confirmedBeforeCard(act.optString("lineups"),act.optString("temporaryCards"),act.optString("definitiveCards"),sideIndex==0,me.getKey(),trace.getOrDefault(me.getKey(),new java.util.ArrayList<>()),CompetitionRules.matchMinutes(season,category,selectedCompetition),me.getValue());if(confirmed>=0){a[9]+=confirmed;a[11]++;matchMinutes.put(id,confirmed);}}
                         }
                     }
                     for(String id:seen)history.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(g.optString("home")+" – "+g.optString("away")+" · "+(matchMinutes.containsKey(id)?matchMinutes.get(id)+" min verificados":"Minutos no verificados"));
@@ -2396,9 +2380,9 @@ public class MainActivity extends Activity {
         java.util.ArrayList<String> keys=new java.util.ArrayList<>(records.keySet());keys.sort((x,y)->Long.compare(matchTimestamp(matches.get(x),false),matchTimestamp(matches.get(y),false)));
         Runnable draw=()->{section.removeAllViews();for(int z=0;z<4;z++)tabs[z].setBackground(gradient(z==active[0]?0xff08643d:0xff203e50,z==active[0]?0xff075037:0xff172b3c,0xff45677d));
             if(active[0]==0||active[0]==1){standingSection(section,"Anotación");if(active[0]==0)profileRing(section,new int[]{a[3]*5,a[4]*2,a[5]*3,a[6]*3},palette,"Puntos");else standingColumns3D(section,new String[]{"Ensayos","Transf.","Castigos","Drops"},new int[]{a[3],a[4],a[5],a[6]},palette);if(active[0]==0){section.addView(txt("Media: "+(a[10]>0?String.format(java.util.Locale.getDefault(),"%.1f puntos registrados / partido",(double)a[2]/a[10]):"—")+" · "+(a[11]>0?String.format(java.util.Locale.getDefault(),"%.1f min / acta verificada",(double)a[9]/a[11]):"—"),13,0xffb8d4cc));standingSection(section,"Disciplina");playerProfileTiles(section,new String[]{"▮ Amarillas","▮ Rojas"},new int[]{a[7],a[8]},new int[]{0xffffd44d,0xffed7979});}else{standingSection(section,"Puntos acumulados registrados");int[] cumulative=new int[keys.size()];String[] labels=new String[keys.size()];int[] cc=new int[keys.size()];int sum=0;for(int n=0;n<keys.size();n++){sum+=records.get(keys.get(n))[2];cumulative[n]=sum;labels[n]="P"+(n+1);cc[n]=palette[0];}if(keys.size()>0)standingColumns3D(section,labels,cumulative,cc);standingSection(section,"Puntos por partido");for(String key:keys){int[] m=records.get(key);org.json.JSONObject g=matches.get(key);section.addView(txt(formatMatchDate(g.optString("when"))+" · "+g.optString("home")+" – "+g.optString("away"),12,Color.WHITE));section.addView(txt(g.optBoolean("playerScoreVerified",false)?m[2]+" puntos verificados":"Anotación no verificada",12,0xff75e6b2));}}}
-            if(active[0]==2){standingSection(section,"Participación");standingColumns3D(section,new String[]{"Conv.","Titular","Jugados"},new int[]{a[0],a[1],a[10]},palette);standingSection(section,"Minutos por partido");java.util.ArrayList<String> ml=new java.util.ArrayList<>();java.util.ArrayList<Integer> mv=new java.util.ArrayList<>();for(int n=0;n<keys.size();n++){int[] m=records.get(keys.get(n));if(m[11]>0){ml.add("P"+(n+1));mv.add(m[9]);}}if(!mv.isEmpty()){int[] mc=new int[mv.size()],vv=new int[mv.size()];for(int n=0;n<mv.size();n++){mc[n]=palette[1];vv[n]=mv.get(n);}standingColumns3D(section,ml.toArray(new String[0]),vv,mc);}for(String key:keys){int[] m=records.get(key);org.json.JSONObject g=matches.get(key);section.addView(txt(formatMatchDate(g.optString("when"))+" · "+g.optString("home")+" – "+g.optString("away"),12,Color.WHITE));section.addView(txt(m[11]>0?m[9]+" min verificados":"Minutos no verificados",13,0xff75e6b2));}}
-            if(active[0]==3){standingSection(section,"Historial de partidos");for(String key:keys){org.json.JSONObject g=matches.get(key);int[] m=records.get(key);LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(8),dp(8),dp(8),dp(8));card.setBackground(gradient(0xff203e50,0xff172b3c,0xff45677d));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(4),0,dp(4));section.addView(card,lp);card.addView(txt(formatMatchDate(g.optString("when"))+" · "+g.optString("round","Jornada no identificada"),12,0xffb8d4cc));LinearLayout versus=new LinearLayout(this);versus.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(versus);LinearLayout home=new LinearLayout(this),away=new LinearLayout(this);home.setOrientation(1);away.setOrientation(1);versus.addView(home,new LinearLayout.LayoutParams(0,-2,1));addStandingTeam(home,g.optString("home"),crestFromMatches(data,g.optString("home")),-1);int color=0xffb8d4cc;java.util.regex.Matcher sm=java.util.regex.Pattern.compile("(\\d+)\\s*[-–:]\\s*(\\d+)").matcher(g.optString("score"));if(sm.find()){int diff=Integer.parseInt(sm.group(1))-Integer.parseInt(sm.group(2));if(!teamKey(team).equals(teamKey(g.optString("home"))))diff=-diff;color=diff>0?0xff75e6b2:diff<0?0xffed7979:0xff65c5ef;}TextView score=txt(g.optString("score"),18,color);score.setTypeface(null,Typeface.BOLD);versus.addView(score);versus.addView(away,new LinearLayout.LayoutParams(0,-2,1));addStandingTeam(away,g.optString("away"),crestFromMatches(data,g.optString("away")),-1);card.addView(txt((m[11]>0?m[9]+" min verificados":"Minutos no verificados")+" · "+(g.optBoolean("playerScoreVerified",false)?m[2]+" puntos verificados":"Anotación no verificada"),14,0xff75e6b2));card.addView(txt((m[1]>0?"Titular":"Suplente")+" · Amarillas "+m[7]+" · Rojas "+m[8],12,0xffb8d4cc));card.addView(txt("Consultar acta ›",13,Color.WHITE));card.setOnClickListener(v->{android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(key));try{startActivity(intent);}catch(Exception e){android.widget.Toast.makeText(this,"No se pudo abrir el acta",0).show();}});}}
-            section.addView(txt("Los datos no verificados no equivalen a cero.",11,0xffb8d4cc));
+            if(active[0]==2){standingSection(section,"Participación");standingColumns3D(section,new String[]{"Conv.","Titular","Jugados"},new int[]{a[0],a[1],a[10]},palette);standingSection(section,"Minutos por partido");java.util.ArrayList<String> ml=new java.util.ArrayList<>();java.util.ArrayList<Integer> mv=new java.util.ArrayList<>();for(int n=0;n<keys.size();n++){int[] m=records.get(keys.get(n));ml.add("P"+(n+1));mv.add(m[11]>0?m[9]:-1);}if(!mv.isEmpty()){int[] mc=new int[mv.size()],vv=new int[mv.size()];for(int n=0;n<mv.size();n++){mc[n]=palette[1];vv[n]=mv.get(n);}standingColumns3D(section,ml.toArray(new String[0]),vv,mc);}for(String key:keys){int[] m=records.get(key);org.json.JSONObject g=matches.get(key);section.addView(txt(formatMatchDate(g.optString("when"))+" · "+g.optString("home")+" – "+g.optString("away"),12,Color.WHITE));section.addView(txt(m[11]>0?m[9]+((m[7]+m[8]>0)?" min confirmados hasta sanción":" min verificados"):"Minutos no verificados",13,0xff75e6b2));}}
+            if(active[0]==3){standingSection(section,"Historial de partidos");for(String key:keys){org.json.JSONObject g=matches.get(key);int[] m=records.get(key);LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(8),dp(8),dp(8),dp(8));card.setBackground(gradient(0xff203e50,0xff172b3c,0xff45677d));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(4),0,dp(4));section.addView(card,lp);card.addView(txt(formatMatchDate(g.optString("when"))+" · "+g.optString("round","Jornada no identificada"),12,0xffb8d4cc));LinearLayout versus=new LinearLayout(this);versus.setGravity(android.view.Gravity.CENTER_VERTICAL);card.addView(versus);LinearLayout home=new LinearLayout(this),away=new LinearLayout(this);home.setOrientation(1);away.setOrientation(1);versus.addView(home,new LinearLayout.LayoutParams(0,-2,1));addStandingTeam(home,g.optString("home"),crestFromMatches(data,g.optString("home")),-1);int color=0xffb8d4cc;java.util.regex.Matcher sm=java.util.regex.Pattern.compile("(\\d+)\\s*[-–:]\\s*(\\d+)").matcher(g.optString("score"));if(sm.find()){int diff=Integer.parseInt(sm.group(1))-Integer.parseInt(sm.group(2));if(!teamKey(team).equals(teamKey(g.optString("home"))))diff=-diff;color=diff>0?0xff75e6b2:diff<0?0xffed7979:0xff65c5ef;}TextView score=txt(g.optString("score"),18,color);score.setTypeface(null,Typeface.BOLD);versus.addView(score);versus.addView(away,new LinearLayout.LayoutParams(0,-2,1));addStandingTeam(away,g.optString("away"),crestFromMatches(data,g.optString("away")),-1);card.addView(txt((m[11]>0?m[9]+((m[7]+m[8]>0)?" min confirmados hasta sanción":" min verificados"):"Minutos no verificados")+" · "+(g.optBoolean("playerScoreVerified",false)?m[2]+" puntos verificados":"Anotación no verificada"),14,0xff75e6b2));card.addView(txt((m[1]>0?"Titular":"Suplente")+" · Amarillas "+m[7]+" · Rojas "+m[8],12,0xffb8d4cc));card.addView(txt("Consultar acta ›",13,Color.WHITE));card.setOnClickListener(v->{android.content.Intent intent=new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(key));try{startActivity(intent);}catch(Exception e){android.widget.Toast.makeText(this,"No se pudo abrir el acta",0).show();}});}}
+            section.addView(txt("Los datos no verificados no equivalen a cero. En sanciones se cuentan como mínimo los minutos hasta la primera expulsión; no se presupone el regreso.",11,0xffb8d4cc));
         };
         for(int z=0;z<4;z++){final int index=z;LinearLayout row;if(z%2==0){row=new LinearLayout(this);nav.addView(row);}else row=(LinearLayout)nav.getChildAt(nav.getChildCount()-1);TextView tab=txt("",14,Color.WHITE);tab.setText(iconLabel(new String[]{"results","trophy","organizer","calendar"}[z],names[z]));tab.setGravity(android.view.Gravity.CENTER);tab.setTypeface(null,Typeface.BOLD);tabs[z]=tab;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(42),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(tab,lp);tab.setOnClickListener(v->{active[0]=index;draw.run();});}
         draw.run();screen.show();screen.getWindow().setLayout(-1,-1);
