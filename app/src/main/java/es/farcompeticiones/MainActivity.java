@@ -1023,7 +1023,7 @@ public class MainActivity extends Activity {
         TextView title=txt(team+" · ESTADÍSTICAS",18,0xff75e6b2);
         title.setTypeface(null,android.graphics.Typeface.BOLD);frame.addView(title);
         frame.addView(txt("Temporada "+season+" · "+selectedCompetition,11,0xffb8d4cc));
-        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(1);tabs.setPadding(dp(6),dp(4),dp(6),dp(4));frame.addView(tabs); final TextView[] tabButtons=new TextView[6];
+        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(1);tabs.setPadding(dp(6),dp(4),dp(6),dp(4));tabs.setBackgroundColor(0xff102233);frame.addView(tabs); android.view.View navDivider=new android.view.View(this);navDivider.setBackgroundColor(0xff45677d);LinearLayout.LayoutParams navDividerLp=new LinearLayout.LayoutParams(-1,dp(2));navDividerLp.setMargins(dp(10),dp(5),dp(10),dp(9));frame.addView(navDivider,navDividerLp); final TextView[] tabButtons=new TextView[6];
         android.widget.ScrollView scroll=new android.widget.ScrollView(this);
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
         content.setPadding(dp(8),dp(4),dp(8),dp(12));
@@ -1048,8 +1048,8 @@ public class MainActivity extends Activity {
             content.removeAllViews();
             for(int i=0;i<tabButtons.length;i++){
                 TextView tab=tabButtons[i];
-                tab.setTextColor(i==active[0]?0xff75e6b2:0xffb0c6d1);
-                android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{i==active[0]?0xff356477:0xff28495b,i==active[0]?0xff204658:0xff172e40});tabBg.setCornerRadius(dp(10));tabBg.setStroke(dp(1),i==active[0]?0xff75e6b2:0xff406575);tab.setBackground(tabBg);
+                tab.setTextColor(i==active[0]?0xff092c25:0xffd9eaff);
+                android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{i==active[0]?0xff83e9bf:0xff244f86,i==active[0]?0xff40bc92:0xff17365c});tabBg.setCornerRadius(dp(7));tabBg.setStroke(dp(1),i==active[0]?0xffa5f6d4:0xff507eb1);tab.setBackground(tabBg);
             }
             if(active[0]==4){
                 java.util.ArrayList<org.json.JSONObject> games=standingTeamMatches(data,team);
@@ -1917,8 +1917,9 @@ public class MainActivity extends Activity {
         for(int i=0;i<labels.length;i++){
             if(i%3==0){tabRow=new LinearLayout(this);tabs.addView(tabRow,new LinearLayout.LayoutParams(-1,-2));}
             final int index=i;TextView tab=txt(tabIcons[i]+"\n"+labels[i],12,Color.WHITE);tabButtons[i]=tab;
+            android.text.SpannableString navText=new android.text.SpannableString(tabIcons[i]+"\n"+labels[i]);navText.setSpan(new android.text.style.RelativeSizeSpan(1.4f),0,tabIcons[i].length(),0);tab.setText(navText);tab.setTypeface(null,android.graphics.Typeface.BOLD);
             tab.setGravity(android.view.Gravity.CENTER);tab.setPadding(dp(2),dp(5),dp(2),dp(5));tab.setMaxLines(2);
-            LinearLayout.LayoutParams tabLp=new LinearLayout.LayoutParams(0,dp(54),1);tabLp.setMargins(dp(3),dp(3),dp(3),dp(3));tabRow.addView(tab,tabLp);
+            LinearLayout.LayoutParams tabLp=new LinearLayout.LayoutParams(0,dp(58),1);tabLp.setMargins(dp(3),dp(3),dp(3),dp(3));tabRow.addView(tab,tabLp);
             tab.setOnClickListener(v->{active[0]=index;redraw.run();});
         }
         redrawRef[0]=redraw;
