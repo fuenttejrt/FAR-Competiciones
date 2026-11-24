@@ -2407,17 +2407,51 @@ public class MainActivity extends Activity {
         LinearLayout averages=new LinearLayout(this);body.addView(averages);
         standingMetric(averages,games>0?String.format(java.util.Locale.getDefault(),"%.1f",points/(double)games):"—","Tantos / partido");standingMetric(averages,""+draws,"Empates");
 
-        standingSection(body,"Ataque y defensa");
-        java.util.ArrayList<String> ordered=new java.util.ArrayList<>(teams);
-        ordered.sort((a,b)->Integer.compare(stats.get(b)[1],stats.get(a)[1]));
-        int max=1;for(int[] a:stats.values())max=Math.max(max,Math.max(a[1],a[2]));
-        for(String team:ordered){int[] a=stats.get(team);standingSection(body,team+" · "+a[0]+" PJ");standingBar(body,"Favor",a[1],max,0xff48dca2);standingBar(body,"Contra",a[2],max,0xffed7979);}
-        standingSection(body,"Comparador y evolución");
+        for(int metric=0;metric<3;metric++){
+            final int mode=metric;
+            standingSection(body,metric==0?"Ranking de ataque":metric==1?"Ranking de defensa":"Diferencia de tantos");
+            java.util.ArrayList<String> ordered=new java.util.ArrayList<>(teams);
+            ordered.sort((x,y)->Integer.compare(mode==0?stats.get(y)[1]:mode==1?stats.get(x)[2]:stats.get(y)[1]-stats.get(y)[2],mode==0?stats.get(x)[1]:mode==1?stats.get(y)[2]:stats.get(x)[1]-stats.get(x)[2]));
+            int max=1;for(String team:ordered){int[] a=stats.get(team);max=Math.max(max,Math.abs(mode==0?a[1]:mode==1?a[2]:a[1]-a[2]));}
+            for(int i=0;i<ordered.size();i++){String team=ordered.get(i);int[] a=stats.get(team);int value=mode==0?a[1]:mode==1?a[2]:a[1]-a[2];
+                standingBar(body,(i+1)+". "+team+(mode==2?" ("+(value>0?"+":"")+value+")":""),Math.abs(value),max,mode==1?0xff56aaf2:value<0?0xffed7979:0xff48dca2);}
+        }
+        standingSection(body,"Victorias, empates y derrotas");
+        for(String team:teams){int[] a=stats.get(team);standingSection(body,team);
+            standingColumns3D(body,new String[]{"Ganados","Empates","Perdidos"},new int[]{a[3],a[4],a[0]-a[3]-a[4]},new int[]{0xff48dca2,0xff56aaf2,0xffed7979});
+            int[][] venue=new int[2][4];
+            for(org.json.JSONObject g:standingTeamMatches(data,team)){int[] score=standingMatchScore(g.optString("score"));if(score==null)continue;boolean home=teamKey(team).equals(teamKey(g.optString("home")));int[] v=venue[home?0:1];int f=score[home?0:1],c=score[home?1:0];v[0]++;if(f>c)v[1]++;if(f==c)v[2]++;if(f<c)v[3]++;}
+            body.addView(txt("Local: "+venue[0][0]+" PJ · "+venue[0][1]+" V / "+venue[0][2]+" E / "+venue[0][3]+" D",12,0xffb8d4cc));
+            body.addView(txt("Visitante: "+venue[1][0]+" PJ · "+venue[1][1]+" V / "+venue[1][2]+" E / "+venue[1][3]+" D",12,0xffb8d4cc));
+        }
+        standingSection(body,"Evolución conjunta · tantos a favor acumulados");
+        final java.util.ArrayList<int[]> curves=new java.util.ArrayList<>();
+        final int[] palette={0xff48dca2,0xff56aaf2,0xffffc365,0xffed7979,0xffc4a0ff,0xfff4a6d7,0xff9de2e2,0xffe5e5e5};
+        int maxGames=1,maxPoints=1;
+        for(String team:teams){java.util.ArrayList<Integer> pointsList=new java.util.ArrayList<>();pointsList.add(0);int sum=0;
+            for(org.json.JSONObject g:standingTeamMatches(data,team)){int[] score=standingMatchScore(g.optString("score"));if(score==null)continue;sum+=score[teamKey(team).equals(teamKey(g.optString("home")))?0:1];pointsList.add(sum);}
+            int[] curve=new int[pointsList.size()];for(int i=0;i<curve.length;i++)curve[i]=pointsList.get(i);curves.add(curve);maxGames=Math.max(maxGames,curve.length-1);maxPoints=Math.max(maxPoints,sum);
+        }
+        final int xMax=maxGames,yMax=maxPoints;
+        android.view.View evolution=new android.view.View(this){
+            @Override protected void onDraw(android.graphics.Canvas canvas){super.onDraw(canvas);
+                android.graphics.Paint p=new android.graphics.Paint(3);float left=dp(38),right=getWidth()-dp(12),top=dp(15),bottom=getHeight()-dp(28);
+                p.setTextSize(dp(10));for(int i=0;i<=4;i++){float y=bottom-(bottom-top)*i/4f;p.setColor(0xff45677d);p.setStrokeWidth(dp(1));canvas.drawLine(left,y,right,y,p);p.setColor(0xffb8d4cc);canvas.drawText(""+Math.round(yMax*i/4f),dp(2),y,p);}
+                for(int i=0;i<=xMax;i++){if(xMax>12&&i%((xMax+11)/12)!=0&&i!=xMax)continue;float x=left+(right-left)*i/xMax;p.setColor(0xffb8d4cc);canvas.drawText(""+i,x-dp(3),bottom+dp(16),p);}
+                for(int k=0;k<curves.size();k++){int[] c=curves.get(k);p.setColor(palette[k%palette.length]);p.setStrokeWidth(dp(2));for(int i=0;i<c.length;i++){float x=left+(right-left)*i/xMax,y=bottom-(bottom-top)*c[i]/yMax;if(i>0)canvas.drawLine(left+(right-left)*(i-1)/xMax,bottom-(bottom-top)*c[i-1]/yMax,x,y,p);canvas.drawCircle(x,y,dp(3),p);}}
+            }
+        };body.addView(evolution,new LinearLayout.LayoutParams(-1,dp(220)));
+        for(int i=0;i<teams.size();i++)body.addView(txt("● "+teams.get(i),12,palette[i%palette.length]));
+        body.addView(txt("Eje horizontal: número de partidos disputados por cada equipo.",11,0xffb8d4cc));
+        TextView compareButton=txt("Comparar dos equipos  ›",15,Color.WHITE);compareButton.setGravity(android.view.Gravity.CENTER);compareButton.setPadding(dp(8),dp(12),dp(8),dp(12));compareButton.setBackgroundColor(0xff173c3b);body.addView(compareButton);
+        compareButton.setOnClickListener(v->{
+        android.widget.ScrollView compareScroll=new android.widget.ScrollView(this);
+        LinearLayout comparisonHost=new LinearLayout(this);comparisonHost.setOrientation(1);comparisonHost.setPadding(dp(12),dp(8),dp(12),dp(8));compareScroll.addView(comparisonHost);
         Spinner first=new Spinner(this),second=new Spinner(this);
         first.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teams));
         second.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teams));
-        body.addView(first);body.addView(second);second.setSelection(Math.min(1,teams.size()-1));
-        LinearLayout comparison=new LinearLayout(this);comparison.setOrientation(1);body.addView(comparison);
+        comparisonHost.addView(first);comparisonHost.addView(second);second.setSelection(Math.min(1,teams.size()-1));
+        LinearLayout comparison=new LinearLayout(this);comparison.setOrientation(1);comparisonHost.addView(comparison);
         Runnable redraw=()->{
             comparison.removeAllViews();
             int i=first.getSelectedItemPosition(),j=second.getSelectedItemPosition();if(i<0||j<0)return;
@@ -2433,6 +2467,9 @@ public class MainActivity extends Activity {
         };
         AdapterView.OnItemSelectedListener listener=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){redraw.run();}};
         first.setOnItemSelectedListener(listener);second.setOnItemSelectedListener(listener);redraw.run();
+
+        new android.app.AlertDialog.Builder(this).setTitle("Comparador de equipos").setView(compareScroll).setPositiveButton("Cerrar",null).show();
+        });
         body.addView(txt("Totales de marcadores importados. Los equipos pueden tener distinto número de partidos.",12,0xffb8d4cc));
     }
     void renderNative(org.json.JSONObject data)throws org.json.JSONException{
