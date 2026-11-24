@@ -2264,8 +2264,9 @@ public class MainActivity extends Activity {
             java.util.Map<String,String> labels=new java.util.HashMap<>();
             java.util.Map<String,java.util.ArrayList<String>> history=new java.util.HashMap<>();
             java.util.Map<String,String> playerTeams=new java.util.HashMap<>();
-            int coverage=0,scoreCoverage=0;
+            java.util.Map<String,java.util.Map<String,int[]>> byRound=new java.util.TreeMap<>();int coverage=0,scoreCoverage=0;
             for(java.util.Map.Entry<String,org.json.JSONObject> entry:matches.entrySet()){
+                java.util.Map<String,int[]> before=new java.util.HashMap<>();for(String k:totals.keySet())before.put(k,totals.get(k).clone());
                 try{
                     String url=entry.getKey();org.json.JSONObject g=entry.getValue();
                     org.json.JSONObject act=new org.json.JSONObject(cache.getString(url,"{}"));
@@ -2331,7 +2332,7 @@ public class MainActivity extends Activity {
                     }
                     if(valid&&sides[0]&&sides[1]&&sums[0]==score[0]&&sums[1]==score[1]){scoreCoverage++;for(String[] e:events){int[] a=totals.get(e[0]);a[2]+=Integer.parseInt(e[2]);String k=e[1];if(k.contains("ensayo"))a[3]++;else if(k.contains("transform"))a[4]++;else if(k.contains("castigo")||k.contains("penal"))a[5]++;else if(k.contains("drop"))a[6]++;}}
                     for(String key:new String[]{"temporaryCards","definitiveCards"}){side=-1;for(String raw:act.optString(key).split("\\r?\\n")){String line=raw.trim();if(line.matches("(?i)Equipo local:.*"))side=0;else if(line.matches("(?i)Equipo visitante:.*"))side=1;else if(side>=0&&line.matches("^\\d+\\. Min .*")){java.util.regex.Matcher m=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(line);if(m.find()){String id=dorsals.get(side+":"+m.group(1));if(id!=null)totals.get(id)[key.equals("temporaryCards")?7:8]++;}}}}
-                }catch(Exception ignored){}
+                }catch(Exception ignored){}finally{String round=entry.getValue().optString("round","").trim();if(round.isEmpty())round="Sin jornada identificada";java.util.Map<String,int[]> bucket=byRound.computeIfAbsent(round,k->new java.util.HashMap<>());for(String k:totals.keySet()){int[] now=totals.get(k),old=before.get(k);if(old!=null&&java.util.Arrays.equals(now,old))continue;int[] dest=bucket.computeIfAbsent(k,x->new int[12]);for(int m=0;m<12;m++)dest[m]+=now[m]-(old==null?0:old[m]);}}
             }
             final int checked=coverage,scored=scoreCoverage;
             runOnUiThread(()->{
@@ -2339,7 +2340,7 @@ public class MainActivity extends Activity {
                 panel.removeAllViews();panel.addView(txt("Alineaciones: "+checked+"/"+matches.size()+" actas · Anotaciones conciliadas: "+scored+"/"+matches.size(),12,0xffb8d4cc));
                 String[] metrics={"Convocatorias","Titularidades","Puntos","Ensayos","Transformaciones","Castigos","Drops","Amarillas","Rojas","Minutos verificados","Partidos jugados"};
                 java.util.ArrayList<String> teamOptions=new java.util.ArrayList<>();teamOptions.add("Todos los equipos");teamOptions.addAll(teams);
-                Spinner teamPicker=new Spinner(this);teamPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teamOptions));panel.addView(teamPicker);
+                Spinner teamPicker=new Spinner(this);teamPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,teamOptions));panel.addView(teamPicker);java.util.ArrayList<String> rounds=new java.util.ArrayList<>();rounds.add("Todas las jornadas");rounds.addAll(byRound.keySet());Spinner roundPicker=new Spinner(this);roundPicker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,rounds));panel.addView(roundPicker);final boolean[] expanded={false};
                 LinearLayout nav=new LinearLayout(this);nav.setOrientation(1);panel.addView(nav,0);
                 String[] sections={"Anotación","Participación","Disciplina","Jugadores"};
                 int[][] groups={{2,3,4,5,6},{0,1,10,9},{7,8},{0}};
@@ -2347,31 +2348,34 @@ public class MainActivity extends Activity {
                 Spinner picker=new Spinner(this);panel.addView(picker);
                 android.widget.EditText search=new android.widget.EditText(this);search.setSingleLine(true);search.setHint("Buscar jugador");search.setTextColor(Color.WHITE);search.setHintTextColor(0xffb8d4cc);panel.addView(search);search.setVisibility(View.GONE);
                 Runnable selectGroup=()->{java.util.ArrayList<String> options=new java.util.ArrayList<>();for(int m:groups[active[0]])options.add(metrics[m]);picker.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,options));picker.setVisibility(active[0]==3?View.GONE:View.VISIBLE);search.setVisibility(active[0]==3?View.VISIBLE:View.GONE);for(int z=0;z<4;z++){android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(z==active[0]?0xff08643d:0xff203e50);bg.setCornerRadius(dp(12));bg.setStroke(dp(1),0xff45677d);tabs[z].setBackground(bg);}};
-                for(int z=0;z<4;z++){final int index=z;LinearLayout row;if(z%2==0){row=new LinearLayout(this);nav.addView(row);}else row=(LinearLayout)nav.getChildAt(nav.getChildCount()-1);TextView tab=txt(sections[z],14,Color.WHITE);tabs[z]=tab;tab.setGravity(android.view.Gravity.CENTER);tab.setTypeface(null,Typeface.BOLD);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(42),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(tab,lp);tab.setOnClickListener(v->{active[0]=index;selectGroup.run();});}
+                for(int z=0;z<4;z++){final int index=z;LinearLayout row;if(z%2==0){row=new LinearLayout(this);nav.addView(row);}else row=(LinearLayout)nav.getChildAt(nav.getChildCount()-1);TextView tab=txt(new String[]{"🏆 ","♟ ","⚑ ","♙ "}[z]+sections[z],14,Color.WHITE);tabs[z]=tab;tab.setGravity(android.view.Gravity.CENTER);tab.setTypeface(null,Typeface.BOLD);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(42),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(tab,lp);tab.setOnClickListener(v->{active[0]=index;selectGroup.run();});}
                 selectGroup.run();
                 LinearLayout results=new LinearLayout(this);results.setOrientation(1);panel.addView(results);
                 Runnable redraw=()->{
                     int choice=picker.getSelectedItemPosition();if(choice<0||choice>=groups[active[0]].length)return;final int position=groups[active[0]][choice];final boolean directory=active[0]==3;final String term=search.getText().toString().trim().toLowerCase(java.util.Locale.ROOT);
-                    int selectedTeam=teamPicker.getSelectedItemPosition();
-                    results.removeAllViews();java.util.ArrayList<String> ids=new java.util.ArrayList<>(totals.keySet());ids.removeIf(k->(!directory&&totals.get(k)[position]<=0)||(directory&&!labels.get(k).toLowerCase(java.util.Locale.ROOT).contains(term))||(selectedTeam>0&&!teamKey(teamOptions.get(selectedTeam)).equals(teamKey(playerTeams.get(k)))));ids.sort((a,b)->{int c=Integer.compare(totals.get(b)[position],totals.get(a)[position]);return !directory&&c!=0?c:labels.get(a).compareTo(labels.get(b));});
+                    int selectedTeam=teamPicker.getSelectedItemPosition();int roundIndex=roundPicker.getSelectedItemPosition();final java.util.Map<String,int[]> selectedTotals=roundIndex>0?byRound.get(rounds.get(roundIndex)):totals;
+                    results.removeAllViews();java.util.ArrayList<String> ids=new java.util.ArrayList<>(selectedTotals.keySet());ids.removeIf(k->(!directory&&selectedTotals.get(k)[position]<=0)||(directory&&!labels.get(k).toLowerCase(java.util.Locale.ROOT).contains(term))||(selectedTeam>0&&!teamKey(teamOptions.get(selectedTeam)).equals(teamKey(playerTeams.get(k)))));ids.sort((a,b)->{int c=Integer.compare(selectedTotals.get(b)[position],selectedTotals.get(a)[position]);return !directory&&c!=0?c:labels.get(a).compareTo(labels.get(b));});
                     if(ids.isEmpty()){results.addView(txt("Sin registros positivos en las actas analizadas",13,0xffb8d4cc));return;}
-                    int n=Math.min(5,ids.size());String[] names=new String[n];int[] values=new int[n],colors=new int[n];for(int i=0;i<n;i++){String k=ids.get(i);names[i]=""+(i+1);values[i]=totals.get(k)[position];colors[i]=i==0?0xffeac36a:i==1?0xffaebfcd:i==2?0xffc48e61:position==7?0xffffc365:position==8?0xffed7979:0xff48dca2;}
+                    int n=Math.min(5,ids.size());String[] names=new String[n];int[] values=new int[n],colors=new int[n];for(int i=0;i<n;i++){String k=ids.get(i);names[i]=""+(i+1);values[i]=selectedTotals.get(k)[position];colors[i]=i==0?0xffeac36a:i==1?0xffaebfcd:i==2?0xffc48e61:position==7?0xffffc365:position==8?0xffed7979:0xff48dca2;}
                     if(!directory)standingColumns3D(results,names,values,colors);
-                    for(int i=0;i<ids.size();i++){
-                        String k=ids.get(i);int[] a=totals.get(k);
-                        LinearLayout playerCard=new LinearLayout(this);playerCard.setOrientation(1);playerCard.setBackground(gradient(0xff203e50,0xff172b3c,0xff45677d));LinearLayout.LayoutParams cardLp=new LinearLayout.LayoutParams(-1,-2);cardLp.setMargins(dp(2),dp(3),dp(2),dp(3));results.addView(playerCard,cardLp);addStandingTeam(playerCard,playerTeams.get(k),crestFromMatches(data,playerTeams.get(k)),-1);TextView row=txt((directory?"":i==0?"🥇 ":i==1?"🥈 ":i==2?"🥉 ":(i+1)+". ")+labels.get(k)+" · "+a[position]+"  ›",14,0xffe2f5fa);
-                        row.setPadding(dp(10),dp(12),dp(10),dp(12));playerCard.addView(row);
-                        row.setOnClickListener(v->{
+                    for(int i=0;i<(expanded[0]?ids.size():Math.min(10,ids.size()));i++){
+                        String k=ids.get(i);int[] a=selectedTotals.get(k);
+                        LinearLayout playerCard=new LinearLayout(this);playerCard.setGravity(android.view.Gravity.CENTER_VERTICAL);playerCard.setPadding(dp(7),dp(5),dp(7),dp(5));int edge=directory?0xff45677d:i==0?0xffeac36a:i==1?0xffaebfcd:i==2?0xffc48e61:0xff45677d;playerCard.setBackground(gradient(0xff203e50,0xff172b3c,edge));LinearLayout.LayoutParams cardLp=new LinearLayout.LayoutParams(-1,-2);cardLp.setMargins(dp(2),dp(3),dp(2),dp(3));results.addView(playerCard,cardLp);
+                        if(!directory){TextView rank=txt(""+(i+1),15,edge);rank.setGravity(android.view.Gravity.CENTER);playerCard.addView(rank,new LinearLayout.LayoutParams(dp(26),-2));}
+                        LinearLayout logoHost=new LinearLayout(this);addStandingTeam(logoHost,"",crestFromMatches(data,playerTeams.get(k)),-1);playerCard.addView(logoHost,new LinearLayout.LayoutParams(dp(38),-2));
+                        LinearLayout info=new LinearLayout(this);info.setOrientation(1);playerCard.addView(info,new LinearLayout.LayoutParams(0,-2,1));String full=labels.get(k);int split=full.lastIndexOf(" · ");TextView name=txt(split<0?full:full.substring(0,split),14,Color.WHITE);name.setTypeface(null,Typeface.BOLD);info.addView(name);info.addView(txt(playerTeams.get(k),11,0xffb8d4cc));if(!directory){TextView value=txt(""+a[position],20,0xff75e6b2);value.setTypeface(null,Typeface.BOLD);playerCard.addView(value);}playerCard.addView(txt(" ›",18,Color.WHITE));
+                        playerCard.setOnClickListener(v->{
                             StringBuilder detail=new StringBuilder();
                             for(int j=0;j<metrics.length;j++)detail.append(metrics[j]).append(": ").append(a[j]).append("\n");
                             detail.append("Actas con minutos verificados: ").append(a[11]).append("/").append(a[0]).append("\n\nHistorial de actas\n");
                             for(String match:history.getOrDefault(k,new java.util.ArrayList<>()))detail.append(match).append("\n");
-                            new android.app.AlertDialog.Builder(this).setTitle(labels.get(k)).setMessage(detail.toString()).setPositiveButton("Cerrar",null).show();
+                            android.widget.ScrollView sc=new android.widget.ScrollView(this);LinearLayout content=new LinearLayout(this);content.setOrientation(1);content.setPadding(dp(12),dp(8),dp(12),dp(8));sc.addView(content);int[] fullStats=totals.get(k);standingSection(content,"Anotación · total competición");standingColumns3D(content,new String[]{"Ensayos","Transf.","Castigos","Drops"},new int[]{fullStats[3],fullStats[4],fullStats[5],fullStats[6]},new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xffc48e61});standingSection(content,"Participación · total competición");standingColumns3D(content,new String[]{"Conv.","Titular","Jugados"},new int[]{fullStats[0],fullStats[1],fullStats[10]},new int[]{0xff48dca2,0xff56aaf2,0xffc48e61});content.addView(txt("Datos del filtro actual; historial de toda la competición",12,0xffb8d4cc));content.addView(txt(detail.toString(),14,Color.WHITE));new android.app.AlertDialog.Builder(this).setTitle(labels.get(k)).setView(sc).setPositiveButton("Cerrar",null).show();
                         });
                     }
+                    if(ids.size()>10){TextView more=txt(expanded[0]?"Mostrar menos":"Ver ranking completo ("+ids.size()+")",14,0xff75e6b2);more.setPadding(dp(12),dp(12),dp(12),dp(12));results.addView(more);more.setOnClickListener(v->{expanded[0]=!expanded[0];picker.setSelection(picker.getSelectedItemPosition());results.post(()->{roundPicker.getOnItemSelectedListener().onItemSelected(roundPicker,null,roundPicker.getSelectedItemPosition(),0);});});}
                 };
                 AdapterView.OnItemSelectedListener filterListener=new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> p){}public void onItemSelected(AdapterView<?> p,View v,int position,long id){redraw.run();}};
-                picker.setOnItemSelectedListener(filterListener);teamPicker.setOnItemSelectedListener(filterListener);picker.setSelection(0);search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){redraw.run();}public void afterTextChanged(android.text.Editable e){}});redraw.run();
+                picker.setOnItemSelectedListener(filterListener);teamPicker.setOnItemSelectedListener(filterListener);roundPicker.setOnItemSelectedListener(filterListener);picker.setSelection(0);search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){redraw.run();}public void afterTextChanged(android.text.Editable e){}});redraw.run();
                 panel.addView(txt("Registros disponibles; las actas incompletas no equivalen a cero. Minutos parciales verificados; se excluyen sanciones y cambios no verificables. Partidos jugados según cambios legibles.",11,0xffb8d4cc));
             });
         }).start();
@@ -2460,6 +2464,7 @@ public class MainActivity extends Activity {
             }
             stats.put(team,a);
         }
+        standingSection(body,"Estadísticas generales de equipos");
         LinearLayout nav=new LinearLayout(this);nav.setOrientation(1);body.addView(nav);
         LinearLayout section=new LinearLayout(this);section.setOrientation(1);
         String[] sections={"Resumen","Rankings","Evolución","Comparador"};
