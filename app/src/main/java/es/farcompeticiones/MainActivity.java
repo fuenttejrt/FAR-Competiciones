@@ -608,7 +608,7 @@ public class MainActivity extends Activity {
         card.setBackground(bgCard);card.setElevation(dp(4));
         TextView big=txt(value,19,metricColor);big.setGravity(android.view.Gravity.CENTER);
         big.setTypeface(null,android.graphics.Typeface.BOLD);card.addView(big);
-        TextView small=txt(label,10,0xffd2e4ef);small.setGravity(android.view.Gravity.CENTER);card.addView(small);
+        TextView small=txt(label,10,0xffd2e4ef);small.setGravity(android.view.Gravity.CENTER);small.setMinLines(2);card.addView(small);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);
         lp.setMargins(dp(3),dp(5),dp(3),dp(5));target.addView(card,lp);
     }
@@ -1095,7 +1095,7 @@ public class MainActivity extends Activity {
                     java.util.Map<String,Integer> actualPlayed=new java.util.HashMap<>(), unused=new java.util.HashMap<>(), entries=new java.util.HashMap<>(), exits=new java.util.HashMap<>(), returns=new java.util.HashMap<>(), participationKnown=new java.util.HashMap<>();
                     java.util.Map<String,java.util.ArrayList<String>> changeBreakdown=new java.util.HashMap<>();
                     java.util.Map<String,Integer> tries=new java.util.HashMap<>(), conversions=new java.util.HashMap<>(), penalties=new java.util.HashMap<>(), drops=new java.util.HashMap<>(), points=new java.util.HashMap<>(), yellows=new java.util.HashMap<>(), reds=new java.util.HashMap<>(), sanctionMinutes=new java.util.HashMap<>(), scoringCoverage=new java.util.HashMap<>(), disciplineCoverage=new java.util.HashMap<>();
-                    java.util.Map<String,java.util.ArrayList<String>> scoreHistory=new java.util.HashMap<>(), cardHistory=new java.util.HashMap<>();
+                    java.util.Map<String,java.util.ArrayList<String>> scoreHistory=new java.util.HashMap<>(), cardHistory=new java.util.HashMap<>(), scoreGames=new java.util.HashMap<>();
                     int[] minuteActCount={0};
                     java.util.ArrayList<String> minuteActDiagnostics=new java.util.ArrayList<>();
                     android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
@@ -1181,7 +1181,7 @@ public class MainActivity extends Activity {
                                     }else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))validScore=false;
                                 }
                                 if(validScore&&sideFound){
-                                    for(String id:thisMatch)scoringCoverage.merge(id,1,Integer::sum);
+                                    for(String id:thisMatch){scoringCoverage.merge(id,1,Integer::sum);scoreGames.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(match.optString("home")+" – "+match.optString("away"));}
                                     for(String[] ev:scoreEvents){
                                         points.merge(ev[0],Integer.parseInt(ev[2]),Integer::sum);
                                         scoreHistory.computeIfAbsent(ev[0],k->new java.util.ArrayList<>()).add(match.optString("home")+" – "+match.optString("away")+" · min "+ev[3]+" · "+ev[1]+" · "+ev[2]+" pts");
@@ -1660,9 +1660,9 @@ public class MainActivity extends Activity {
                                 int yc=yellows.getOrDefault(statId,0), rc=reds.getOrDefault(statId,0);
                                 LinearLayout sr=new LinearLayout(this);summaryPanel.addView(sr);
                                 standingMetric(sr,(mins+estimated)+" min",estimatedCount>0?"Orientativos":"Verificados");
-                                standingMetric(sr,minuteKnown>0&&duration>0?Math.round(100.0*(mins+estimated)/(duration*minuteKnown))+"%":"—","Participación");
+                                standingMetric(sr,minuteKnown>0&&duration>0?Math.round(100.0*(mins+estimated)/(duration*minuteKnown))+"%":"—",estimatedCount>0?"Particip. orientativa":"Participación");
                                 LinearLayout sr2=new LinearLayout(this);summaryPanel.addView(sr2);standingMetric(sr2,""+pt,"Puntos");standingMetric(sr2,""+t,"Ensayos");
-                                LinearLayout sr3=new LinearLayout(this);summaryPanel.addView(sr3);standingMetric(sr3,""+cv,"Transformaciones");standingMetric(sr3,""+yc,"Amarillas",0xffffc365);standingMetric(sr3,""+rc,"Rojas",0xffed7979);
+                                LinearLayout sr3=new LinearLayout(this);summaryPanel.addView(sr3);standingMetric(sr3,""+cv,"Transf.");standingMetric(sr3,""+yc,"Amarillas",0xffffc365);standingMetric(sr3,""+rc,"Rojas",0xffed7979);
                                 standingColumns3D(summaryPanel,new String[]{"Disputados","Titular","Suplente"},new int[]{playedActual,starterCount,benchCount},new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
                                 int sc=scoringCoverage.getOrDefault(statId,0);
                                 standingSection(scoringPanel,"Anotaciones · "+sc+"/"+playedCount+" actas");
@@ -1672,12 +1672,31 @@ public class MainActivity extends Activity {
                                 if(pt>0&&5*t+2*cv+3*pn+3*dr==pt)standingPie(scoringPanel,new int[]{5*t,2*cv,3*pn,3*dr},new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff80d9cc},new String[]{"Ensayos","Transformaciones","Castigos","Drops"});
                                 standingColumns3D(scoringPanel,new String[]{"Ensayos","Transf.","Castigos","Drops"},new int[]{t,cv,pn,dr},new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff80d9cc});
                                 java.util.ArrayList<String> sh=scoreHistory.get(statId);
-                                if(sh!=null){standingSection(scoringPanel,"Historial de anotaciones");java.util.LinkedHashMap<String,Integer> perGame=new java.util.LinkedHashMap<>();for(String event:sh){String[] f=event.split(" · ");if(f.length==4){try{perGame.merge(f[0],Integer.parseInt(f[3].replace(" pts","")),Integer::sum);}catch(Exception ignored){}}}int maxPoints=1;for(int n:perGame.values())maxPoints=Math.max(maxPoints,n);for(java.util.Map.Entry<String,Integer> game:perGame.entrySet())standingBar(scoringPanel,game.getKey(),game.getValue(),maxPoints,0xff48dca2);for(String event:sh)scoringPanel.addView(txt(event,12,0xffd2e4ef));}
+                                java.util.ArrayList<String> sg=scoreGames.get(statId);
+                                if(sg!=null&&!sg.isEmpty()){
+                                    java.util.LinkedHashMap<String,Integer> perGame=new java.util.LinkedHashMap<>();
+                                    for(String game:sg)perGame.put(game,0);
+                                    if(sh!=null)for(String event:sh){String[] f=event.split(" · ");if(f.length==4){try{perGame.merge(f[0],Integer.parseInt(f[3].replace(" pts","")),Integer::sum);}catch(Exception ignored){}}}
+                                    int maxPoints=1;for(int n:perGame.values())maxPoints=Math.max(maxPoints,n);
+                                    String[] gameLabels=new String[perGame.size()];int[] accumulated=new int[perGame.size()];int[] chartColors=new int[perGame.size()];int idx=0,totalPoints=0;
+                                    for(int n:perGame.values()){totalPoints+=n;gameLabels[idx]="P"+(idx+1);accumulated[idx]=totalPoints;chartColors[idx]=0xff48dca2;idx++;}
+                                    standingSection(scoringPanel,"Puntos acumulados · actas analizadas");
+                                    standingColumns3D(scoringPanel,gameLabels,accumulated,chartColors);
+                                    standingSection(scoringPanel,"Anotaciones por partido");
+                                    for(java.util.Map.Entry<String,Integer> game:perGame.entrySet()){
+                                        LinearLayout gc=new LinearLayout(this);gc.setOrientation(1);gc.setPadding(dp(10),dp(8),dp(10),dp(8));
+                                        android.graphics.drawable.GradientDrawable gb=new android.graphics.drawable.GradientDrawable();gb.setColor(0xff203b4c);gb.setCornerRadius(dp(9));gc.setBackground(gb);
+                                        LinearLayout.LayoutParams gl=new LinearLayout.LayoutParams(-1,-2);gl.setMargins(0,dp(4),0,dp(4));scoringPanel.addView(gc,gl);
+                                        gc.addView(txt(game.getKey(),13,0xffe2f5fa));standingBar(gc,"Puntos",game.getValue(),maxPoints,0xff48dca2);
+                                        if(game.getValue()==0)gc.addView(txt("Sin anotaciones registradas",11,0xffa9c4d2));
+                                        if(sh!=null)for(String event:sh)if(event.startsWith(game.getKey()+" · "))gc.addView(txt(event.substring(game.getKey().length()+3),12,0xffd2e4ef));
+                                    }
+                                }
                                 standingSection(disciplinePanel,"Disciplina · "+disciplineCoverage.getOrDefault(statId,0)+"/"+playedCount+" actas");
-                                LinearLayout ds=new LinearLayout(this);disciplinePanel.addView(ds);standingMetric(ds,""+yc,"Amarillas",0xffffc365);standingMetric(ds,""+rc,"Rojas",0xffed7979);standingMetric(ds,""+sanctionMinutes.getOrDefault(statId,0),"Min. reglamentarios",0xffffb76c);
+                                LinearLayout ds=new LinearLayout(this);disciplinePanel.addView(ds);standingMetric(ds,""+yc,"Amarillas",0xffffc365);standingMetric(ds,""+rc,"Rojas",0xffed7979);standingMetric(ds,""+sanctionMinutes.getOrDefault(statId,0),"Min. sanción",0xffffb76c);
                                 standingColumns3D(disciplinePanel,new String[]{"Amarillas","Rojas"},new int[]{yc,rc},new int[]{0xffffc365,0xffed7979});
                                 java.util.ArrayList<String> ch=cardHistory.get(statId);
-                                if(ch!=null){standingSection(disciplinePanel,"Historial de sanciones");for(String event:ch){TextView cardText=txt("■ "+event,12,event.contains(" · Roja · ")?0xffed7979:0xffffc365);cardText.setPadding(dp(10),dp(10),dp(10),dp(10));cardText.setBackgroundColor(0xff203b4c);LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-1,-2);clp.setMargins(0,dp(4),0,dp(4));disciplinePanel.addView(cardText,clp);}}
+                                if(ch!=null){standingSection(disciplinePanel,"Historial de sanciones");for(String event:ch){TextView cardText=txt("■ "+event+(event.contains(" · Amarilla · ")&&CompetitionRules.temporarySuspensionMinutes(season,category)>0?" · "+CompetitionRules.temporarySuspensionMinutes(season,category)+" min reglamentarios":""),12,event.contains(" · Roja · ")?0xffed7979:0xffffc365);cardText.setPadding(dp(10),dp(10),dp(10),dp(10));android.graphics.drawable.GradientDrawable cbg=new android.graphics.drawable.GradientDrawable();cbg.setColor(0xff203b4c);cbg.setCornerRadius(dp(9));cardText.setBackground(cbg);LinearLayout.LayoutParams clp=new LinearLayout.LayoutParams(-1,-2);clp.setMargins(0,dp(4),0,dp(4));disciplinePanel.addView(cardText,clp);}}
                                 disciplinePanel.addView(txt("La duración reglamentaria no confirma el regreso efectivo al campo.",11,0xffb8d4cc));
                                 LinearLayout panelBody=new LinearLayout(this);panelBody.setOrientation(1);
                                 for(LinearLayout panel:playerPanels){details.removeView(panel);panelBody.addView(panel);}
