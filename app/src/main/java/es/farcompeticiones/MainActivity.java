@@ -950,6 +950,10 @@ public class MainActivity extends Activity {
     }
 
     private java.util.Map<String,Integer> verifiedActMinutes(String lineup,String changes,boolean local,int duration){
+        return verifiedActMinutes(lineup,changes,local,duration,new java.util.HashMap<>());
+    }
+    private java.util.Map<String,Integer> verifiedActMinutes(String lineup,String changes,boolean local,int duration,
+        java.util.Map<String,java.util.ArrayList<String>> trace){
         if(duration<=0||changes==null||changes.trim().isEmpty())return null;
         java.util.Map<String,String> byDorsal=new java.util.HashMap<>();
         java.util.Map<String,Integer> minutes=new java.util.HashMap<>();
@@ -989,6 +993,8 @@ public class MainActivity extends Activity {
                 if(minute<0||minute>duration||minute<lastMinute||!onField.contains(out)
                     ||onField.contains(in)||!byDorsal.containsKey(in)||!byDorsal.containsKey(out))return null;
                 String id=byDorsal.get(out);
+                trace.computeIfAbsent(id,k->new java.util.ArrayList<>()).add("Sale min "+minute);
+                trace.computeIfAbsent(byDorsal.get(in),k->new java.util.ArrayList<>()).add("Entra min "+minute);
                 minutes.put(id,minutes.get(id)+minute-enteredAt.get(out));
                 onField.remove(out);enteredAt.remove(out);
                 onField.add(in);enteredAt.put(in,minute);
@@ -1083,6 +1089,8 @@ public class MainActivity extends Activity {
                     java.util.Map<String,Integer> estimatedMinutes=new java.util.HashMap<>();
                     java.util.Map<String,Integer> estimatedMatches=new java.util.HashMap<>();
                     java.util.Map<String,java.util.ArrayList<String>> playerMinuteBreakdown=new java.util.HashMap<>();
+                    java.util.Map<String,Integer> actualPlayed=new java.util.HashMap<>(), unused=new java.util.HashMap<>(), entries=new java.util.HashMap<>(), exits=new java.util.HashMap<>(), returns=new java.util.HashMap<>(), participationKnown=new java.util.HashMap<>();
+                    java.util.Map<String,java.util.ArrayList<String>> changeBreakdown=new java.util.HashMap<>();
                     int[] minuteActCount={0};
                     java.util.ArrayList<String> minuteActDiagnostics=new java.util.ArrayList<>();
                     android.content.SharedPreferences actCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
@@ -1196,8 +1204,26 @@ public class MainActivity extends Activity {
                                     }
                                 }
                             }
+                            java.util.Map<String,java.util.ArrayList<String>> trace=new java.util.HashMap<>();
                             java.util.Map<String,Integer> perAct=verifiedActMinutes(lineup,cached.optString("changes",""),local,
-                                CompetitionRules.matchMinutes(season,category,selectedCompetition));
+                                CompetitionRules.matchMinutes(season,category,selectedCompetition),trace);
+                            if(perAct!=null){
+                                String label=match.optString("home","")+" – "+match.optString("away","");
+                                for(String id:thisMatch){
+                                    java.util.ArrayList<String> events=trace.getOrDefault(id,new java.util.ArrayList<>());
+                                    int en=0,ex=0,re=0;
+                                    boolean hasPlayed=matchStarters.contains(id);
+                                    for(String event:events){
+                                        if(event.startsWith("Entra")){
+                                            en++;if(hasPlayed)re++;hasPlayed=true;
+                                        }else if(event.startsWith("Sale"))ex++;
+                                    }
+                                    participationKnown.merge(id,1,Integer::sum);
+                                    (hasPlayed?actualPlayed:unused).merge(id,1,Integer::sum);
+                                    entries.merge(id,en,Integer::sum);exits.merge(id,ex,Integer::sum);returns.merge(id,re,Integer::sum);
+                                    changeBreakdown.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(label+" · "+(matchStarters.contains(id)?"Titular":hasPlayed?"Suplente utilizado":"Sin jugar")+(events.isEmpty()?"":" · "+android.text.TextUtils.join(" · ",events)));
+                                }
+                            }
                             int excludedPlayers=0;
                             if(perAct!=null&&!sanctionedDorsals.isEmpty()){
                                 java.util.HashMap<String,String> dorsalIds=new java.util.HashMap<>();
@@ -1285,7 +1311,7 @@ public class MainActivity extends Activity {
                         String prior=canonicalPlayers.get(fields[0]);
                         if(prior==null||candidate.length()<prior.length())canonicalPlayers.put(fields[0],candidate);
                     }
-                    for(java.util.Map<String,Integer> counts:java.util.Arrays.asList(appearances,starts,benches,verifiedMinutes,verifiedMatches,estimatedMinutes,estimatedMatches)){
+                    for(java.util.Map<String,Integer> counts:java.util.Arrays.asList(appearances,starts,benches,verifiedMinutes,verifiedMatches,estimatedMinutes,estimatedMatches,actualPlayed,unused,entries,exits,returns,participationKnown)){
                         java.util.Map<String,Integer> merged=new java.util.HashMap<>();
                         for(java.util.Map.Entry<String,Integer> entry:counts.entrySet()){
                             String id=entry.getKey();
@@ -1301,6 +1327,12 @@ public class MainActivity extends Activity {
                         mergedBreakdown.computeIfAbsent(canonical,k->new java.util.ArrayList<>()).addAll(entry.getValue());
                     }
                     playerMinuteBreakdown.clear();playerMinuteBreakdown.putAll(mergedBreakdown);
+                    java.util.Map<String,java.util.ArrayList<String>> mergedChanges=new java.util.HashMap<>();
+                    for(java.util.Map.Entry<String,java.util.ArrayList<String>> e:changeBreakdown.entrySet()){
+                        String canonical=canonicalPlayers.getOrDefault(e.getKey().split("\\|",2)[0],e.getKey());
+                        mergedChanges.computeIfAbsent(canonical,k->new java.util.ArrayList<>()).addAll(e.getValue());
+                    }
+                    changeBreakdown.clear();changeBreakdown.putAll(mergedChanges);
                     if(!appearances.isEmpty()){
                         standingSection(content,"Jugadores identificados · actas consultadas");
                         java.util.ArrayList<java.util.Map.Entry<String,Integer>> ranking=new java.util.ArrayList<>(appearances.entrySet());
@@ -1471,11 +1503,27 @@ public class MainActivity extends Activity {
                                 details.addView(txt("Partidos con alineación: "+playedCount,14,0xffe2f5fa));
                                 details.addView(txt("Titularidades: "+starterCount,14,0xffe2f5fa));
                                 details.addView(txt("Convocatorias como suplente: "+benchCount,14,0xffe2f5fa));
+                                String statId=item.getKey();
+                                int playedActual=actualPlayed.getOrDefault(statId,0), known=participationKnown.getOrDefault(statId,0);
+                                details.addView(txt("Participación · "+known+"/"+playedCount+" actas comprobadas",14,0xff75e6b2));
+                                details.addView(txt("Partidos disputados: "+playedActual+" · Sin jugar: "+unused.getOrDefault(statId,0),13,0xffe2f5fa));
+                                details.addView(txt("Entradas: "+entries.getOrDefault(statId,0)+" · Salidas: "+exits.getOrDefault(statId,0)+" · Reingresos: "+returns.getOrDefault(statId,0),13,0xffe2f5fa));
                                 int mins=verifiedMinutes.getOrDefault(item.getKey(),0);
                                 int checked=verifiedMatches.getOrDefault(item.getKey(),0);
                                 details.addView(txt("Minutos verificados: "+(checked>0?mins+" min en "+checked+" acta(s)":"Sin datos verificables"),14,0xff75e6b2));
                                 int estimated=estimatedMinutes.getOrDefault(item.getKey(),0);
                                 int estimatedCount=estimatedMatches.getOrDefault(item.getKey(),0);
+                                int minuteKnown=checked+estimatedCount;
+                                if(minuteKnown>0&&duration>0){
+                                    String qualifier=estimatedCount>0?" (orientativo)":"";
+                                    details.addView(txt("Media por convocatoria analizada: "+String.format(java.util.Locale.getDefault(),"%.1f",(mins+estimated)/(double)minuteKnown)+" min"+qualifier,13,0xffd2e4ef));
+                                    details.addView(txt("Minutos posibles en actas analizadas: "+Math.round(100.0*(mins+estimated)/(duration*(double)minuteKnown))+" %"+qualifier,13,0xffd2e4ef));
+                                }
+                                java.util.ArrayList<String> changesForPlayer=changeBreakdown.get(statId);
+                                if(changesForPlayer!=null){
+                                    details.addView(txt("Cambios por partido",14,0xff75e6b2));
+                                    for(String line:changesForPlayer)details.addView(txt(line,11,0xffd2e4ef));
+                                }
                                 if(estimatedCount>0){
                                     details.addView(txt("Minutos estimados por sanción: "+estimated+" min en "+estimatedCount+" acta(s)",13,0xffffc38c));
                                     details.addView(txt("Total orientativo: "+(mins+estimated)+" min · verificados y estimados separados",13,0xffffc38c));
