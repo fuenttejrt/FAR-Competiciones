@@ -1396,18 +1396,49 @@ public class MainActivity extends Activity {
                         minuteRankingPanel.setOrientation(1);
                         LinearLayout starterRankingPanel=new LinearLayout(this);
                         starterRankingPanel.setOrientation(1);
+                        LinearLayout pointsPanel=new LinearLayout(this);pointsPanel.setOrientation(1);
+                        LinearLayout triesPanel=new LinearLayout(this);triesPanel.setOrientation(1);
+                        for(int rankingType=0;rankingType<2;rankingType++){
+                            LinearLayout panel=rankingType==0?pointsPanel:triesPanel;
+                            java.util.Map<String,Integer> metric=rankingType==0?points:tries;
+                            java.util.ArrayList<String> ranked=new java.util.ArrayList<>(metric.keySet());
+                            ranked.removeIf(k->metric.getOrDefault(k,0)<=0);
+                            ranked.sort((x,y)->Integer.compare(metric.get(y),metric.get(x)));
+                            int count=Math.min(10,ranked.size());
+                            standingSection(panel,rankingType==0?"Top 10 · puntos registrados":"Top 10 · ensayos registrados");
+                            if(count==0)panel.addView(txt("Sin anotaciones identificadas",12,0xffb8d4cc));
+                            else{
+                                String[] names=new String[count];int[] numbers=new int[count];
+                                for(int k=0;k<count;k++){
+                                    String key=ranked.get(k);
+                                    names[k]=key.substring(key.indexOf('|')+1);
+                                    numbers[k]=metric.get(key);
+                                }
+                                standingMinuteRanking3D(panel,names,numbers,new int[count],playerCardLookup);
+                                for(int k=0;k<count;k++){
+                                    final String name=names[k];
+                                    TextView line=txt(name+" · "+numbers[k],12,0xffd2e4ef);
+                                    line.setOnClickListener(v->{android.view.View card=playerCardLookup.get(name);if(card!=null)card.performClick();});
+                                    panel.addView(line);
+                                }
+                            }
+                        }
                         TextView rankingSelector=txt("Ranking: Minutos  ▾",15,0xff75e6b2);
                         rankingSelector.setPadding(dp(10),dp(10),dp(10),dp(10));
                         content.addView(rankingSelector);
                         content.addView(minuteRankingPanel);
                         content.addView(starterRankingPanel);
+                        content.addView(pointsPanel);content.addView(triesPanel);
+                        pointsPanel.setVisibility(android.view.View.GONE);triesPanel.setVisibility(android.view.View.GONE);
                         starterRankingPanel.setVisibility(android.view.View.GONE);
                         rankingSelector.setOnClickListener(v->new android.app.AlertDialog.Builder(this)
                             .setTitle("Seleccionar ranking")
-                            .setItems(new String[]{"Minutos","Titularidades"},(rankingDialog,choice)->{
+                            .setItems(new String[]{"Minutos","Titularidades","Puntos","Ensayos"},(rankingDialog,choice)->{
                                 minuteRankingPanel.setVisibility(choice==0?android.view.View.VISIBLE:android.view.View.GONE);
                                 starterRankingPanel.setVisibility(choice==1?android.view.View.VISIBLE:android.view.View.GONE);
-                                rankingSelector.setText("Ranking: "+(choice==0?"Minutos":"Titularidades")+"  ▾");
+                                pointsPanel.setVisibility(choice==2?android.view.View.VISIBLE:android.view.View.GONE);
+                                triesPanel.setVisibility(choice==3?android.view.View.VISIBLE:android.view.View.GONE);
+                                rankingSelector.setText("Ranking: "+new String[]{"Minutos","Titularidades","Puntos","Ensayos"}[choice]+"  ▾");
                             }).show());
                         int minuteChartSize=Math.min(10,minuteRank.size());
                         if(minuteChartSize>0){
