@@ -2392,20 +2392,20 @@ public class MainActivity extends Activity {
         final int[] colors={0xff48dca2,0xff56aaf2,0xffed7979};
         android.widget.HorizontalScrollView scroll=new android.widget.HorizontalScrollView(this);target.addView(scroll);
         View chart=new View(this){
-            @Override protected void onMeasure(int w,int h){setMeasuredDimension(Math.max(getResources().getDisplayMetrics().widthPixels-dp(28),dp(76)*teams.size()+dp(32)),dp(215));}
+            @Override protected void onMeasure(int w,int h){setMeasuredDimension(Math.max(target.getWidth()>0?target.getWidth():getResources().getDisplayMetrics().widthPixels-dp(28),dp(48)*teams.size()+dp(28)),dp(215));}
             @Override protected void onDraw(android.graphics.Canvas c){super.onDraw(c);
             android.graphics.Paint p=new android.graphics.Paint(3);float base=getHeight()-dp(42),top=dp(28),left=dp(24),slot=(getWidth()-left-dp(8))/Math.max(1,teams.size());int max=1;for(int[] a:stats.values())max=Math.max(max,a[0]);
             p.setTextSize(dp(10));p.setTextAlign(android.graphics.Paint.Align.RIGHT);
             int step=Math.max(1,(max+5)/6);for(int tick=0;tick<=max;tick+=step){float y=base-(base-top)*tick/max;p.setColor(0xff45677d);c.drawLine(left,y,getWidth()-dp(5),y,p);p.setColor(0xffb8d4cc);c.drawText(String.valueOf(tick),left-dp(3),y,p);}
-            for(int i=0;i<teams.size();i++){int[] a=stats.get(teams.get(i));int[] values={a[3],a[4],a[0]-a[3]-a[4]};float w=slot/5f;
-                for(int j=0;j<3;j++){float x=left+i*slot+slot*.10f+j*slot*.26f,y=base-(base-top)*values[j]/max;int color=colors[j];float d=dp(3);
+            for(int i=0;i<teams.size();i++){int[] a=stats.get(teams.get(i));int[] values={a[3],a[4],a[0]-a[3]-a[4]};float w=slot*.24f;
+                for(int j=0;j<3;j++){float x=left+i*slot+slot*.07f+j*slot*.28f,y=base-(base-top)*values[j]/max;int color=colors[j];float d=dp(2);
                     if(values[j]>0){p.setShader(new android.graphics.LinearGradient(x,y,x+w,y,standingShade(color,1.35f),color,android.graphics.Shader.TileMode.CLAMP));c.drawRect(x,y,x+w,base,p);p.setShader(null);android.graphics.Path side=new android.graphics.Path();side.moveTo(x+w,y);side.lineTo(x+w+d,y-d);side.lineTo(x+w+d,base-d);side.lineTo(x+w,base);side.close();p.setColor(standingShade(color,.6f));c.drawPath(side,p);android.graphics.Path cap=new android.graphics.Path();cap.moveTo(x,y);cap.lineTo(x+d,y-d);cap.lineTo(x+w+d,y-d);cap.lineTo(x+w,y);cap.close();p.setColor(standingShade(color,1.4f));c.drawPath(cap,p);}
-                    p.setColor(Color.WHITE);p.setTextAlign(android.graphics.Paint.Align.CENTER);p.setTextSize(dp(11));c.drawText(""+values[j],x+w/2,y-dp(7),p);
+                    p.setColor(Color.WHITE);p.setTextAlign(android.graphics.Paint.Align.CENTER);p.setTextSize(dp(10));c.drawText(""+values[j],x+w/2,y-dp(7),p);
                 }
-                p.setColor(0xffb8d4cc);p.setTextSize(dp(11));String name=competitionShortTeam(teams.get(i));while(name.length()>2&&p.measureText(name)>slot-dp(4))name=name.substring(0,name.length()-1);c.drawText(name,left+i*slot+slot/2,base+dp(20),p);
+                p.setColor(0xffb8d4cc);p.setTextSize(dp(10));String name=competitionShortTeam(teams.get(i));while(name.length()>2&&p.measureText(name)>slot-dp(4))name=name.substring(0,name.length()-1);c.drawText(name,left+i*slot+slot/2,base+dp(20),p);
             }
         }};
-        chart.setBackground(gradient(0xff203e50,0xff172b3c,0xff45677d));scroll.addView(chart,new android.widget.FrameLayout.LayoutParams(Math.max(getResources().getDisplayMetrics().widthPixels-dp(28),dp(76)*teams.size()+dp(32)),dp(215)));
+        chart.setBackground(gradient(0xff203e50,0xff172b3c,0xff45677d));scroll.addView(chart,new android.widget.FrameLayout.LayoutParams(Math.max(target.getWidth()>0?target.getWidth():getResources().getDisplayMetrics().widthPixels-dp(28),dp(48)*teams.size()+dp(28)),dp(215)));
         LinearLayout keyRow=new LinearLayout(this);target.addView(keyRow);for(int z=0;z<3;z++){TextView key=txt("● "+new String[]{"Victorias","Empates","Derrotas"}[z],12,colors[z]);keyRow.addView(key,new LinearLayout.LayoutParams(0,-2,1));}
 
     }
