@@ -618,11 +618,14 @@ public class MainActivity extends Activity {
     }
     private void standingMinuteRanking3D(LinearLayout target,String[] names,int[] verified,int[] estimated,
                                          java.util.Map<String,android.view.View> playerCards){
+        standingMinuteRanking3D(target,names,verified,estimated,playerCards,0xff50dca9);
+    }
+    private void standingMinuteRanking3D(LinearLayout target,String[] names,int[] verified,int[] estimated,java.util.Map<String,android.view.View> playerCards,int barColor){
         android.view.View chart=new android.view.View(this){
             final android.graphics.Paint p=new android.graphics.Paint(3);
             @Override protected void onDraw(android.graphics.Canvas c){
                 super.onDraw(c);
-                c.save();c.scale(getWidth()/360f,getHeight()/300f);
+                c.save();c.scale(getWidth()/360f,getHeight()/245f);
                 int max=1;
                 for(int i=0;i<verified.length;i++)max=Math.max(max,verified[i]+estimated[i]);
                 p.setColor(0xff456073);p.setStrokeWidth(1);c.drawLine(10,192,350,192,p);
@@ -631,13 +634,13 @@ public class MainActivity extends Activity {
                     float x=12+i*slot+slot*.20f;
                     float w=Math.min(25,slot*.54f);
                     float h=158f*(verified[i]+estimated[i])/max;
-                    float estimatedH=140f*estimated[i]/max;
+                    float estimatedH=158f*estimated[i]/max;
                     float top=188-h;
                     android.graphics.Path side=new android.graphics.Path();
                     side.moveTo(x+w,top);side.lineTo(x+w+6,top-6);
                     side.lineTo(x+w+6,186);side.lineTo(x+w,192);side.close();
                     p.setColor(0xff254b60);c.drawPath(side,p);
-                    p.setColor(0xff50dca9);c.drawRect(x,top+estimatedH,x+w,192,p);
+                    p.setColor(barColor);c.drawRect(x,top+estimatedH,x+w,192,p);
                     if(estimatedH>0){p.setColor(0xffeeb57d);c.drawRect(x,top,x+w,top+estimatedH,p);}
                     android.graphics.Path cap=new android.graphics.Path();
                     cap.moveTo(x,top);cap.lineTo(x+6,top-6);cap.lineTo(x+w+6,top-6);cap.lineTo(x+w,top);cap.close();
@@ -657,7 +660,7 @@ public class MainActivity extends Activity {
             }
         };
         chart.setBackgroundColor(0xff1b2d3f);
-        target.addView(chart,new LinearLayout.LayoutParams(-1,dp(300)));
+        target.addView(chart,new LinearLayout.LayoutParams(-1,dp(245)));
         chart.setOnTouchListener((v,event)->{
             if(event.getAction()!=android.view.MotionEvent.ACTION_UP)return true;
             float logicalX=event.getX()*360f/Math.max(1,v.getWidth());
@@ -1140,10 +1143,10 @@ public class MainActivity extends Activity {
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
                 if(active[0]==3||active[0]==5){
                     int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
-                    LinearLayout durationCards=new LinearLayout(this);content.addView(durationCards);
+                    LinearLayout durationCards=new LinearLayout(this);if(active[0]==3)content.addView(durationCards);
                     standingMetric(durationCards,duration>0?duration+" min":"—","Partido completo");
                     standingMetric(durationCards,duration>0?(duration/2)+" min":"—","Cada tiempo");
-                    content.addView(txt(duration>0?"Duración prevista según las reglas verificadas de esta competición.":"Duración pendiente de la circular oficial de esta categoría y temporada.",12,0xffb8d4cc));
+                    if(active[0]==3)content.addView(txt(duration>0?"Duración prevista según las reglas verificadas de esta competición.":"Duración pendiente de la circular oficial de esta categoría y temporada.",12,0xffb8d4cc));
                     int actCount=0;
                     java.util.Map<String,Integer> appearances=new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
                     java.util.Map<String,Integer> starts=new java.util.HashMap<>();
@@ -1441,7 +1444,7 @@ public class MainActivity extends Activity {
                     }
                     changeBreakdown.clear();changeBreakdown.putAll(mergedChanges);
                     if(!appearances.isEmpty()){
-                        standingSection(content,"Jugadores identificados · actas consultadas");
+                        if(active[0]==3)standingSection(content,"Jugadores identificados · actas consultadas");
                         java.util.ArrayList<java.util.Map.Entry<String,Integer>> ranking=new java.util.ArrayList<>(appearances.entrySet());
                         java.util.Collections.sort(ranking,(a,b)->Integer.compare(b.getValue(),a.getValue()));
                         java.util.ArrayList<java.util.Map.Entry<String,Integer>> starterRanking=new java.util.ArrayList<>(ranking);
@@ -1512,15 +1515,15 @@ public class MainActivity extends Activity {
                             if(n==0){panel.addView(txt("Sin registros positivos disponibles",12,0xffb8d4cc));continue;}
                             String[] names=new String[n];int[] nums=new int[n];
                             for(int k=0;k<n;k++){String id=ids.get(k);names[k]=id.substring(id.indexOf('|')+1);nums[k]=metric.get(id);}
-                            standingMinuteRanking3D(panel,names,nums,new int[n],playerCardLookup);
+                            standingMinuteRanking3D(panel,names,nums,new int[n],playerCardLookup,kind==6?0xffffc66d:kind==7?0xffef777d:0xff50dca9);
                             for(int k=0;k<ids.size();k++){
                                 String id=ids.get(k),name=id.substring(id.indexOf('|')+1);
                                 TextView line=txt((k+1)+". "+name+" · "+metric.get(id)+(kind==1?" %"+(estimatedMatches.getOrDefault(id,0)>0?" (orientativo)":""):""),13,0xffd2e4ef);
-                                line.setPadding(dp(8),dp(7),dp(8),dp(7));panel.addView(line);
+                                line.setPadding(dp(10),dp(9),dp(10),dp(9));android.graphics.drawable.GradientDrawable rankBg=new android.graphics.drawable.GradientDrawable();rankBg.setColor(0xff203e50);rankBg.setCornerRadius(dp(8));line.setBackground(rankBg);LinearLayout.LayoutParams rankLp=new LinearLayout.LayoutParams(-1,-2);rankLp.setMargins(0,dp(3),0,dp(3));panel.addView(line,rankLp);
                                 line.setOnClickListener(v->{android.view.View card=playerCardLookup.get(name);if(card!=null)card.performClick();});
                             }
                         }
-                        TextView rankingSelector=txt("Ranking: Minutos  ▾",15,0xff75e6b2);
+                        TextView rankingSelector=txt("Ranking: Minutos  ▾",15,0xff75e6b2);android.graphics.drawable.GradientDrawable selectorBg=new android.graphics.drawable.GradientDrawable();selectorBg.setColor(0xff203e50);selectorBg.setCornerRadius(dp(10));selectorBg.setStroke(dp(1),0xff406575);rankingSelector.setBackground(selectorBg);
                         rankingSelector.setPadding(dp(10),dp(10),dp(10),dp(10));content.addView(rankingSelector);
                         for(int ri=0;ri<rankPanels.size();ri++){LinearLayout panel=rankPanels.get(ri);content.addView(panel);panel.setVisibility(ri==0?android.view.View.VISIBLE:android.view.View.GONE);}
                         rankingSelector.setOnClickListener(v->new android.app.AlertDialog.Builder(this).setTitle("Seleccionar ranking").setItems(rankLabels,(rd,choice)->{
@@ -1601,7 +1604,7 @@ public class MainActivity extends Activity {
                             diagnosticList.setVisibility(show?android.view.View.VISIBLE:android.view.View.GONE);
                             diagnosticToggle.setText("Comprobación de partidos  "+(show?"▴":"▾"));
                         });
-                        standingSection(content,"Plantilla · "+ranking.size()+" jugadores");
+                        if(active[0]==3)standingSection(content,"Plantilla · "+ranking.size()+" jugadores");
                         android.widget.EditText searchPlayer=new android.widget.EditText(this);
                         searchPlayer.setSingleLine(true);searchPlayer.setTextSize(13);
                         searchPlayer.setHint("Buscar nombre o licencia");
