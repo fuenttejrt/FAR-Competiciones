@@ -1568,12 +1568,12 @@ public class MainActivity extends Activity {
                             playerRow.setOnClickListener(v->{
                                 LinearLayout details=new LinearLayout(this);
                                 details.setOrientation(1);
+                                details.setBackgroundColor(0xff162b3b);
                                 details.setPadding(dp(20),dp(12),dp(20),dp(8));
                                 details.addView(txt(playerName,19,0xff75e6b2));
                                 details.addView(txt("Licencia: "+parts[0],12,0xffb8d4cc));
-                                details.addView(txt("Partidos con alineación: "+playedCount,14,0xffe2f5fa));
-                                details.addView(txt("Titularidades: "+starterCount,14,0xffe2f5fa));
-                                details.addView(txt("Convocatorias como suplente: "+benchCount,14,0xffe2f5fa));
+                                LinearLayout playerHeader=new LinearLayout(this);details.addView(playerHeader);
+                                standingMetric(playerHeader,""+playedCount,"Convocado");standingMetric(playerHeader,""+starterCount,"Titular");standingMetric(playerHeader,""+benchCount,"Suplente");
                                 LinearLayout summaryPanel=new LinearLayout(this);summaryPanel.setOrientation(1);
                                 LinearLayout participationPanel=new LinearLayout(this);participationPanel.setOrientation(1);
                                 LinearLayout scoringPanel=new LinearLayout(this);scoringPanel.setOrientation(1);
@@ -1592,35 +1592,52 @@ public class MainActivity extends Activity {
                                 });
                                 String statId=item.getKey();
                                 int playedActual=actualPlayed.getOrDefault(statId,0), known=participationKnown.getOrDefault(statId,0);
-                                participationPanel.addView(txt("Participación · "+known+"/"+playedCount+" actas comprobadas",14,0xff75e6b2));
-                                participationPanel.addView(txt("Partidos disputados: "+playedActual+" · Sin jugar: "+unused.getOrDefault(statId,0),13,0xffe2f5fa));
-                                participationPanel.addView(txt("Entradas: "+entries.getOrDefault(statId,0)+" · Salidas: "+exits.getOrDefault(statId,0)+" · Reingresos: "+returns.getOrDefault(statId,0),13,0xffe2f5fa));
-                                int mins=verifiedMinutes.getOrDefault(item.getKey(),0);
-                                int checked=verifiedMatches.getOrDefault(item.getKey(),0);
-                                participationPanel.addView(txt("Minutos verificados: "+(checked>0?mins+" min en "+checked+" acta(s)":"Sin datos verificables"),14,0xff75e6b2));
-                                int estimated=estimatedMinutes.getOrDefault(item.getKey(),0);
-                                int estimatedCount=estimatedMatches.getOrDefault(item.getKey(),0);
+                                int mins=verifiedMinutes.getOrDefault(statId,0), checked=verifiedMatches.getOrDefault(statId,0);
+                                int estimated=estimatedMinutes.getOrDefault(statId,0), estimatedCount=estimatedMatches.getOrDefault(statId,0);
                                 int minuteKnown=checked+estimatedCount;
+                                standingSection(participationPanel,"Participación · "+known+"/"+playedCount+" actas");
+                                LinearLayout pr=new LinearLayout(this);participationPanel.addView(pr);
+                                standingMetric(pr,""+playedActual,"Disputados");standingMetric(pr,""+unused.getOrDefault(statId,0),"Sin jugar");
+                                LinearLayout mr=new LinearLayout(this);participationPanel.addView(mr);
+                                standingMetric(mr,checked>0?mins+" min":"—","Verificados · "+checked+" actas");
+                                standingMetric(mr,estimatedCount>0?estimated+" min":"—","Estimados · "+estimatedCount+" actas");
                                 if(minuteKnown>0&&duration>0){
-                                    String qualifier=estimatedCount>0?" (orientativo)":"";
-                                    participationPanel.addView(txt("Media por convocatoria analizada: "+String.format(java.util.Locale.getDefault(),"%.1f",(mins+estimated)/(double)minuteKnown)+" min"+qualifier,13,0xffd2e4ef));
-                                    participationPanel.addView(txt("Minutos posibles en actas analizadas: "+Math.round(100.0*(mins+estimated)/(duration*(double)minuteKnown))+" %"+qualifier,13,0xffd2e4ef));
+                                    int possible=duration*minuteKnown;
+                                    int pct=(int)Math.round(100.0*(mins+estimated)/possible);
+                                    LinearLayout totals=new LinearLayout(this);participationPanel.addView(totals);
+                                    standingMetric(totals,(mins+estimated)+" min",estimatedCount>0?"Total orientativo":"Total verificado");
+                                    standingMetric(totals,String.format(java.util.Locale.getDefault(),"%.1f min",(mins+estimated)/(double)minuteKnown),"Media por convocatoria");
+                                    standingSection(participationPanel,pct+"% de minutos posibles"+(estimatedCount>0?" · orientativo":""));
+                                    standingPie(participationPanel,new int[]{mins,estimated,Math.max(0,possible-mins-estimated)},new int[]{0xff48dca2,0xffffb76c,0xff456073},new String[]{"Verificados","Estimados","No jugados"});
                                 }
+                                standingSection(participationPanel,"Sustituciones");
+                                standingColumns3D(participationPanel,new String[]{"Entradas","Salidas","Reingresos"},new int[]{entries.getOrDefault(statId,0),exits.getOrDefault(statId,0),returns.getOrDefault(statId,0)},new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
+                                java.util.ArrayList<String> breakdown=playerMinuteBreakdown.get(statId);
+                                if(breakdown!=null&&!breakdown.isEmpty()){
+                                    standingSection(participationPanel,"Minutos por partido");
+                                    for(String line:breakdown){
+                                        java.util.regex.Matcher mm=java.util.regex.Pattern.compile("(\\d+)\\s+min").matcher(line);
+                                        if(mm.find()&&duration>0){
+                                            int value=Integer.parseInt(mm.group(1));
+                                            String label=line.substring(0,mm.start()).trim();
+                                            standingBar(participationPanel,label,value,duration,line.contains("estimados")?0xffffb76c:0xff48dca2);
+                                            if(line.contains("estimados"))participationPanel.addView(txt("Estimado · regreso no confirmado",11,0xffffc38c));
+                                        }else participationPanel.addView(txt(line,12,0xffd2e4ef));
+                                    }
+                                }
+                                if(estimatedCount>0)participationPanel.addView(txt("Naranja: minutos estimados descontando la sanción reglamentaria. El regreso efectivo no consta en el acta.",11,0xffffc38c));
                                 java.util.ArrayList<String> changesForPlayer=changeBreakdown.get(statId);
                                 if(changesForPlayer!=null){
-                                    participationPanel.addView(txt("Cambios por partido",14,0xff75e6b2));
-                                    for(String line:changesForPlayer)participationPanel.addView(txt(line,11,0xffd2e4ef));
-                                }
-                                if(estimatedCount>0){
-                                    participationPanel.addView(txt("Minutos estimados por sanción: "+estimated+" min en "+estimatedCount+" acta(s)",13,0xffffc38c));
-                                    participationPanel.addView(txt("Total orientativo: "+(mins+estimated)+" min · verificados y estimados separados",13,0xffffc38c));
-                                }
-                                participationPanel.addView(txt("Los minutos estimados descuentan 5 minutos reglamentarios de amarilla dentro de los intervalos de participación. El regreso efectivo no figura en el acta; no se consideran verificados.",11,0xffa9c4d2));
-                                java.util.ArrayList<String> breakdown=playerMinuteBreakdown.get(item.getKey());
-                                if(breakdown!=null&&!breakdown.isEmpty()){
-                                    participationPanel.addView(txt("Desglose por partido",14,0xff75e6b2));
-                                    for(String line:breakdown)
-                                        participationPanel.addView(txt("• "+line,11,line.contains("estimados")?0xffffc38c:0xffd2e4ef));
+                                    standingSection(participationPanel,"Historial de participación");
+                                    for(String line:changesForPlayer){
+                                        TextView eventCard=txt(line,12,0xffd2e4ef);
+                                        eventCard.setPadding(dp(10),dp(9),dp(10),dp(9));
+                                        android.graphics.drawable.GradientDrawable eventBg=new android.graphics.drawable.GradientDrawable();
+                                        eventBg.setColor(0xff203b4c);eventBg.setCornerRadius(dp(9));eventBg.setStroke(dp(1),0xff365768);
+                                        eventCard.setBackground(eventBg);
+                                        LinearLayout.LayoutParams eventLp=new LinearLayout.LayoutParams(-1,-2);eventLp.setMargins(0,dp(3),0,dp(3));
+                                        participationPanel.addView(eventCard,eventLp);
+                                    }
                                 }
                                 standingColumns3D(summaryPanel,new String[]{"Partidos","Titular","Suplente"},
                                     new int[]{playedCount,starterCount,benchCount},
