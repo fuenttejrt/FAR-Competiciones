@@ -3022,7 +3022,7 @@ private void profileRing(LinearLayout parent,int[] values,int[] colors,String la
                     center.setOrientation(LinearLayout.VERTICAL);
                     center.setGravity(android.view.Gravity.CENTER);
                     center.addView(mid,new LinearLayout.LayoutParams(-2,-2));
-                    if(selectedTab.equals("Resultados")){
+                    if(selectedTab.equals("Resultados")||selectedTab.equals("Calendario")){
                         String hour=matchHour(row.optString("when",""));
                         if(!hour.isEmpty()){
                             TextView time=txt(hour+" h",9,Color.LTGRAY);
