@@ -97,7 +97,8 @@ public class MainActivity extends Activity {
     }
     CharSequence iconLabel(String kind,String label){
         android.text.SpannableString span=new android.text.SpannableString("  "+label);
-        android.graphics.drawable.Drawable icon=lineIcon(kind);
+        int navKind="calendar".equals(kind)?2:"results".equals(kind)?1:"trophy".equals(kind)?5:"refresh".equals(kind)?6:"external".equals(kind)?7:"organizer".equals(kind)?3:-1;
+        android.graphics.drawable.Drawable icon=navKind>=0?standingNavIcon(navKind,Color.WHITE):lineIcon(kind);
         icon.setBounds(0,0,dp(17),dp(17));
         span.setSpan(new android.text.style.ImageSpan(icon,android.text.style.DynamicDrawableSpan.ALIGN_BASELINE),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return span;
@@ -1950,6 +1951,10 @@ public class MainActivity extends Activity {
                 c.save();c.rotate(-38,11,12);c.drawOval(5,9,17,15,p);c.drawLine(8,12,14,12,p);c.drawLine(10,10.5f,10,13.5f,p);c.drawLine(12,10.5f,12,13.5f,p);c.restore();c.drawLine(15,7,19,7,p);c.drawLine(19,7,19,11,p);break;
             case 5:
                 q.moveTo(7,3);q.lineTo(17,3);q.lineTo(17,10);q.quadTo(17,15,12,15);q.quadTo(7,15,7,10);q.close();c.drawPath(q,p);q.reset();q.moveTo(7,5);q.lineTo(3,5);q.quadTo(3,12,8,12);q.moveTo(17,5);q.lineTo(21,5);q.quadTo(21,12,16,12);c.drawPath(q,p);c.drawLine(12,15,12,20,p);c.drawLine(7,21,17,21,p);break;
+            case 6:
+                c.drawArc(4,4,20,20,35,285,false,p);c.drawLine(20,4,20,10,p);c.drawLine(20,10,14,10,p);break;
+            case 7:
+                q.moveTo(11,5);q.lineTo(4,5);q.lineTo(4,20);q.lineTo(19,20);q.lineTo(19,13);c.drawPath(q,p);c.drawLine(12,3,21,3,p);c.drawLine(21,3,21,12,p);c.drawLine(11,13,21,3,p);break;
         }
         android.graphics.drawable.BitmapDrawable d=new android.graphics.drawable.BitmapDrawable(getResources(),b);d.setBounds(0,0,size,size);return d;
     }
