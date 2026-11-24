@@ -590,14 +590,15 @@ public class MainActivity extends Activity {
         fill.setBackground(shine);
         fill.setElevation(dp(3));
         track.addView(fill,new android.widget.FrameLayout.LayoutParams(0,-1));
-        track.post(()->{
+        track.addOnLayoutChangeListener((view,l,t,rr,b,ol,ot,orr,ob)->{
             android.view.ViewGroup.LayoutParams lp=fill.getLayoutParams();
-            lp.width=Math.max(value>0?dp(5):0,(int)((long)track.getWidth()*Math.max(0,value)/Math.max(1,max)));
-            fill.setLayoutParams(lp);
+            int width=(int)((long)track.getWidth()*Math.min(Math.max(0,value),Math.max(1,max))/Math.max(1,max));
+            if(lp.width!=width){lp.width=width;fill.setLayoutParams(lp);}
         });
     }
 
-    private void standingMetric(LinearLayout target,String value,String label){
+    private void standingMetric(LinearLayout target,String value,String label){standingMetric(target,value,label,0xff75e6b2);}
+    private void standingMetric(LinearLayout target,String value,String label,int metricColor){
         LinearLayout card=new LinearLayout(this);card.setOrientation(1);
         card.setPadding(dp(8),dp(7),dp(8),dp(7));
         android.graphics.drawable.GradientDrawable bgCard=new android.graphics.drawable.GradientDrawable(
@@ -605,7 +606,7 @@ public class MainActivity extends Activity {
             new int[]{0xff34566a,0xff1a3447,0xff122737});
         bgCard.setCornerRadius(dp(12));bgCard.setStroke(dp(1),0xff3d7380);
         card.setBackground(bgCard);card.setElevation(dp(4));
-        TextView big=txt(value,19,0xff75e6b2);big.setGravity(android.view.Gravity.CENTER);
+        TextView big=txt(value,19,metricColor);big.setGravity(android.view.Gravity.CENTER);
         big.setTypeface(null,android.graphics.Typeface.BOLD);card.addView(big);
         TextView small=txt(label,10,0xffd2e4ef);small.setGravity(android.view.Gravity.CENTER);card.addView(small);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);
@@ -681,6 +682,7 @@ public class MainActivity extends Activity {
                     float barWidth=Math.min(35,slot*.5f);
                     float height=values[i]*110f/max,top=147-height;
                     int color=colors[i%colors.length];
+                    if(values[i]>0){
                     android.graphics.Path side=new android.graphics.Path();
                     side.moveTo(x+barWidth,top);side.lineTo(x+barWidth+9,top-8);
                     side.lineTo(x+barWidth+9,143);side.lineTo(x+barWidth,151);side.close();
@@ -692,6 +694,7 @@ public class MainActivity extends Activity {
                     cap.moveTo(x,top);cap.lineTo(x+9,top-8);
                     cap.lineTo(x+barWidth+9,top-8);cap.lineTo(x+barWidth,top);cap.close();
                     p.setColor(0x99ffffff);c.drawPath(cap,p);
+                    }
                     p.setColor(0xfff1f7fc);p.setTextSize(14);
                     p.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
                     p.setTextAlign(android.graphics.Paint.Align.CENTER);
@@ -1578,18 +1581,21 @@ public class MainActivity extends Activity {
                                 LinearLayout participationPanel=new LinearLayout(this);participationPanel.setOrientation(1);
                                 LinearLayout scoringPanel=new LinearLayout(this);scoringPanel.setOrientation(1);
                                 LinearLayout disciplinePanel=new LinearLayout(this);disciplinePanel.setOrientation(1);
-                                android.widget.Spinner playerTab=new android.widget.Spinner(this);
-                                playerTab.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Resumen","Participación","Anotaciones","Disciplina"}));
-                                details.addView(playerTab);
+                                LinearLayout playerTabs=new LinearLayout(this);
+                                details.addView(playerTabs);
                                 details.addView(summaryPanel);details.addView(participationPanel);details.addView(scoringPanel);details.addView(disciplinePanel);
                                 LinearLayout[] playerPanels={summaryPanel,participationPanel,scoringPanel,disciplinePanel};
-                                for(int tabIndex=1;tabIndex<4;tabIndex++)playerPanels[tabIndex].setVisibility(android.view.View.GONE);
-                                playerTab.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
-                                    public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){
-                                        for(int k=0;k<4;k++)playerPanels[k].setVisibility(k==position?android.view.View.VISIBLE:android.view.View.GONE);
-                                    }
-                                    public void onNothingSelected(android.widget.AdapterView<?> parent){}
-                                });
+                                String[] tabNames={"Resumen","Participación","Anotaciones","Disciplina"};
+                                TextView[] tabViews=new TextView[4];
+                                for(int k=0;k<4;k++){
+                                    final int selected=k;
+                                    TextView tab=txt(tabNames[k],10,0xffd2e4ef);tabViews[k]=tab;
+                                    tab.setGravity(android.view.Gravity.CENTER);tab.setPadding(0,dp(12),0,dp(12));
+                                    tab.setBackgroundColor(k==0?0xff28566b:0xff1b3446);
+                                    playerTabs.addView(tab,new LinearLayout.LayoutParams(0,-2,1));
+                                    playerPanels[k].setVisibility(k==0?android.view.View.VISIBLE:android.view.View.GONE);
+                                    tab.setOnClickListener(v->{for(int j=0;j<4;j++){playerPanels[j].setVisibility(j==selected?android.view.View.VISIBLE:android.view.View.GONE);tabViews[j].setBackgroundColor(j==selected?0xff28566b:0xff1b3446);}});
+                                }
                                 String statId=item.getKey();
                                 int playedActual=actualPlayed.getOrDefault(statId,0), known=participationKnown.getOrDefault(statId,0);
                                 int mins=verifiedMinutes.getOrDefault(statId,0), checked=verifiedMatches.getOrDefault(statId,0);
@@ -1600,7 +1606,7 @@ public class MainActivity extends Activity {
                                 standingMetric(pr,""+playedActual,"Disputados");standingMetric(pr,""+unused.getOrDefault(statId,0),"Sin jugar");
                                 LinearLayout mr=new LinearLayout(this);participationPanel.addView(mr);
                                 standingMetric(mr,checked>0?mins+" min":"—","Verificados · "+checked+" actas");
-                                standingMetric(mr,estimatedCount>0?estimated+" min":"—","Estimados · "+estimatedCount+" actas");
+                                standingMetric(mr,estimatedCount>0?estimated+" min":"—","Estimados · "+estimatedCount+" actas",0xffffb76c);
                                 if(minuteKnown>0&&duration>0){
                                     int possible=duration*minuteKnown;
                                     int pct=(int)Math.round(100.0*(mins+estimated)/possible);
@@ -1613,32 +1619,40 @@ public class MainActivity extends Activity {
                                 standingSection(participationPanel,"Sustituciones");
                                 standingColumns3D(participationPanel,new String[]{"Entradas","Salidas","Reingresos"},new int[]{entries.getOrDefault(statId,0),exits.getOrDefault(statId,0),returns.getOrDefault(statId,0)},new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
                                 java.util.ArrayList<String> breakdown=playerMinuteBreakdown.get(statId);
-                                if(breakdown!=null&&!breakdown.isEmpty()){
-                                    standingSection(participationPanel,"Minutos por partido");
-                                    for(String line:breakdown){
-                                        java.util.regex.Matcher mm=java.util.regex.Pattern.compile("(\\d+)\\s+min").matcher(line);
+                                java.util.ArrayList<String> changesForPlayer=changeBreakdown.get(statId);
+                                standingSection(participationPanel,"Participación por partido");
+                                java.util.LinkedHashMap<String,java.util.ArrayList<String>> matchCards=new java.util.LinkedHashMap<>();
+                                if(changesForPlayer!=null)for(String line:changesForPlayer){
+                                    String[] fields=line.split(" · ",2);
+                                    matchCards.computeIfAbsent(fields[0].trim(),k->new java.util.ArrayList<>()).add(fields.length>1?fields[1]:"");
+                                }
+                                if(breakdown!=null)for(String line:breakdown){
+                                    String[] fields=line.split(" · ",2);
+                                    matchCards.computeIfAbsent(fields[0].trim(),k->new java.util.ArrayList<>()).add(fields.length>1?fields[1]:line);
+                                }
+                                for(java.util.Map.Entry<String,java.util.ArrayList<String>> matchCard:matchCards.entrySet()){
+                                    LinearLayout eventCard=new LinearLayout(this);eventCard.setOrientation(1);eventCard.setPadding(dp(10),dp(9),dp(10),dp(9));
+                                    android.graphics.drawable.GradientDrawable eventBg=new android.graphics.drawable.GradientDrawable();
+                                    eventBg.setColor(0xff203b4c);eventBg.setCornerRadius(dp(9));eventBg.setStroke(dp(1),0xff365768);eventCard.setBackground(eventBg);
+                                    LinearLayout.LayoutParams eventLp=new LinearLayout.LayoutParams(-1,-2);eventLp.setMargins(0,dp(4),0,dp(4));
+                                    participationPanel.addView(eventCard,eventLp);
+                                    eventCard.addView(txt(matchCard.getKey(),13,0xffe2f5fa));
+                                    for(String line:matchCard.getValue()){
+                                        java.util.regex.Matcher mm=java.util.regex.Pattern.compile("^(\\d+)\\s+min").matcher(line);
                                         if(mm.find()&&duration>0){
-                                            int value=Integer.parseInt(mm.group(1));
-                                            String label=line.substring(0,mm.start()).trim();
-                                            standingBar(participationPanel,label,value,duration,line.contains("estimados")?0xffffb76c:0xff48dca2);
-                                            if(line.contains("estimados"))participationPanel.addView(txt("Estimado · regreso no confirmado",11,0xffffc38c));
-                                        }else participationPanel.addView(txt(line,12,0xffd2e4ef));
+                                            int value=Integer.parseInt(mm.group(1));boolean est=line.contains("estimados");
+                                            standingBar(eventCard,est?"Estimados":"Verificados",value,duration,est?0xffffb76c:0xff48dca2);
+                                            if(est)eventCard.addView(txt("■ Amarilla · regreso no confirmado",11,0xffffc38c));
+                                        }else{
+                                            for(String event:line.split(" · ")){
+                                                int eventColor=event.startsWith("Sale")?0xffffb76c:event.startsWith("Entra")?0xff75e6b2:0xff8fcaf5;
+                                                String marker=event.startsWith("Sale")?"↗ ":event.startsWith("Entra")?"↘ ":"● ";
+                                                eventCard.addView(txt(marker+event,12,eventColor));
+                                            }
+                                        }
                                     }
                                 }
                                 if(estimatedCount>0)participationPanel.addView(txt("Naranja: minutos estimados descontando la sanción reglamentaria. El regreso efectivo no consta en el acta.",11,0xffffc38c));
-                                java.util.ArrayList<String> changesForPlayer=changeBreakdown.get(statId);
-                                if(changesForPlayer!=null){
-                                    standingSection(participationPanel,"Historial de participación");
-                                    for(String line:changesForPlayer){
-                                        TextView eventCard=txt(line,12,0xffd2e4ef);
-                                        eventCard.setPadding(dp(10),dp(9),dp(10),dp(9));
-                                        android.graphics.drawable.GradientDrawable eventBg=new android.graphics.drawable.GradientDrawable();
-                                        eventBg.setColor(0xff203b4c);eventBg.setCornerRadius(dp(9));eventBg.setStroke(dp(1),0xff365768);
-                                        eventCard.setBackground(eventBg);
-                                        LinearLayout.LayoutParams eventLp=new LinearLayout.LayoutParams(-1,-2);eventLp.setMargins(0,dp(3),0,dp(3));
-                                        participationPanel.addView(eventCard,eventLp);
-                                    }
-                                }
                                 standingColumns3D(summaryPanel,new String[]{"Partidos","Titular","Suplente"},
                                     new int[]{playedCount,starterCount,benchCount},
                                     new int[]{0xff48dca2,0xff56aaf2,0xff80d9cc});
