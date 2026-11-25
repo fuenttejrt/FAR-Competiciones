@@ -210,6 +210,15 @@ jobs:
                               for ident in ids:
                                   if ident in staff_ids: continue
                                   anchors=[w for w in words if w['text']==ident and (w['x0']<page.width/2)==(side==0)]
+                                  # Identify repeated licence anchors by position, without logging personal data.
+                                  half=[w for w in words if (w['x0']<page.width/2)==(side==0)]
+                                  for a in anchors:
+                                      same=[w for w in half if abs(w['top']-a['top'])<2]
+                                      previous=[w for w in half if 0<a['top']-w['top']<30]
+                                      following=[w for w in half if 0<w['top']-a['top']<20]
+                                      def shape(ws):
+                                          return ' '.join(('N'+str(len(w['text'])) if w['text'].isdigit() else w['text'] if w['text'].casefold() in ('juez','línea','licencia:','licencia','nº','dorsal','c/x','x/c','f','c','x') else 'TXT')+'@'+str(round(w['x0']/page.width,2)) for w in sorted(ws,key=lambda w:(round(w['top']/2),w['x0'])))
+                                      print('Diagnóstico fila pendiente',m['id'],'lado',side,'altura',round(a['top']/page.height,3),'fila',shape(same),'anteriores',shape(previous),'siguientes',shape(following))
                                   for a in anchors:
                                       row=[w for w in words if abs(w['top']-a['top'])<2]
                                       nearby=[w for w in words if abs(w['top']-a['top'])<25]
