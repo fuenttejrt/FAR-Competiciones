@@ -47,7 +47,33 @@ jobs:
               print('ESQUEMA RPC',','.join(sorted(p.split('/')[-1] for p in schema.get('paths',{}) if re.fullmatch(r'/rpc/[a-zA-Z_][a-zA-Z0-9_]*',p))))
           except Exception as exc:
               print('Inventario esquema no disponible',type(exc).__name__)
+          # Inventory existing records and logical keys without exposing any values.
+          checks={'jugadores':['licencia'],'jugadores_equipos':['jugador_id','equipo_id'],'alineaciones':['partido_id','equipo_id','jugador_id'],'anotaciones':['partido_id','equipo_id','orden_evento'],'sustituciones':['partido_id','equipo_id','orden_evento'],'sanciones':['partido_id','equipo_id','orden_evento'],'participaciones':['alineacion_id'],'estadisticas_jugadores':['jugador_id','equipo_id'],'estadisticas_equipos':['equipo_id'],'actas':['partido_id'],'actas_versiones':['acta_id','version']}
           from collections import Counter,defaultdict
+          inventory={}
+          for table,fields in checks.items():
+              try:
+                  rows=[]; offset=0
+                  while True:
+                      batch=get(table,{'select':','.join(dict.fromkeys(['id']+fields)),'order':'id.asc','limit':'500','offset':str(offset)})
+                      rows.extend(batch)
+                      if len(batch)<500: break
+                      offset+=len(batch)
+                  keys=[tuple(row.get(f) for f in fields) for row in rows]
+                  valid=[k for k in keys if all(v is not None and v!='' for v in k)]
+                  print('INVENTARIO DATOS',table,'registros',len(rows),'clave lógica',','.join(fields),'duplicados',len(valid)-len(set(valid)),'claves incompletas',len(keys)-len(valid))
+                  inventory[table]=rows
+              except Exception as exc:
+                  print('INVENTARIO ERROR',table,type(exc).__name__)
+          for child,field,parent in [('jugadores_equipos','jugador_id','jugadores'),('alineaciones','jugador_id','jugadores'),('estadisticas_jugadores','jugador_id','jugadores'),('participaciones','alineacion_id','alineaciones'),('actas_versiones','acta_id','actas')]:
+              if child in inventory and parent in inventory:
+                  ids={r['id'] for r in inventory[parent]}
+                  print('RELACION DATOS',child,field,parent,'huérfanos',sum(r.get(field) not in ids for r in inventory[child]))
+          for table,definition in sorted(locals().get('definitions',{}).items()):
+              if table not in checks: continue
+              for field,prop in sorted(definition.get('properties',{}).items()):
+                  print('TIPO CAMPO',table,field,prop.get('type',''),prop.get('format',''))
+
           team_totals=defaultdict(Counter)
           players=defaultdict(Counter)
           accepted=0
