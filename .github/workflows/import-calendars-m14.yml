@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: python -m pip install beautifulsoup4
-      - name: Importar equipos y jornadas
+      - name: Importar equipos, jornadas y partidos
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -19,6 +19,7 @@ jobs:
           python - <<'PY'
           import os,json,urllib.request,urllib.parse,urllib.error,re,hashlib
           from datetime import datetime
+          from zoneinfo import ZoneInfo
           from bs4 import BeautifulSoup
           base=os.environ['SUPABASE_URL'].rstrip('/')
           key=os.environ['SUPABASE_SECRET_KEY']
@@ -43,7 +44,7 @@ jobs:
               with opener.open(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=40) as r: soup=BeautifulSoup(r.read(),'html.parser')
               comps=api('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1: raise SystemExit('Competición no identificada')
-              teams=set(); rounds={}; count=0
+              teams=set(); rounds={}; count=0; matches=[]; identities=set()
               for t in soup.find_all('table'):
                   rows=t.find_all('tr')
                   header=next((r for r in rows if r.find('th')),None)
@@ -68,7 +69,49 @@ jobs:
                       if len(b)>1 and b[1].strip(): venues.add(b[1].strip())
                       d=re.search(r'\d{2}/\d{2}/\d{4}',cells[labels.index('fecha/hora')])
                       if d: dates.add(datetime.strptime(d.group(),'%d/%m/%Y').date().isoformat())
-                      if a and b[0].strip() and 'descanso' not in (a.lower(),b[0].strip().lower()): count+=1
+                      if a and b[0].strip() and 'descanso' not in (a.lower(),b[0].strip().lower()):
+                          count+=1
+                          away=b[0].strip()
+                          identity=hashlib.sha256(json.dumps([cid,code,a.casefold(),away.casefold()],ensure_ascii=False).encode()).hexdigest()
+                          if identity in identities: raise SystemExit('Partido ambiguo en jornada '+code)
+                          identities.add(identity)
+                          when=cells[labels.index('fecha/hora')]
+                          dt=re.search(r'\d{2}/\d{2}/\d{4}\s+\d{1,2}:\d{2}',when)
+                          timestamp=datetime.strptime(dt.group(),'%d/%m/%Y %H:%M').replace(tzinfo=ZoneInfo('Europe/Madrid')).isoformat() if dt else None
+                          score=re.fullmatch(r'(\d+)\s*[-–]\s*(\d+)',cells[labels.index('resultado')])
+                          act=None; stats=None
+                          for link in row.select('a[href]'):
+                              href=urllib.parse.urljoin(url,link['href'])
+                              if urllib.parse.urlparse(href).hostname!='farugby.matchready.es': continue
+                              if re.search(r'/match_pdf/\d+/act/?
+                  rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
+              if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
+              plans.append((cid,comps[0]['id'],teams,rounds,count,matches))
+          for cid,comp,teams,rounds,count,matches in plans:
+              team_ids={}; round_ids={}
+              for name in sorted(teams):
+                  identity='nombre:'+hashlib.sha256(name.casefold().encode()).hexdigest()
+                  team_ids[name]=put('equipos','competicion_id,id_oficial',{'competicion_id':comp,'id_oficial':identity,'nombre':name})
+              for row in rounds.values(): round_ids[row['codigo']]=put('jornadas','competicion_id,codigo',dict(row,competicion_id=comp))
+              for code,a,b,row in matches:
+                  put('partidos','id_oficial',dict(row,jornada_id=round_ids[code],equipo_local_id=team_ids[a],equipo_visitante_id=team_ids[b]))
+              print('Resultados:',sum(x[3]['puntos_local'] is not None for x in matches),'Horarios:',sum(x[3]['fecha_hora'] is not None for x in matches),'Actas:',sum(x[3]['url_acta'] is not None for x in matches))
+              print(f'Competición {cid}: {len(teams)} equipos, {len(rounds)} jornadas, {count} partidos guardados')
+          PY
+,href): act=href
+                              if re.search(r'/competition/\d+/match_statistics/?
+                  rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
+              if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
+              plans.append((cid,comps[0]['id'],teams,rounds,count))
+          for cid,comp,teams,rounds,count in plans:
+              for name in sorted(teams):
+                  identity='nombre:'+hashlib.sha256(name.casefold().encode()).hexdigest()
+                  put('equipos','competicion_id,id_oficial',{'competicion_id':comp,'id_oficial':identity,'nombre':name})
+              for row in rounds.values(): put('jornadas','competicion_id,codigo',dict(row,competicion_id=comp))
+              print(f'Competición {cid}: {len(teams)} equipos, {len(rounds)} jornadas, {count} partidos detectados (sin guardar)')
+          PY
+,href): stats=href
+                          matches.append((code,a,away,{'id_oficial':'calendario:'+identity,'fecha_hora':timestamp,'campo':b[1].strip() if len(b)>1 and b[1].strip() else None,'puntos_local':int(score.group(1)) if score else None,'puntos_visitante':int(score.group(2)) if score else None,'estado':'finalizado' if score else 'pendiente','url_oficial':stats,'url_acta':act}))
                   rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
               if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
               plans.append((cid,comps[0]['id'],teams,rounds,count))
