@@ -49,6 +49,8 @@ jobs:
                           words=page.extract_words(x_tolerance=3,y_tolerance=2)
                           licences=set()
                           roster={}
+                          starting={}
+                          timeline={'local':[],'visitante':[]}
                           rejected={}
                           staff_ids=set()
                           for side in (0,1):
@@ -77,6 +79,7 @@ jobs:
                               roster['local' if side==0 else 'visitante']={x[1] for x in parsed}
                               split=next((y for y in headers if parsed and y>min(x[0] for x in parsed)+2),None)
                               starters=sum(x[0]<split for x in parsed) if split is not None else None
+                              starting['local' if side==0 else 'visitante']={x[1] for x in parsed if split is not None and x[0]<split}
                               if starters!=15 or len(parsed)==starters:
                                   print('Diagnóstico plantilla reducida',m['id'],'lado',side,'titulares',starters,'total',len(parsed),'licencias columna plantilla',sum(min(headers,default=page.height)<w['top']<page.height*.65 and page.width*.38<w['x0']-side*page.width/2<page.width*.48 for w in anchors),'cabeceras dorsal',len(headers))
                               duplicates=len(parsed)-len({x[1] for x in parsed})
@@ -164,9 +167,37 @@ jobs:
                                               bad_same=len(dorsals)==2 and dorsals[0]==dorsals[1]
                                               missing_minute+=bad_minute; unknown_dorsal+=bad_dorsal; same_dorsal+=bad_same
                                               if bad_minute or bad_dorsal or bad_same: invalid+=1
+                                              else: timeline[side].append((minute,heading,dorsals,event['text'].upper()))
                                           print('Validación eventos',m['id'],heading,side,'minutos ausentes',missing_minute,'dorsales inválidos',unknown_dorsal,'entra igual sale',same_dorsal)
                                           print(heading,side,'eventos',len(events),'incompletos',invalid,'tokens desconocidos',len(unknown))
                               if found!={'local','visitante'}: print(heading,'bloques incompletos',len(found))
+                      # Diagnostic simulation only: ordinary M14 duration 36, temporary suspension 5.
+                      for side in ('local','visitante'):
+                          active=set(starting[side]); banned=set(); suspended={}; minutes={d:0 for d in roster[side]}
+                          issues=[]; previous=0; events=sorted(timeline[side],key=lambda e:e[0])
+                          for t in range(37):
+                              for d,end in list(suspended.items()):
+                                  if end==t:
+                                      del suspended[d]
+                                      if d not in banned: active.add(d)
+                              current=[e for e in events if e[0]==t]
+                              if len(current)>1: issues.append('simultáneos')
+                              for _,kind,ds,code in current:
+                                  if kind=='Cambios':
+                                      enter,leave=ds
+                                      if leave not in active or enter in active or enter in banned or enter in suspended: issues.append('cambio incompatible')
+                                      else: active.remove(leave); active.add(enter)
+                                  else:
+                                      d=ds[0]
+                                      if d not in active: issues.append('sanción fuera de campo')
+                                      active.discard(d)
+                                      if kind=='Expulsiones definitivas': banned.add(d); suspended.pop(d,None)
+                                      else: suspended[d]=t+5
+                              if len(active)>15: issues.append('exceso jugadores')
+                              if t<36:
+                                  for d in active: minutes[d]+=1
+                          if any(e[0]<0 or e[0]>36 for e in events): issues.append('minuto fuera duración')
+                          print('Simulación participación',m['id'],side,'titulares',len(starting[side]),'jugadores con minutos',sum(v>0 for v in minutes.values()),'minutos acumulados',sum(minutes.values()),'incidencias',len(issues),'tipos',','.join(sorted(set(issues))) or 'ninguna')
                       with pdfplumber.open(io.BytesIO(raw)) as doc:
                           page=doc.pages[0]
                           for side in (0,1):
