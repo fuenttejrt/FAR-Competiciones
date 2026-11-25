@@ -112,6 +112,10 @@ jobs:
                           dorsals=cols.get('dorsal',[])
                           expected=m['puntos_local' if side=='local' else 'puntos_visitante']
                           valid='tipo' in cols and 'minuto' in cols and len(types)==len(minutes) and all(x in weights for x in types) and all(x.isdigit() for x in minutes)
+                          # Collective scoring and individual attribution are independent checks.
+                          individual_expected=sum(t!='EC' for t in types)
+                          known_dorsals=sum(d.isdigit() and int(d) in roster.get(side,set()) for d in dorsals)
+                          print('Validación anotación individual',m['id'],side,'esperados',individual_expected,'dorsales reconocidos',known_dorsals,'tokens dorsal',len(dorsals),'tipos desconocidos',sum(t not in weights for t in types),'minutos inválidos',sum(not x.isdigit() for x in minutes))
                           total=sum(weights.get(x,0) for x in types)
                           print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
                       if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
@@ -150,11 +154,17 @@ jobs:
                                           events=[w for w in labels['tipo'] if w['text'].upper() in allowed]
                                           unknown=[w for w in labels['tipo'] if w['text'].upper() not in allowed and w['text'].lower() not in ('tipo','*','tipo*')]
                                           invalid=0
+                                          missing_minute=0; unknown_dorsal=0; same_dorsal=0
                                           for event in events:
                                               x=center(event)
                                               minute=cell('minuto',x)
                                               dorsals=[cell(label,x) for label in fields]
-                                              if minute is None or any(d is None or d not in roster.get(side,set()) for d in dorsals) or (len(dorsals)==2 and dorsals[0]==dorsals[1]): invalid+=1
+                                              bad_minute=minute is None
+                                              bad_dorsal=any(d is None or d not in roster.get(side,set()) for d in dorsals)
+                                              bad_same=len(dorsals)==2 and dorsals[0]==dorsals[1]
+                                              missing_minute+=bad_minute; unknown_dorsal+=bad_dorsal; same_dorsal+=bad_same
+                                              if bad_minute or bad_dorsal or bad_same: invalid+=1
+                                          print('Validación eventos',m['id'],heading,side,'minutos ausentes',missing_minute,'dorsales inválidos',unknown_dorsal,'entra igual sale',same_dorsal)
                                           print(heading,side,'eventos',len(events),'incompletos',invalid,'tokens desconocidos',len(unknown))
                               if found!={'local','visitante'}: print(heading,'bloques incompletos',len(found))
                       with pdfplumber.open(io.BytesIO(raw)) as doc:
