@@ -185,7 +185,17 @@ jobs:
                                   ident=' '.join((idbox.extract_text() or '').split())
                                   ids=re.findall(r'\b\d{3,10}\b',ident)
                                   has_name=any(c.isalpha() for c in name) and name.casefold() not in ('no','ninguno','sin médico','no consta')
-                                  if len(ids)==1 and has_name and (i==2 or len(ids[0])==7):
+                                  # Preserve the entire printed identifier, including prefixes.
+                                  if i==2:
+                                      if not has_name and not ident.strip(' -–—'):
+                                          print('Estado médico ausente en origen')
+                                      elif has_name and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ./-]{0,30}',ident) and any(c.isdigit() for c in ident):
+                                          officials[role]=ident
+                                          staff_ids.update(ids)
+                                          print('Estado médico identificación conservada')
+                                      else:
+                                          print('Estado médico revisión manual')
+                                  if i!=2 and len(ids)==1 and has_name and len(ids[0])==7:
                                       officials[role]=ids[0]
                                       staff_ids.add(ids[0])
                                   if i==2:
