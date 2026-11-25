@@ -119,6 +119,36 @@ jobs:
                           individual_expected=sum(t!='EC' for t in types)
                           known_dorsals=sum(d.isdigit() and int(d) in roster.get(side,set()) for d in dorsals)
                           print('Validación anotación individual',m['id'],side,'esperados',individual_expected,'dorsales reconocidos',known_dorsals,'tokens dorsal',len(dorsals),'tipos desconocidos',sum(t not in weights for t in types),'minutos inválidos',sum(not x.isdigit() for x in minutes))
+                          # Match physical scoring columns, including blank penalty-try dorsal cells.
+                          scoring_columns=[]
+                          with pdfplumber.open(io.BytesIO(raw)) as score_doc:
+                              for score_page in score_doc.pages:
+                                  region=score_page.crop((0,score_page.height*.13,score_page.width,score_page.height*.47))
+                                  words=region.extract_words(x_tolerance=2,y_tolerance=2)
+                                  rows=[]
+                                  for w in sorted(words,key=lambda w:(w['top'],w['x0'])):
+                                      if not rows or abs(rows[-1][0]['top']-w['top'])>=2: rows.append([w])
+                                      else: rows[-1].append(w)
+                                  rows=[sorted(row,key=lambda w:w['x0']) for row in rows]
+                                  labels=[' '.join(w['text'] for w in row) for row in rows]
+                                  for i,label in enumerate(labels):
+                                      if not re.match(r'(?i)^Equipo\\s+'+side+r':',label): continue
+                                      fields={}
+                                      for j in range(i+1,min(i+9,len(rows))):
+                                          if re.match(r'(?i)^Equipo\\s+|^Cambios|^Expulsiones',labels[j]): break
+                                          match=re.match(r'(?i)^(Tipo|Minuto|Dorsal)\\b',labels[j])
+                                          if match: fields[match.group(1).lower()]=rows[j]
+                                      if not all(k in fields for k in ('tipo','minuto','dorsal')): continue
+                                      def cx(w): return (w['x0']+w['x1'])/2
+                                      def value(k,x):
+                                          candidates=[w for w in fields[k] if w['text'].isdigit() and abs(cx(w)-x)<12.5]
+                                          return int(min(candidates,key=lambda w:abs(cx(w)-x))['text']) if candidates else None
+                                      for w in fields['tipo']:
+                                          kind=w['text'].upper()
+                                          if kind in weights: scoring_columns.append((kind,value('minuto',cx(w)),value('dorsal',cx(w))))
+                          attribution_errors=sum(t is None or not 0<=t<=36 or (d is not None if k=='EC' else d not in roster.get(side,set())) for k,t,d in scoring_columns)
+                          exact=len(scoring_columns)==len(types) and [k for k,t,d in scoring_columns]==types and [str(t) for k,t,d in scoring_columns]==minutes and attribution_errors==0
+                          print('Atribución exacta',m['id'],side,'eventos',len(scoring_columns),'esperados',len(types),'errores',attribution_errors,'coincide',exact)
                           total=sum(weights.get(x,0) for x in types)
                           print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
                       if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
