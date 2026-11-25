@@ -1021,6 +1021,20 @@ public class MainActivity extends Activity {
             if(valid&&rivalValid){relativeChecked++;for(int n=0;n<duration;n++){int ownCount=0,rivalCount=0;for(boolean[] x:intervals.values())if(x[n])ownCount++;for(boolean[] x:rivalIntervals.values())if(x[n])rivalCount++;if(ownCount>rivalCount){inferior++;mi++;}else if(ownCount<rivalCount){superior++;ms++;}else{equal++;me++;}}}
             times.add(valid?one:-1);
             details.addView(txt("P"+played+" · "+game.optString(local?"away":"home")+" · "+(valid?y+" amarillas / "+r+" rojas · "+one+" min con sanción"+(rivalValid?" · Sup. "+ms+" / Igual "+me+" / Inf. "+mi+" min":" · Balance sin verificar"):"Sin verificar"),12,valid?0xffb8d4cc:0xffffc365));
+            if(valid){
+                LinearLayout matchDetail=new LinearLayout(this);matchDetail.setOrientation(1);matchDetail.setVisibility(View.GONE);
+                TextView toggle=txt("Ver intervalos y anotación  ▾",13,0xff75e6b2);details.addView(toggle);details.addView(matchDetail);
+                toggle.setOnClickListener(view->{boolean show=matchDetail.getVisibility()!=View.VISIBLE;matchDetail.setVisibility(show?View.VISIBLE:View.GONE);toggle.setText(show?"Ocultar intervalos  ▴":"Ver intervalos y anotación  ▾");});
+                int[] losses=new int[duration];java.util.TreeMap<Integer,int[]> breakdown=new java.util.TreeMap<>();
+                for(int n=0;n<duration;n++){for(boolean[] x:intervals.values())if(x[n])losses[n]++;breakdown.computeIfAbsent(losses[n],k->new int[3])[0]++;}
+                int start=0;for(int n=1;n<=duration;n++){if(n==duration||losses[n]!=losses[start]){matchDetail.addView(txt("Min "+start+"–"+n+" · "+(losses[start]==0?"Sin sanciones":losses[start]+" jugador(es) menos"),12,losses[start]==0?0xff75e6b2:0xffffc365));start=n;}}
+                boolean scoringValid=false;
+                try{org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl"),"{}"));java.util.ArrayList<String[]> events=reconciledScoring(act,game.optString("score"));scoringValid=events!=null;
+                    if(scoringValid)for(String[] e:events){int minute=Integer.parseInt(e[4]);if(minute<0||minute>duration){scoringValid=false;break;}int count=losses[Math.min(duration-1,minute)];breakdown.get(count)[e[0].equals(local?"0":"1")?1:2]+=Integer.parseInt(e[3]);}
+                }catch(Exception e){scoringValid=false;}
+                for(java.util.Map.Entry<Integer,int[]> entry:breakdown.entrySet()){int[] val=entry.getValue();matchDetail.addView(txt((entry.getKey()==0?"Sin sanciones":entry.getKey()+" menos")+" · "+val[0]+" min"+(scoringValid?" · "+val[1]+" favor / "+val[2]+" contra":" · Anotación sin verificar"),13,0xffe2f5fa));}
+                matchDetail.addView(txt("Intervalos reglamentarios. Anotaciones en el mismo minuto que un cambio de sanción se asignan al estado posterior; el orden exacto no consta.",11,0xffb8d4cc));
+            }
         }
         standingSection(content,"Disciplina colectiva · "+checked+"/"+played+" actas");
         LinearLayout cards=new LinearLayout(this);content.addView(cards);
