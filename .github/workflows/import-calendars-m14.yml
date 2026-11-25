@@ -83,7 +83,9 @@ jobs:
                           for link in row.select('a[href]'):
                               href=urllib.parse.urljoin(url,link['href'])
                               if urllib.parse.urlparse(href).hostname!='farugby.matchready.es': continue
-                              if re.search(r'/match_pdf/\d+/act/?
+                              if re.search(r'/match_pdf/\d+/act/?$',href): act=href
+                              if re.search(r'/competition/\d+/match_statistics/?$',href): stats=href
+                          matches.append((code,a,away,{'id_oficial':'calendario:'+identity,'fecha_hora':timestamp,'campo':b[1].strip() if len(b)>1 and b[1].strip() else None,'puntos_local':int(score.group(1)) if score else None,'puntos_visitante':int(score.group(2)) if score else None,'estado':'finalizado' if score else 'pendiente','url_oficial':stats,'url_acta':act}))
                   rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
               if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
               plans.append((cid,comps[0]['id'],teams,rounds,count,matches))
@@ -97,28 +99,4 @@ jobs:
                   put('partidos','id_oficial',dict(row,jornada_id=round_ids[code],equipo_local_id=team_ids[a],equipo_visitante_id=team_ids[b]))
               print('Resultados:',sum(x[3]['puntos_local'] is not None for x in matches),'Horarios:',sum(x[3]['fecha_hora'] is not None for x in matches),'Actas:',sum(x[3]['url_acta'] is not None for x in matches))
               print(f'Competición {cid}: {len(teams)} equipos, {len(rounds)} jornadas, {count} partidos guardados')
-          PY
-,href): act=href
-                              if re.search(r'/competition/\d+/match_statistics/?
-                  rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
-              if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
-              plans.append((cid,comps[0]['id'],teams,rounds,count))
-          for cid,comp,teams,rounds,count in plans:
-              for name in sorted(teams):
-                  identity='nombre:'+hashlib.sha256(name.casefold().encode()).hexdigest()
-                  put('equipos','competicion_id,id_oficial',{'competicion_id':comp,'id_oficial':identity,'nombre':name})
-              for row in rounds.values(): put('jornadas','competicion_id,codigo',dict(row,competicion_id=comp))
-              print(f'Competición {cid}: {len(teams)} equipos, {len(rounds)} jornadas, {count} partidos detectados (sin guardar)')
-          PY
-,href): stats=href
-                          matches.append((code,a,away,{'id_oficial':'calendario:'+identity,'fecha_hora':timestamp,'campo':b[1].strip() if len(b)>1 and b[1].strip() else None,'puntos_local':int(score.group(1)) if score else None,'puntos_visitante':int(score.group(2)) if score else None,'estado':'finalizado' if score else 'pendiente','url_oficial':stats,'url_acta':act}))
-                  rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
-              if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
-              plans.append((cid,comps[0]['id'],teams,rounds,count))
-          for cid,comp,teams,rounds,count in plans:
-              for name in sorted(teams):
-                  identity='nombre:'+hashlib.sha256(name.casefold().encode()).hexdigest()
-                  put('equipos','competicion_id,id_oficial',{'competicion_id':comp,'id_oficial':identity,'nombre':name})
-              for row in rounds.values(): put('jornadas','competicion_id,codigo',dict(row,competicion_id=comp))
-              print(f'Competición {cid}: {len(teams)} equipos, {len(rounds)} jornadas, {count} partidos detectados (sin guardar)')
           PY
