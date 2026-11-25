@@ -1,0 +1,198 @@
+name: Auditar formatos de todas las actas M14
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python -m pip install pypdf pdfplumber
+      - name: Comprobar PDF sin publicar datos personales
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request,urllib.parse,io,hashlib,re
+          from pypdf import PdfReader
+          import pdfplumber
+          base=os.environ['SUPABASE_URL'].rstrip('/')
+          key=os.environ['SUPABASE_SECRET_KEY']
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): return None
+          opener=urllib.request.build_opener(NoRedirect())
+          def get(table,params):
+              req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
+              with opener.open(req,timeout=30) as r: return json.load(r)
+          for cid in ('11','12','15'):
+              comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
+              if len(comps)!=1: raise SystemExit('Competición ambigua')
+              rounds=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'})
+              matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante','order':'id.asc'})
+              if not matches: raise SystemExit('Sin actas: '+cid)
+              print('Actas a revisar',cid,len(matches))
+              for m in matches:
+                  try:
+                      url=m['url_acta']
+                      u=urllib.parse.urlparse(url)
+                      if u.scheme!='https' or u.netloc!='farugby.matchready.es' or not re.fullmatch(r'/es/public/competition/match_pdf/\d+/act/?',u.path): raise SystemExit('URL no admitida')
+                      with opener.open(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=40) as r: raw=r.read(15000001)
+                      if len(raw)>15000000 or not raw.startswith(b'%PDF'): raise SystemExit('PDF no válido')
+                      pdf=PdfReader(io.BytesIO(raw))
+                      content='\n'.join(p.extract_text() or '' for p in pdf.pages)
+                      if not content.strip(): raise SystemExit('PDF sin texto extraíble')
+                      print('Competición',cid,'partido interno',m['id'],'páginas',len(pdf.pages),'caracteres',len(content),'SHA256',hashlib.sha256(raw).hexdigest())
+                      print('Marcador calendario:',m['puntos_local'],m['puntos_visitante'])
+                      with pdfplumber.open(io.BytesIO(raw)) as doc:
+                          page=doc.pages[0]
+                          words=page.extract_words(x_tolerance=3,y_tolerance=2)
+                          licences=set()
+                          roster={}
+                          rejected={}
+                          staff_ids=set()
+                          for side in (0,1):
+                              col=[w for w in words if (w['x0']<page.width/2)==(side==0)]
+                              anchors=[w for w in col if re.fullmatch(r'\d{7}',w['text'])]
+                              headers=sorted(w['top'] for w in col if 'dorsal' in w['text'].casefold())
+                              parsed=[]; unmatched=0
+                              rejected[side]=[]
+                              for anchor in anchors:
+                                  line=' '.join(w['text'] for w in sorted([w for w in col if abs(w['top']-anchor['top'])<2],key=lambda w:w['x0']))
+                                  player=re.fullmatch(r'\s*(\d{1,3})\s+(?:[XC]\s+)?(.+?)\s+(\d{7})(?:\s+F)?\s*',line)
+                                  if not player or 'licencia' in player.group(2).casefold(): unmatched+=1; rejected[side].append(anchor['text']); continue
+                                  parsed.append((anchor['top'],int(player.group(1)),player.group(3)))
+                              roster['local' if side==0 else 'visitante']={x[1] for x in parsed}
+                              split=next((y for y in headers if parsed and y>min(x[0] for x in parsed)+2),None)
+                              starters=sum(x[0]<split for x in parsed) if split is not None else None
+                              duplicates=len(parsed)-len({x[1] for x in parsed})
+                              repeated=sum(x[2] in licences for x in parsed)
+                              licences.update(x[2] for x in parsed)
+                              print('Alineación', 'local' if side==0 else 'visitante','filas',len(parsed),'titulares',starters,'suplentes',len(parsed)-starters if starters is not None else None,'filas no reconocidas',unmatched,'dorsales repetidos',duplicates,'licencias cruzadas',repeated,'separación explícita',split is not None)
+                      print('Huella texto normalizado:',hashlib.sha256(' '.join(content.split()).encode()).hexdigest())
+                      weights={'E':5,'T':2,'D':3,'PC':3,'EC':7}
+                      sections=[]
+                      with pdfplumber.open(io.BytesIO(raw)) as doc:
+                          for page in doc.pages:
+                              region=page.crop((0,page.height*.13,page.width,page.height*.47))
+                              score=region.extract_text(x_tolerance=3,y_tolerance=2) or ''
+                              heading=re.search(r'(?im)^\s*Marcador\s*$',score)
+                              if heading:
+                                  sections.append(re.split(r'(?im)^\s*(?:Cambios|Expulsiones temporales|Expulsiones definitivas)\s*$',score[heading.end():],maxsplit=1)[0])
+                      blocks=re.split(r'(?im)(?=^\s*Equipo\s+(?:local|visitante):)','\n'.join(sections))
+                      seen=set()
+                      for block in blocks:
+                          team=re.match(r'(?i)^\s*Equipo\s+(local|visitante):',block)
+                          if not team: continue
+                          side=team.group(1).lower()
+                          if side in seen:
+                              print('Marcador ambiguo: bloque repetido',side); continue
+                          seen.add(side)
+                          cols={}
+                          for line in block.splitlines():
+                              field=re.fullmatch(r'\s*(Tipo|Minuto|Dorsal)\s*\*?\s*(.*)',line,re.I)
+                              if field: cols[field.group(1).lower()]=field.group(2).split()
+                          types=[x.upper() for x in cols.get('tipo',[])]
+                          minutes=cols.get('minuto',[])
+                          dorsals=cols.get('dorsal',[])
+                          expected=m['puntos_local' if side=='local' else 'puntos_visitante']
+                          valid='tipo' in cols and 'minuto' in cols and len(types)==len(minutes) and all(x in weights for x in types) and all(x.isdigit() for x in minutes)
+                          total=sum(weights.get(x,0) for x in types)
+                          print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
+                      if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
+                      with pdfplumber.open(io.BytesIO(raw)) as doc:
+                          for heading,allowed,fields in [('Cambios',{'CT','CL','CS','CC','C1','CJ','C20'},['dorsal entra','dorsal sale']),('Expulsiones temporales',set('ABCDE'),['dorsal']),('Expulsiones definitivas',set('ABCDE'),['dorsal'])]:
+                              found=set()
+                              for page in doc.pages:
+                                  region=page
+                                  if heading!='Cambios':
+                                      region=page.crop((0 if heading.endswith('temporales') else page.width/2,0,page.width/2 if heading.endswith('temporales') else page.width,page.height))
+                                  words=region.extract_words(x_tolerance=2,y_tolerance=2)
+                                  rows=[]
+                                  for w in sorted(words,key=lambda w:(w['top'],w['x0'])):
+                                      if not rows or abs(rows[-1][0]['top']-w['top'])>=2: rows.append([w])
+                                      else: rows[-1].append(w)
+                                  rows=[sorted(row,key=lambda w:w['x0']) for row in rows]
+                                  lines=[' '.join(w['text'] for w in row).strip() for row in rows]
+                                  starts=[i for i,line in enumerate(lines) if line.casefold()==heading.casefold()]
+                                  for start in starts:
+                                      end=next((i for i in range(start+1,len(lines)) if re.fullmatch(r'Cambios|Expulsiones temporales|Expulsiones definitivas|Árbitro',lines[i],re.I)),len(lines))
+                                      teams=[i for i in range(start+1,end) if re.match(r'Equipo\s+(local|visitante):',lines[i],re.I)]
+                                      for k,idx in enumerate(teams):
+                                          side=re.match(r'Equipo\s+(local|visitante):',lines[idx],re.I).group(1).lower()
+                                          if side in found: continue
+                                          stop=teams[k+1] if k+1<len(teams) else end
+                                          labels={}
+                                          for i in range(idx+1,stop):
+                                              match=re.match(r'^(Dorsal entra|Dorsal sale|Dorsal|Minuto|Tipo)\b',lines[i],re.I)
+                                              if match: labels[match.group(1).lower()]=rows[i]
+                                          if not all(x in labels for x in ['tipo','minuto']+fields): continue
+                                          found.add(side)
+                                          def center(w): return (w['x0']+w['x1'])/2
+                                          def cell(label,x):
+                                              candidates=[w for w in labels[label] if w['text'].isdigit() and abs(center(w)-x)<12.5]
+                                              return int(min(candidates,key=lambda w:abs(center(w)-x))['text']) if candidates else None
+                                          events=[w for w in labels['tipo'] if w['text'].upper() in allowed]
+                                          unknown=[w for w in labels['tipo'] if w['text'].upper() not in allowed and w['text'].lower() not in ('tipo','*','tipo*')]
+                                          invalid=0
+                                          for event in events:
+                                              x=center(event)
+                                              minute=cell('minuto',x)
+                                              dorsals=[cell(label,x) for label in fields]
+                                              if minute is None or any(d is None or d not in roster.get(side,set()) for d in dorsals) or (len(dorsals)==2 and dorsals[0]==dorsals[1]): invalid+=1
+                                          print(heading,side,'eventos',len(events),'incompletos',invalid,'tokens desconocidos',len(unknown))
+                              if found!={'local','visitante'}: print(heading,'bloques incompletos',len(found))
+                      with pdfplumber.open(io.BytesIO(raw)) as doc:
+                          page=doc.pages[0]
+                          for side in (0,1):
+                              region=page.crop((side*page.width/2,0,(side+1)*page.width/2,page.height))
+                              lines=(region.extract_text(x_tolerance=3,y_tolerance=2) or '').splitlines()
+                              for role in ('Entrenador','Delegado','Juez línea'):
+                                  hits=[]
+                                  for i,line in enumerate(lines):
+                                      match=re.match(r'^\s*'+re.escape(role)+r'\s*:\s*(.*)$',line,re.I)
+                                      if not match: continue
+                                      name=match.group(1).strip()
+                                      licence=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{7})\b',lines[i+1]) if i+1<len(lines) else None
+                                      if name and licence and any(c.isalpha() for c in name):
+                                          hits.append(licence.group(1))
+                                  if len(hits)==1: staff_ids.add(hits[0])
+                                  print('Personal',role,'local' if side==0 else 'visitante','registros completos',len(hits))
+                          words=page.extract_words(x_tolerance=2,y_tolerance=2)
+                          referee_id=None
+                          officials={}
+                          for h in words:
+                              if h['text'].casefold()!='árbitro' or h['top']<page.height*.7: continue
+                              header=page.crop((0,max(0,h['top']-4),page.width,min(page.height,h['bottom']+4))).extract_text() or ''
+                              if not all(t in header.casefold() for t in ('delegado','médico','licencia')): continue
+                              # Six equally spaced columns, as shown in the official form.
+                              for i,role in enumerate(('Árbitro principal','Delegado de campo','Médico')):
+                                  namebox=page.crop((page.width*(2*i)/6,h['bottom']+1,page.width*(2*i+1)/6,min(page.height,h['bottom']+40)))
+                                  idbox=page.crop((page.width*(2*i+1)/6,h['bottom']+1,page.width*(2*i+2)/6,min(page.height,h['bottom']+40)))
+                                  name=' '.join((namebox.extract_text() or '').split())
+                                  ids=re.findall(r'\b\d{3,10}\b',idbox.extract_text() or '')
+                                  if len(ids)==1 and any(c.isalpha() for c in name) and (i==2 or len(ids[0])==7):
+                                      officials[role]=ids[0]
+                                      staff_ids.add(ids[0])
+                              break
+                          print('Formato seis columnas reconocido',len(officials)==3)
+                          referee_id=officials.get('Árbitro principal')
+                          for role in ('Delegado de campo','Médico'):
+                              print(role,'registro completo',role in officials)
+                          # Diagnose remaining anchors without exposing names or numbers.
+                          for side,ids in rejected.items():
+                              for ident in ids:
+                                  if ident in staff_ids: continue
+                                  anchors=[w for w in words if w['text']==ident and (w['x0']<page.width/2)==(side==0)]
+                                  for a in anchors:
+                                      row=[w for w in words if abs(w['top']-a['top'])<2]
+                                      nearby=[w for w in words if abs(w['top']-a['top'])<25]
+                                      labels=[label for label in ('licencia','árbitro','delegado','entrenador','juez','médico','sanitario','capitán','firma') if any(label in w['text'].casefold() for w in nearby)]
+                                      print('Ancla pendiente','local' if side==0 else 'visitante','altura relativa',round(a['top']/page.height,3),'etiquetas próximas',','.join(labels),'números en fila',sum(w['text'].isdigit() for w in row))
+                          print('Árbitro principal completo',bool(referee_id))
+                          print('Filas excluidas de alineación explicadas por personal',sum(x in staff_ids for ids in rejected.values() for x in ids),'de',sum(map(len,rejected.values())))
+                      for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
+                          print(term, 'detectado' if term in content.casefold() else 'no detectado')
+                  except Exception as exc:
+                      print('Error de auditoría partido',m['id'],type(exc).__name__)
+          PY
