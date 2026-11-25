@@ -1000,7 +1000,9 @@ public class MainActivity extends Activity {
                             if(!licenses.add(m.group(3))){unique=false;issues.add(club+" · licencia repetida · "+m.group(2));}
                         }}
                     }
-                    if(events!=null)for(String[] e:events){if(!dorsals.contains(e[0]+":"+e[1]))issues.add(game.optString(e[0].equals("0")?"home":"away")+" · min "+e[4]+" · "+e[2]+" ("+e[3]+" puntos) · "+(e[1].isEmpty()?"sin dorsal":"dorsal "+e[1]+" no identificado"));}
+                    if(events!=null)for(String[] e:events){if(!penaltyTry(e)&&!dorsals.contains(e[0]+":"+e[1]))issues.add(game.optString(e[0].equals("0")?"home":"away")+" · min "+e[4]+" · "+e[2]+" ("+e[3]+" puntos) · "+(e[1].isEmpty()?"sin dorsal":"dorsal "+e[1]+" no identificado"));}
+                    if(!changes){issues.add("Cambios: secuencia, dorsales o minutos no conciliados");for(String line:act.optString("changes").split("\\r?\\n"))if(line.trim().matches("^\\d+\\. Min .*"))issues.add("Cambio a revisar: "+line.trim());}
+                    if(!cards){issues.add("Expulsiones: identificación o sección incompleta");for(String key:new String[]{"temporaryCards","definitiveCards"}){int cs=-1;for(String line:act.optString(key).split("\\r?\\n")){String z=line.trim();if(z.startsWith("Equipo local:"))cs=0;else if(z.startsWith("Equipo visitante:"))cs=1;else if(z.matches("^\\d+\\. Min .*")&&(cs<0||cs==(local?0:1))){java.util.regex.Matcher dm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(z);if(!dm.find()||!dorsals.contains(cs+":"+dm.group(1)))issues.add("Expulsión a revisar: "+z);}}}}
                     String[] labels={"Marcador colectivo conciliado","Anotadores identificados","Cambios del equipo comprobados","Tarjetas del equipo identificadas","Sin dorsales ni licencias duplicados"};
                     boolean[] checks={collective,individual,changes,cards,unique};
                     for(int n=0;n<checks.length;n++)card.addView(txt((checks[n]?"✓ ":"⚠ ")+labels[n]+(checks[n]?"":" · pendiente"),12,checks[n]?0xff75e6b2:0xffffc365));
@@ -1010,6 +1012,7 @@ public class MainActivity extends Activity {
             if(state==1)complete++;else if(state==2)partial++;else pending++;
             int color=state==1?0xff75e6b2:state==2?0xffffc365:0xffed7979;
             android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(0xff1b3447);bg.setCornerRadius(dp(8));bg.setStroke(dp(1),color);card.setBackground(bg);
+            long updated=cache.getLong("validated_at:"+url,0);card.addView(txt(updated>0?"Última descarga: "+new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm",java.util.Locale.getDefault()).format(new java.util.Date(updated)):"Fecha de descarga no registrada",11,0xffb8d4cc));
             card.addView(txt(state==1?"COMPROBADA":state==2?"PARCIAL":"PENDIENTE",12,color),1);
             for(String issue:issues)card.addView(txt("• "+issue,12,0xffffc365));
             if(url.startsWith("https://farugby.matchready.es/")){
@@ -1017,7 +1020,7 @@ public class MainActivity extends Activity {
                 TextView open=txt("Abrir acta",13,0xff75e6b2),refresh=txt("Actualizar acta",13,0xff75e6b2);
                 for(TextView button:new TextView[]{open,refresh}){button.setGravity(android.view.Gravity.CENTER);button.setPadding(dp(4),dp(12),dp(4),dp(8));actions.addView(button,new LinearLayout.LayoutParams(0,-2,1));}
                 open.setOnClickListener(v->{try{startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(url)));}catch(Exception e){android.widget.Toast.makeText(this,"No se pudo abrir el acta",0).show();}});
-                refresh.setOnClickListener(v->{refresh.setEnabled(false);refresh.setText("Actualizando…");new Thread(()->{boolean ok=false;try{com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);if(!parsed.optString("lineups").trim().isEmpty()){cache.edit().putString(url,parsed.toString()).apply();ok=true;}}catch(Exception ignored){}final boolean success=ok;runOnUiThread(()->{if(success){content.removeAllViews();renderActValidation(content,matches,team);}else{refresh.setEnabled(true);refresh.setText("Reintentar");android.widget.Toast.makeText(this,"No se pudo actualizar; se conserva el acta anterior",1).show();}});}).start();});
+                refresh.setOnClickListener(v->{refresh.setEnabled(false);refresh.setText("Actualizando…");new Thread(()->{boolean ok=false;try{com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);if(!parsed.optString("lineups").trim().isEmpty()){cache.edit().putString(url,parsed.toString()).putLong("validated_at:"+url,System.currentTimeMillis()).apply();ok=true;}}catch(Exception ignored){}final boolean success=ok;runOnUiThread(()->{if(success){content.removeAllViews();renderActValidation(content,matches,team);}else{refresh.setEnabled(true);refresh.setText("Reintentar");android.widget.Toast.makeText(this,"No se pudo actualizar; se conserva el acta anterior",1).show();}});}).start();});
             }
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(5),0,dp(5));rows.addView(card,lp);cardsList.add(card);states.add(state);
         }
@@ -1146,6 +1149,7 @@ public class MainActivity extends Activity {
         }
         return sides[0]&&sides[1]&&sums[0]==score[0]&&sums[1]==score[1]?events:null;
     }
+    private boolean penaltyTry(String[] e){return e[2].contains("ensayo")&&(e[2].contains("castigo")||e[2].contains("penal"))&&"7".equals(e[3]);}
     private boolean scoringPlayersKnown(org.json.JSONObject act,java.util.ArrayList<String[]> events){
         if(events==null)return false;
         java.util.Set<String> ids=new java.util.HashSet<>();int side=-1;
@@ -1153,7 +1157,7 @@ public class MainActivity extends Activity {
             String t=raw.trim();if(t.equals("EQUIPO LOCAL"))side=0;else if(t.equals("EQUIPO VISITANTE"))side=1;
             else if(side>=0){java.util.regex.Matcher m=java.util.regex.Pattern.compile("^(\\d+)\\s*·.*\\|\\s*\\d{7}.*$").matcher(t);if(m.matches())ids.add(side+":"+m.group(1));}
         }
-        for(String[] e:events)if(!ids.contains(e[0]+":"+e[1]))return false;
+        for(String[] e:events)if(!penaltyTry(e)&&!ids.contains(e[0]+":"+e[1]))return false;
         return true;
     }
     private boolean hasUnknownCard(String lineup,String temporary,String definitive,boolean local){
@@ -1303,21 +1307,21 @@ public class MainActivity extends Activity {
                 }
                 if(loadingActs[0])content.addView(txt("Consultando actas oficiales…",12,0xff75e6b2));
                 int pfTotal=0,paTotal=0,checked=0,playedGames=0;
-                int[][] totals=new int[2][4], venue=new int[2][3], typePoints=new int[2][4]; int bestF=-1,worstF=Integer.MAX_VALUE,bestD=Integer.MAX_VALUE,worstD=-1; String bf="",wf="",bd="",wd="";
+                int[][] totals=new int[2][5], venue=new int[2][3], typePoints=new int[2][5]; int bestF=-1,worstF=Integer.MAX_VALUE,bestD=Integer.MAX_VALUE,worstD=-1; String bf="",wf="",bd="",wd="";
                 java.util.ArrayList<Integer> pfSeries=new java.util.ArrayList<>(),paSeries=new java.util.ArrayList<>();
                 LinearLayout history=new LinearLayout(this);history.setOrientation(1);
                 for(org.json.JSONObject game:games){
                     int[] result=standingMatchScore(game.optString("score",""));if(result==null)continue;
                     boolean local=teamKey(team).equals(teamKey(game.optString("home","")));
                     int pf=result[local?0:1],pa=result[local?1:0];pfTotal+=pf;paTotal+=pa;playedGames++;pfSeries.add(pf);paSeries.add(pa);
-                    String opponent=game.optString(local?"away":"home"); int v=local?0:1;venue[v][0]++;venue[v][1]+=pf;venue[v][2]+=pa; if(pf>bestF){bestF=pf;bf=opponent;}if(pf<worstF){worstF=pf;wf=opponent;}if(pa<bestD){bestD=pa;bd=opponent;}if(pa>worstD){worstD=pa;wd=opponent;} int[][] counts=new int[2][4], eventPoints=new int[2][4];boolean valid=false;
+                    String opponent=game.optString(local?"away":"home"); int v=local?0:1;venue[v][0]++;venue[v][1]+=pf;venue[v][2]+=pa; if(pf>bestF){bestF=pf;bf=opponent;}if(pf<worstF){worstF=pf;wf=opponent;}if(pa<bestD){bestD=pa;bd=opponent;}if(pa>worstD){worstD=pa;wd=opponent;} int[][] counts=new int[2][5], eventPoints=new int[2][5];boolean valid=false;
                     try{
                         org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl",""),"{}"));
                         java.util.ArrayList<String[]> events=reconciledScoring(act,game.optString("score"));
                         valid=events!=null;
                         if(valid)for(String[] e:events){
                             int side=Integer.parseInt(e[0]),pts=Integer.parseInt(e[3]);String kind=e[2];
-                            int k=kind.contains("ensayo")?0:kind.contains("transform")?1:kind.contains("castigo")||kind.contains("penal")?2:3;
+                            int k=penaltyTry(e)?4:kind.contains("ensayo")?0:kind.contains("transform")?1:kind.contains("castigo")||kind.contains("penal")?2:3;
                             counts[side][k]++;eventPoints[side][k]+=pts;
                         }
                     }catch(Exception e){valid=false;}
@@ -1326,8 +1330,8 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(4),0,dp(4));history.addView(card,lp);
                     card.addView(txt(game.optString("home")+" – "+game.optString("away"),13,0xffe2f5fa));
                     card.addView(txt((local?"LOCAL":"VISITANTE")+" · "+(pf>pa?"Victoria":pf==pa?"Empate":"Derrota"),12,pf>pa?0xff75e6b2:pf==pa?0xffffc365:0xffed7979)); LinearLayout matchRow=new LinearLayout(this);card.addView(matchRow);standingMetric(matchRow,""+pf,"Favor");standingMetric(matchRow,""+pa,"Contra");
-                    if(valid){checked++;for(int k=0;k<4;k++){totals[0][k]+=counts[local?0:1][k];totals[1][k]+=counts[local?1:0][k];typePoints[0][k]+=eventPoints[local?0:1][k];typePoints[1][k]+=eventPoints[local?1:0][k];}
-                    card.addView(txt("Ensayos: "+counts[local?0:1][0]+" a favor / "+counts[local?1:0][0]+" en contra",12,0xffd2e4ef));card.addView(txt("Acta conciliada con marcador",11,0xff75e6b2));}
+                    if(valid){checked++;for(int k=0;k<5;k++){totals[0][k]+=counts[local?0:1][k];totals[1][k]+=counts[local?1:0][k];typePoints[0][k]+=eventPoints[local?0:1][k];typePoints[1][k]+=eventPoints[local?1:0][k];}
+                    card.addView(txt("Ensayos: "+counts[local?0:1][0]+" a favor / "+counts[local?1:0][0]+" en contra",12,0xffd2e4ef));card.addView(txt("Ensayos de castigo: "+counts[local?0:1][4]+" favor / "+counts[local?1:0][4]+" contra",12,0xffd2e4ef));card.addView(txt("Acta conciliada con marcador",11,0xff75e6b2));}
                     else card.addView(txt("Desglose del acta pendiente de conciliación",11,0xffffc365));
                 }
                 standingSection(content,"Ataque y defensa · "+playedGames+" resultados");
@@ -1343,10 +1347,10 @@ public class MainActivity extends Activity {
                     content.addView(txt("Medias calculadas sobre "+checked+" actas conciliadas.",11,0xffb8d4cc));
                     standingColumns3D(content,new String[]{"E+","E−","T+","T−","C+","C−","D+","D−"},new int[]{totals[0][0],totals[1][0],totals[0][1],totals[1][1],totals[0][2],totals[1][2],totals[0][3],totals[1][3]},new int[]{0xff48dca2,0xffed7979,0xff48dca2,0xffed7979,0xff48dca2,0xffed7979,0xff48dca2,0xffed7979});
                     content.addView(txt("E: ensayos · T: transformaciones · C: castigos · D: drops. + favor / − contra",11,0xffb8d4cc));
-                    standingSection(content,"Origen de los puntos a favor");
-                    if(java.util.Arrays.stream(typePoints[0]).sum()>0)standingPie(content,typePoints[0],new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff9b8be8},new String[]{"Ensayos","Transformaciones","Castigos","Drops"});
+                    content.addView(txt("Ensayos de castigo: "+totals[0][4]+" a favor / "+totals[1][4]+" en contra. Medias de ensayos normales por separado.",12,0xffb8d4cc));standingSection(content,"Origen de los puntos a favor");
+                    if(java.util.Arrays.stream(typePoints[0]).sum()>0)standingPie(content,typePoints[0],new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff9b8be8,0xffed7979},new String[]{"Ensayos","Transformaciones","Castigos","Drops","Ensayos de castigo"});
                     standingSection(content,"Origen de los puntos en contra");
-                    if(java.util.Arrays.stream(typePoints[1]).sum()>0)standingPie(content,typePoints[1],new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff9b8be8},new String[]{"Ensayos","Transformaciones","Castigos","Drops"});
+                    if(java.util.Arrays.stream(typePoints[1]).sum()>0)standingPie(content,typePoints[1],new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff9b8be8,0xffed7979},new String[]{"Ensayos","Transformaciones","Castigos","Drops","Ensayos de castigo"});
                     else content.addView(txt("Sin puntos recibidos en las actas conciliadas.",12,0xffb8d4cc));
                 }
                 if(playedGames>0){
@@ -1487,7 +1491,7 @@ public class MainActivity extends Activity {
                                 java.util.ArrayList<String[]> reconciled=reconciledScoring(cached,match.optString("score"));
                                 boolean validScore=scoringPlayersKnown(cached,reconciled),sideFound=true;
                                 java.util.ArrayList<String[]> scoreEvents=new java.util.ArrayList<>();
-                                if(validScore)for(String[] e:reconciled){if(!e[0].equals(local?"0":"1"))continue;String id=statDorsals.get(e[1]);if(id==null){validScore=false;break;}scoreEvents.add(new String[]{id,e[2],e[3],e[4]});}
+                                if(validScore)for(String[] e:reconciled){if(penaltyTry(e)||!e[0].equals(local?"0":"1"))continue;String id=statDorsals.get(e[1]);if(id==null){validScore=false;break;}scoreEvents.add(new String[]{id,e[2],e[3],e[4]});}
                                 if(validScore&&sideFound){
                                     for(String id:thisMatch){scoringCoverage.merge(id,1,Integer::sum);scoreGames.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(match.optString("home")+" – "+match.optString("away"));}
                                     for(String[] ev:scoreEvents){
@@ -2502,7 +2506,7 @@ public class MainActivity extends Activity {
                     for(String id:seen)history.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(g.optString("home")+" – "+g.optString("away")+" · "+(matchMinutes.containsKey(id)?matchMinutes.get(id)+" min verificados":"Minutos no verificados"));
                     java.util.ArrayList<String[]> events=reconciledScoring(act,g.optString("score"));
                     g.put("playerScoreVerified",false);
-                    if(scoringPlayersKnown(act,events)&&events.stream().allMatch(e->dorsals.containsKey(e[0]+":"+e[1]))){scoreCoverage++;g.put("playerScoreVerified",true);for(String[] e:events){int[] a=totals.get(dorsals.get(e[0]+":"+e[1]));a[2]+=Integer.parseInt(e[3]);String k=e[2];if(k.contains("ensayo"))a[3]++;else if(k.contains("transform"))a[4]++;else if(k.contains("castigo")||k.contains("penal"))a[5]++;else if(k.contains("drop"))a[6]++;}}
+                    if(scoringPlayersKnown(act,events)&&events.stream().allMatch(e->penaltyTry(e)||dorsals.containsKey(e[0]+":"+e[1]))){scoreCoverage++;g.put("playerScoreVerified",true);for(String[] e:events){if(penaltyTry(e))continue;int[] a=totals.get(dorsals.get(e[0]+":"+e[1]));a[2]+=Integer.parseInt(e[3]);String k=e[2];if(k.contains("ensayo"))a[3]++;else if(k.contains("transform"))a[4]++;else if(k.contains("castigo")||k.contains("penal"))a[5]++;else if(k.contains("drop"))a[6]++;}}
                     for(String key:new String[]{"temporaryCards","definitiveCards"}){side=-1;for(String raw:act.optString(key).split("\\r?\\n")){String line=raw.trim();if(line.matches("(?i)Equipo local:.*"))side=0;else if(line.matches("(?i)Equipo visitante:.*"))side=1;else if(side>=0&&line.matches("^\\d+\\. Min .*")){java.util.regex.Matcher m=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(line);if(m.find()){String id=dorsals.get(side+":"+m.group(1));if(id!=null)totals.get(id)[key.equals("temporaryCards")?7:8]++;}}}}
                 }catch(Exception ignored){}finally{String round=entry.getValue().optString("round","").trim();if(round.isEmpty())round="Sin jornada identificada";java.util.Map<String,int[]> bucket=byRound.computeIfAbsent(round,k->new java.util.HashMap<>());for(String k:totals.keySet()){int[] now=totals.get(k),old=before.get(k);if(old!=null&&java.util.Arrays.equals(now,old))continue;int[] dest=bucket.computeIfAbsent(k,x->new int[12]);int[] delta=new int[12];for(int m=0;m<12;m++){delta[m]=now[m]-(old==null?0:old[m]);dest[m]+=delta[m];}playerMatches.computeIfAbsent(k,x->new java.util.LinkedHashMap<>()).put(entry.getKey(),delta);}}
             }
