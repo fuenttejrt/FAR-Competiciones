@@ -1,0 +1,40 @@
+name: Analizar calendarios M14
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  analizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar analizador HTML
+        run: python -m pip install beautifulsoup4
+      - name: Inspeccionar calendarios oficiales
+        run: |
+          python - <<'PY'
+          import urllib.request, urllib.parse, re
+          from bs4 import BeautifulSoup
+          for cid in ('11','12','15','83'):
+              url=f'https://farugby.matchready.es/es/public/calendar/35/{cid}/combined/'
+              print('\nCOMPETICIÓN',cid)
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+              with urllib.request.urlopen(req,timeout=40) as response:
+                  if urllib.parse.urlparse(response.geturl()).hostname!='farugby.matchready.es':
+                      raise SystemExit('Redirección inesperada')
+                  soup=BeautifulSoup(response.read(),'html.parser')
+              tables=soup.find_all('table')
+              print('Tablas:',len(tables))
+              for t in tables[:40]:
+                  rows=t.find_all('tr')
+                  header=next((r for r in rows if r.find('th')),None)
+                  if not header: continue
+                  labels=[c.get_text(' ',strip=True) for c in header.find_all(['th','td'],recursive=False)]
+                  print('Cabeceras:',labels,'Filas:',len(rows)-1)
+                  h=t.find_previous(['h1','h2','h3','h4','h5'])
+                  print('Encabezado:',h.get_text(' ',strip=True)[:180] if h else '')
+                  if any('local' in x.lower() for x in labels):
+                      for row in rows[rows.index(header)+1:rows.index(header)+3]:
+                          print('Muestra:',[c.get_text(' ',strip=True)[:160] for c in row.find_all(['td','th'],recursive=False)])
+                          print('Enlaces:',[urllib.parse.urljoin(url,a['href']) for a in row.select('a[href]') if urllib.parse.urlparse(urllib.parse.urljoin(url,a['href'])).hostname=='farugby.matchready.es'])
+              if not tables: print('Sin tablas HTML; comprobar carga dinámica')
+          PY
