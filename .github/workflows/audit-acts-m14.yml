@@ -108,21 +108,35 @@ jobs:
                               starting['local' if side==0 else 'visitante']={x[1] for x in parsed if split is not None and x[0]<split}
                               if starters!=15 or len(parsed)==starters:
                                   print('Diagnóstico plantilla reducida',m['id'],'lado',side,'titulares',starters,'total',len(parsed),'licencias columna plantilla',sum(min(headers,default=page.height)<w['top']<page.height*.65 and page.width*.38<w['x0']-side*page.width/2<page.width*.48 for w in anchors),'cabeceras dorsal',len(headers))
-                              # Audit candidate name rows and marker positions without logging identities.
-                              for y,d,ident in parsed:
+                              # Compare geometric row reconstruction with baseline extraction.
+                              ordered=sorted(parsed)
+                              for idx,(y,d,ident) in enumerate(ordered):
                                   roster_audit['filas']+=1
                                   offset=side*page.width/2
-                                  nearby=[w for w in col if abs(w['top']-y)<2]
-                                  tokens=sorted([w for w in nearby if page.width*.085<w['x0']-offset<page.width*.38 and any(c.isalpha() for c in w['text'])],key=lambda w:w['x0'])
-                                  name=' '.join(w['text'] for w in tokens)
+                                  lo=(ordered[idx-1][0]+y)/2 if idx else y-12
+                                  hi=(ordered[idx+1][0]+y)/2 if idx+1<len(ordered) else y+12
+                                  for boundary in headers:
+                                      if lo<boundary<y: lo=boundary+2
+                                      if y<boundary<hi: hi=boundary-2
+                                  nearby=[w for w in col if lo<=w['top']<hi]
+                                  # Record only aggregate column geometry, never text or licence.
+                                  for w in nearby:
+                                      if abs(w['top']-y)<2 and any(c.isalpha() for c in w['text']):
+                                          roster_audit['texto_x_'+str(round((w['x0']-offset)/page.width,2))]+=1
+                                  tokens=[w for w in nearby if page.width*.10<w['x0']-offset<page.width*.38 and any(c.isalpha() for c in w['text'])]
+                                  lines=[]
+                                  for w in sorted(tokens,key=lambda w:(w['top'],w['x0'])):
+                                      if not lines or abs(w['top']-lines[-1][0]['top'])>=2: lines.append([])
+                                      lines[-1].append(w)
+                                  name=' '.join(w['text'] for line in lines for w in sorted(line,key=lambda w:w['x0']))
                                   if len(name.split())>=2:
                                       roster_audit['nombre_multitoken']+=1
                                       name_variants[ident].add(' '.join(name.casefold().split()))
                                   else: roster_audit['nombre_revisar']+=1
-                                  markers=[w for w in nearby if w['text'].upper() in ('C','X') and page.width*.035<w['x0']-offset<page.width*.12]
+                                  if len(lines)>1: roster_audit['nombre_multilinea']+=1
+                                  markers=[w for w in nearby if abs(w['top']-y)<2 and w['text'].upper() in ('C','X') and page.width*.035<w['x0']-offset<page.width*.12]
                                   for w in markers:
-                                      roster_audit['marca_'+w['text'].upper()]+=1
-                                      roster_audit['marca_posicion_'+str(round((w['x0']-offset)/page.width,2))]+=1
+                                      roster_audit['marca_'+w['text'].upper()+'_x_'+str(round((w['x0']-offset)/page.width,2))]+=1
                               duplicates=len(parsed)-len({x[1] for x in parsed})
                               print('Licencias repetidas dentro del equipo',len(parsed)-len({x[2] for x in parsed}))
                               repeated=sum(x[2] in licences for x in parsed)
