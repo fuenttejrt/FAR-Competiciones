@@ -155,21 +155,26 @@ jobs:
                                   hits.append(licence.group(1))
                           if len(hits)==1: staff_ids.add(hits[0])
                           print('Personal',role,'local' if side==0 else 'visitante','registros completos',len(hits))
-                  first=doc.pages[0].extract_text(x_tolerance=3,y_tolerance=2) or ''
-                  referee=re.search(r'(?is)Árbitro\s+N[ºo]\s*Licencia del árbitro[^\n]*\n\s*([^\d\n]+?)\s+(\d{7})\b',first)
-                  # Locate the referee licence column independently of wrapped names.
-                  referee_id=referee.group(2) if referee else None
                   words=page.extract_words(x_tolerance=2,y_tolerance=2)
-                  headings=[w for w in words if w['text'].casefold()=='árbitro']
-                  for h in headings:
-                      same=[w for w in words if abs(w['top']-h['top'])<3]
-                      if not any(w['text'].casefold()=='licencia' for w in same): continue
-                      candidates=[w for w in words if re.fullmatch(r'\d{7}',w['text']) and 2<w['top']-h['top']<35]
-                      for a in candidates:
-                          row=[w for w in words if abs(w['top']-a['top'])<2 and h['x0']-5<=w['x0']<a['x0']]
-                          if sum(any(c.isalpha() for c in w['text']) for w in row)>=2 and a['text'] not in licences and a['text'] not in staff_ids:
-                              if len(candidates)==1: referee_id=a['text']
-                  if referee_id: staff_ids.add(referee_id)
+                  referee_id=None
+                  officials={}
+                  for h in words:
+                      if h['text'].casefold()!='árbitro' or h['top']<page.height*.7: continue
+                      header=page.crop((0,max(0,h['top']-4),page.width,min(page.height,h['bottom']+4))).extract_text() or ''
+                      if not all(t in header.casefold() for t in ('delegado','médico','licencia')): continue
+                      # Six equally spaced columns, as shown in the official form.
+                      for i,role in enumerate(('Árbitro principal','Delegado de campo','Médico')):
+                          namebox=page.crop((page.width*(2*i)/6,h['bottom']+1,page.width*(2*i+1)/6,min(page.height,h['bottom']+40)))
+                          idbox=page.crop((page.width*(2*i+1)/6,h['bottom']+1,page.width*(2*i+2)/6,min(page.height,h['bottom']+40)))
+                          name=' '.join((namebox.extract_text() or '').split())
+                          ids=re.findall(r'\b\d{3,10}\b',idbox.extract_text() or '')
+                          if len(ids)==1 and any(c.isalpha() for c in name) and (i==2 or len(ids[0])==7):
+                              officials[role]=ids[0]
+                              staff_ids.add(ids[0])
+                      break
+                  referee_id=officials.get('Árbitro principal')
+                  for role in ('Delegado de campo','Médico'):
+                      print(role,'registro completo',role in officials)
                   # Diagnose remaining anchors without exposing names or numbers.
                   for side,ids in rejected.items():
                       for ident in ids:
