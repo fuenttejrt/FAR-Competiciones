@@ -131,12 +131,17 @@ jobs:
                                       else: rows[-1].append(w)
                                   rows=[sorted(row,key=lambda w:w['x0']) for row in rows]
                                   labels=[' '.join(w['text'] for w in row) for row in rows]
-                                  for i,label in enumerate(labels):
-                                      if not re.match(r'(?i)^Equipo\\s+'+side+r':',label): continue
+                                  headings=[i for i,label in enumerate(labels) if label.strip().casefold()=='marcador']
+                                  if not headings: continue
+                                  first=headings[0]
+                                  last=next((i for i in range(first+1,len(labels)) if re.match(r'(?i)^Cambios|^Expulsiones',labels[i])),len(labels))
+                                  for i in range(first+1,last):
+                                      label=labels[i]
+                                      if not re.match(r'(?i)^Equipo\s+'+side+r':',label): continue
                                       fields={}
-                                      for j in range(i+1,min(i+9,len(rows))):
-                                          if re.match(r'(?i)^Equipo\\s+|^Cambios|^Expulsiones',labels[j]): break
-                                          match=re.match(r'(?i)^(Tipo|Minuto|Dorsal)\\b',labels[j])
+                                      for j in range(i+1,min(i+9,last)):
+                                          if re.match(r'(?i)^Equipo\s+|^Cambios|^Expulsiones',labels[j]): break
+                                          match=re.match(r'(?i)^(Tipo|Minuto|Dorsal)\b',labels[j])
                                           if match: fields[match.group(1).lower()]=rows[j]
                                       if not all(k in fields for k in ('tipo','minuto','dorsal')): continue
                                       def cx(w): return (w['x0']+w['x1'])/2
