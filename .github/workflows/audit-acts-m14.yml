@@ -137,6 +137,9 @@ jobs:
                                       if not lines or abs(w['top']-lines[-1][0]['top'])>=2: lines.append([])
                                       lines[-1].append(w)
                                   name=' '.join(w['text'] for line in lines for w in sorted(line,key=lambda w:w['x0']))
+                                  roster_audit['nombre_palabras_'+str(min(len(name.split()),8))]+=1
+                                  roster_audit['nombre_contiene_digitos']+=int(any(c.isdigit() for c in name))
+                                  roster_audit['nombre_posible_cabecera']+=int(any(w.casefold().strip(':') in ('dorsal','licencia','jugador','titulares','suplentes','apellidos') for w in name.split()))
                                   if len(name.split())>=2:
                                       roster_audit['nombre_multitoken']+=1
                                       name_variants[ident].add(' '.join(name.casefold().split()))
@@ -455,6 +458,8 @@ jobs:
                               if kind!='Cambios':
                                   tc[kind]+=1
                                   players[(team_id,identities[side][ds[0]])][kind]+=1
+                      if duration_warning or not all(participation[x][1] for x in ('local','visitante')):
+                          print('ACTA PARCIAL',m['id'],'PDF',url,'advertencia duración',duration_warning,'participación local válida',participation['local'][1],'participación visitante válida',participation['visitante'][1])
                       version_plan.append({'url_pdf':url,'partido_id':m['id'],'hash_contenido':content_hash,'estado_validacion':'parcial' if duration_warning or not all(participation[x][1] for x in ('local','visitante')) else 'correcto'})
                       accepted+=1
                       for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
@@ -518,6 +523,7 @@ jobs:
               print('Rankings ámbito',scope,'equipos',len(scoped_teams),'jugadores únicos',len(scoped_players))
           print('Rankings calculados',len(rankings),'ámbitos',len(scopes),'sin publicar identidades')
           print('Auditoría nombres y marcas',dict(sorted(roster_audit.items())))
+          print('Calidad nombres: distribución de palabras y anomalías',dict(sorted((k,v) for k,v in roster_audit.items() if k.startswith(('nombre_palabras_','nombre_contiene_','nombre_posible_')))))
           print('Identidades con variantes de nombre',sum(len(v)>1 for v in name_variants.values()),'identidades con nombre candidato',len(name_variants))
           # Preflight before any optional writes.
           existing={}
