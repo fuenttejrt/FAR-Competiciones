@@ -61,6 +61,37 @@ jobs:
                       repeated=sum(x[2] in licences for x in parsed)
                       licences.update(x[2] for x in parsed)
                       print('Alineación', 'local' if side==0 else 'visitante','filas',len(parsed),'titulares',starters,'suplentes',len(parsed)-starters if starters is not None else None,'filas no reconocidas',unmatched,'dorsales repetidos',duplicates,'licencias cruzadas',repeated,'separación explícita',split is not None)
+              print('Huella texto normalizado:',hashlib.sha256(' '.join(content.split()).encode()).hexdigest())
+              weights={'E':5,'T':2,'D':3,'PC':3,'EC':7}
+              sections=[]
+              with pdfplumber.open(io.BytesIO(raw)) as doc:
+                  for page in doc.pages:
+                      region=page.crop((0,page.height*.13,page.width,page.height*.47))
+                      score=region.extract_text(x_tolerance=3,y_tolerance=2) or ''
+                      heading=re.search(r'(?im)^\s*Marcador\s*$',score)
+                      if heading:
+                          sections.append(re.split(r'(?im)^\s*(?:Cambios|Expulsiones temporales|Expulsiones definitivas)\s*$',score[heading.end():],maxsplit=1)[0])
+              blocks=re.split(r'(?im)(?=^\s*Equipo\s+(?:local|visitante):)','\n'.join(sections))
+              seen=set()
+              for block in blocks:
+                  team=re.match(r'(?i)^\s*Equipo\s+(local|visitante):',block)
+                  if not team: continue
+                  side=team.group(1).lower()
+                  if side in seen:
+                      print('Marcador ambiguo: bloque repetido',side); continue
+                  seen.add(side)
+                  cols={}
+                  for line in block.splitlines():
+                      field=re.fullmatch(r'\s*(Tipo|Minuto|Dorsal)\s*\*?\s*(.*)',line,re.I)
+                      if field: cols[field.group(1).lower()]=field.group(2).split()
+                  types=[x.upper() for x in cols.get('tipo',[])]
+                  minutes=cols.get('minuto',[])
+                  dorsals=cols.get('dorsal',[])
+                  expected=m['puntos_local' if side=='local' else 'puntos_visitante']
+                  valid='tipo' in cols and 'minuto' in cols and len(types)==len(minutes) and all(x in weights for x in types) and all(x.isdigit() for x in minutes)
+                  total=sum(weights.get(x,0) for x in types)
+                  print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
+              if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
               for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
                   print(term, 'detectado' if term in content.casefold() else 'no detectado')
           PY
