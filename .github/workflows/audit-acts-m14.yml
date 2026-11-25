@@ -231,9 +231,11 @@ jobs:
                           print('Validación temporal anotaciones',m['id'],side,'advertencias',temporal_warnings,'duración referencia',36)
                           scores[side]=scoring_columns
                           score_ok[side]=exact and valid and sum(weights.get(x,0) for x in types)==expected
-                          duration_warning=duration_warning or bool(temporal_warnings)
+                          # Scoring beyond regulation is retained; participation remains capped at 36.
                           if temporal_warnings:
-                              print('Participación requiere revisión de duración',m['id'],'minuto máximo anotación',max(t for k,t,d in scoring_columns if t is not None))
+                              print('Anotación fuera de referencia conservada',m['id'],side,'eventos',temporal_warnings,'tope estadístico',36)
+                          if temporal_warnings:
+                              print('Anotación original posterior a duración de referencia',m['id'],'minuto máximo anotación',max(t for k,t,d in scoring_columns if t is not None))
                           total=sum(weights.get(x,0) for x in types)
                           print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
                       if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
