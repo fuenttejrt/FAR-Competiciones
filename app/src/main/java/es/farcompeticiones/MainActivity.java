@@ -971,6 +971,32 @@ public class MainActivity extends Activity {
         return overlap;
     }
 
+    private boolean hasUnknownCard(String lineup,String temporary,String definitive,boolean local){
+        java.util.Set<String> dorsals=new java.util.HashSet<>();
+        int side=-1;
+        for(String raw:lineup.split("\\r?\\n")){
+            String t=raw.trim();
+            if(t.equals("EQUIPO LOCAL"))side=0;
+            else if(t.equals("EQUIPO VISITANTE"))side=1;
+            else if(side==(local?0:1)){
+                java.util.regex.Matcher m=java.util.regex.Pattern.compile("^(\\d+)\\s*·.*\\|\\s*\\d{7}.*$").matcher(t);
+                if(m.matches())dorsals.add(m.group(1));
+            }
+        }
+        for(String cards:new String[]{temporary,definitive}){
+            side=-1;
+            for(String raw:cards.split("\\r?\\n")){
+                String t=raw.trim();
+                if(t.matches("(?i)Equipo local:.*"))side=0;
+                else if(t.matches("(?i)Equipo visitante:.*"))side=1;
+                else if(t.matches("^\\d+\\. Min .*")&&(side<0||side==(local?0:1))){
+                    java.util.regex.Matcher m=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(t);
+                    if(side<0||!m.find()||!dorsals.contains(m.group(1)))return true;
+                }
+            }
+        }
+        return false;
+    }
     private int confirmedBeforeCard(String lineup,String temporary,String definitive,boolean local,String id,java.util.List<String> trace,int duration,int base){
         int side=-1;boolean starter=false,initial=false;String dorsal=null;
         for(String raw:lineup.split("\\r?\\n")){String t=raw.trim();if(t.equals("EQUIPO LOCAL"))side=0;else if(t.equals("EQUIPO VISITANTE"))side=1;else if(t.startsWith("TITULARES ("))starter=true;else if(t.startsWith("SUPLENTES ("))starter=false;else if(side==(local?0:1)){java.util.regex.Matcher m=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$").matcher(t);if(m.matches()&&id.startsWith(m.group(3)+"|")){dorsal=m.group(1);initial=starter;}}}
@@ -1364,27 +1390,14 @@ public class MainActivity extends Activity {
                                 }
                             }
                             int excludedPlayers=0;
-                            if(perAct!=null&&!sanctionedDorsals.isEmpty()){
-                                java.util.HashMap<String,String> dorsalIds=new java.util.HashMap<>();
-                                int lineSide=-1;
-                                java.util.regex.Pattern dorsalPlayer=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$");
-                                for(String rawLine:lineup.split("\\r?\\n")){
-                                    String t=rawLine.trim();
-                                    if(t.equals("EQUIPO LOCAL"))lineSide=0;
-                                    else if(t.equals("EQUIPO VISITANTE"))lineSide=1;
-                                    else if(lineSide==(local?0:1)){
-                                        java.util.regex.Matcher pm=dorsalPlayer.matcher(t);
-                                        if(pm.matches())dorsalIds.put(pm.group(1),pm.group(3)+"|"+pm.group(2).trim());
-                                    }
-                                }
-                                for(String dorsal:sanctionedDorsals){
-                                    String id=dorsalIds.get(dorsal);
-                                    if(id==null){unknownSanction=true;continue;}
-                                    Integer base=perAct.get(id);if(base==null)continue;int confirmed=confirmedBeforeCard(lineup,cached.optString("temporaryCards"),cached.optString("definitiveCards"),local,id,trace.getOrDefault(id,new java.util.ArrayList<>()),CompetitionRules.matchMinutes(season,category,selectedCompetition),base);if(confirmed<0){perAct.remove(id);excludedPlayers++;}else perAct.put(id,confirmed);
+                            unknownSanction=hasUnknownCard(lineup,cached.optString("temporaryCards"),cached.optString("definitiveCards"),local);
+                            if(unknownSanction)perAct=null;
+                            if(perAct!=null){
+                                for(String id:new java.util.ArrayList<>(perAct.keySet())){
+                                    int confirmed=confirmedBeforeCard(lineup,cached.optString("temporaryCards"),cached.optString("definitiveCards"),local,id,trace.getOrDefault(id,new java.util.ArrayList<>()),CompetitionRules.matchMinutes(season,category,selectedCompetition),perAct.get(id));
+                                    if(confirmed<0){perAct.remove(id);excludedPlayers++;}else perAct.put(id,confirmed);
                                 }
                             }
-                            // If a card has no identifiable player, no minute count can be certified.
-                            if(unknownSanction)perAct=null;
                             String matchLabel=match.optString("home","")+" - "+match.optString("away","");
                             if(perAct==null){
                                 String reason=unknownSanction?"Expulsión sin dorsal identificable":
@@ -1397,7 +1410,7 @@ public class MainActivity extends Activity {
                                 minuteActDiagnostics.add("✓ "+matchLabel+" · "+CompetitionRules.matchMinutes(season,category,selectedCompetition)+" min analizados");
                             }
                             for(String detail:sanctionDetails)
-                                minuteActDiagnostics.add("    ↳ "+matchLabel+" · "+detail+" · reincorporación no confirmada");
+                                minuteActDiagnostics.add("    ↳ "+matchLabel+" · "+detail+" · cálculo según reglamento y cambios del acta");
                             if(perAct!=null){
                                 minuteActCount[0]++;
                                 for(java.util.Map.Entry<String,Integer> e:perAct.entrySet()){
@@ -2278,21 +2291,6 @@ public class MainActivity extends Activity {
                         if(seen.add(id)){int[] a=totals.computeIfAbsent(id,k->new int[12]);a[0]++;if(starter)a[1]++;}
                     }
                     if(seen.isEmpty())continue;coverage++;
-                    java.util.Set<String> sanctioned=new java.util.HashSet<>();
-                    boolean unknownCard=false;
-                    for(String key:new String[]{"temporaryCards","definitiveCards"}){
-                        int cardSide=-1;
-                        for(String raw:act.optString(key).split("\\r?\\n")){
-                            String line=raw.trim();
-                            if(line.matches("(?i)Equipo local:.*"))cardSide=0;
-                            else if(line.matches("(?i)Equipo visitante:.*"))cardSide=1;
-                            else if(line.matches("^\\d+\\. Min .*")){
-                                java.util.regex.Matcher cm=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(line);
-                                String who=cm.find()?dorsals.get(cardSide+":"+cm.group(1)):null;
-                                if(who==null)unknownCard=true;else sanctioned.add(who);
-                            }
-                        }
-                    }
                     java.util.Map<String,Integer> matchMinutes=new java.util.HashMap<>();
                     for(int sideIndex=0;sideIndex<2;sideIndex++){
                         java.util.Map<String,java.util.ArrayList<String>> trace=new java.util.HashMap<>();
@@ -2304,7 +2302,7 @@ public class MainActivity extends Activity {
                             if(!seen.contains(id))continue;
                             int[] a=totals.get(id);
                             if(me.getValue()>0||trace.getOrDefault(me.getKey(),new java.util.ArrayList<>()).stream().anyMatch(e->e.startsWith("Entra")))a[10]++;
-                            if(!unknownCard){int confirmed=confirmedBeforeCard(act.optString("lineups"),act.optString("temporaryCards"),act.optString("definitiveCards"),sideIndex==0,me.getKey(),trace.getOrDefault(me.getKey(),new java.util.ArrayList<>()),CompetitionRules.matchMinutes(season,category,selectedCompetition),me.getValue());if(confirmed>=0){a[9]+=confirmed;a[11]++;matchMinutes.put(id,confirmed);}}
+                            if(!hasUnknownCard(act.optString("lineups"),act.optString("temporaryCards"),act.optString("definitiveCards"),sideIndex==0)){int confirmed=confirmedBeforeCard(act.optString("lineups"),act.optString("temporaryCards"),act.optString("definitiveCards"),sideIndex==0,me.getKey(),trace.getOrDefault(me.getKey(),new java.util.ArrayList<>()),CompetitionRules.matchMinutes(season,category,selectedCompetition),me.getValue());if(confirmed>=0){a[9]+=confirmed;a[11]++;matchMinutes.put(id,confirmed);}}
                         }
                     }
                     for(String id:seen)history.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(g.optString("home")+" – "+g.optString("away")+" · "+(matchMinutes.containsKey(id)?matchMinutes.get(id)+" min verificados":"Minutos no verificados"));
