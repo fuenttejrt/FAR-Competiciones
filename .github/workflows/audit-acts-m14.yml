@@ -34,6 +34,19 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
+          # Read-only schema inventory: never print row data, credentials or schema descriptions.
+          try:
+              schema_req=urllib.request.Request(base+'/rest/v1/',headers={'apikey':key,'Accept':'application/openapi+json'})
+              with opener.open(schema_req,timeout=30) as response: schema=json.load(response)
+              definitions=schema.get('definitions',{})
+              print('Inventario esquema tablas',len(definitions))
+              for table,definition in sorted(definitions.items()):
+                  if not re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*',table): continue
+                  props=definition.get('properties',{})
+                  print('ESQUEMA TABLA',table,'columnas',','.join(sorted(k for k in props if re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*',k))),'obligatorias',','.join(sorted(k for k in definition.get('required',[]) if re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*',k))))
+              print('ESQUEMA RPC',','.join(sorted(p.split('/')[-1] for p in schema.get('paths',{}) if re.fullmatch(r'/rpc/[a-zA-Z_][a-zA-Z0-9_]*',p))))
+          except Exception as exc:
+              print('Inventario esquema no disponible',type(exc).__name__)
           from collections import Counter,defaultdict
           team_totals=defaultdict(Counter)
           players=defaultdict(Counter)
