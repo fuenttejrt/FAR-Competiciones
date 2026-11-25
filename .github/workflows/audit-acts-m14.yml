@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_jugadores:
+        description: Importar realmente jugadores M14 y sus relaciones (autorización explícita)
+        type: boolean
+        default: false
       guardar_actas:
         description: Guardar referencias nuevas y versiones modificadas en Supabase
         type: boolean
@@ -21,6 +25,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_JUGADORES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_jugadores || false }}
           GUARDAR_ACTAS: ${{ github.event_name == 'workflow_dispatch' && inputs.guardar_actas || false }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -654,6 +659,24 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          if os.environ.get('IMPORTAR_JUGADORES')=='true':
+              if os.environ.get('GUARDAR_ACTAS')=='true': raise SystemExit('Ejecutar importación de jugadores por separado')
+              if accepted!=53 or len(identities_expected)!=432 or len(links)!=436 or len(confirmed_teams)!=18: raise SystemExit('Alcance distinto del validado; revisar antes de importar')
+              if changes['estado_correcto']!=accepted or changes['modificada'] or changes['nueva']: raise SystemExit('Actas cambiadas; revisar antes de importar')
+              def write_identities():
+                  request=urllib.request.Request(base+'/rest/v1/rpc/importar_identidades_m14',data=json.dumps(dict(p_filas=identity_payload,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  try:
+                      with opener.open(request,timeout=90) as response: return json.load(response)
+                  except urllib.error.HTTPError as exc:
+                      raise SystemExit('Importación SQL HTTP '+str(exc.code)) from None
+              first=write_identities()
+              if first.get('identidades')!=432 or first.get('relaciones')!=436 or first.get('simulacion') is not False: raise SystemExit('Resultado importación inesperado')
+              print('IMPORTACION 38 jugadores insertados',first['insertados'],'relaciones insertadas',first['relaciones_insertadas'])
+              second=write_identities()
+              if second!=dict(identidades=432,relaciones=436,insertados=0,relaciones_insertadas=0,simulacion=False): raise SystemExit('Repetición importación incorrecta')
+              print('IMPORTACION 38 repetición sin duplicados correcta')
+          else:
+              print('IMPORTACION 38 escritura no autorizada; solo simulación')
           if os.environ.get('GUARDAR_ACTAS')!='true':
               print('Plan de versiones solo lectura; ninguna escritura')
           else:
