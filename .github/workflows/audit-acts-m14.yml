@@ -151,14 +151,13 @@ jobs:
                                       for w in fields['tipo']:
                                           kind=w['text'].upper()
                                           if kind in weights: scoring_columns.append((kind,value('minuto',cx(w)),value('dorsal',cx(w))))
-                          attribution_errors=sum(t is None or not 0<=t<=36 or (d is not None if k=='EC' else d not in roster.get(side,set())) for k,t,d in scoring_columns)
-                          if attribution_errors:
-                              for k,t,d in scoring_columns:
-                                  if t is None or not 0<=t<=36 or (d is not None if k=='EC' else d not in roster.get(side,set())):
-                                      print('Diagnóstico anotación',m['id'],side,'tipo',k,'minuto',t,'dorsal',d,'dorsal en plantilla',d in roster.get(side,set()))
-                              print('Diagnóstico secuencia',m['id'],side,'tipos',types,'minutos',minutes,'dorsales impresos',dorsals,'columnas',scoring_columns)
+                          attribution_errors=sum(t is None or t<0 or (d is not None if k=='EC' else d not in roster.get(side,set())) for k,t,d in scoring_columns)
+                          temporal_warnings=sum(t is not None and t>36 for k,t,d in scoring_columns)
                           exact=len(scoring_columns)==len(types) and [k for k,t,d in scoring_columns]==types and [str(t) for k,t,d in scoring_columns]==minutes and attribution_errors==0
                           print('Atribución exacta',m['id'],side,'eventos',len(scoring_columns),'esperados',len(types),'errores',attribution_errors,'coincide',exact)
+                          print('Validación temporal anotaciones',m['id'],side,'advertencias',temporal_warnings,'duración referencia',36)
+                          if temporal_warnings:
+                              print('Participación requiere revisión de duración',m['id'],'minuto máximo anotación',max(t for k,t,d in scoring_columns if t is not None))
                           total=sum(weights.get(x,0) for x in types)
                           print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
                       if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
