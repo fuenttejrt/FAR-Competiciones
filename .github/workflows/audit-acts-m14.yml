@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       guardar_actas:
-        description: Guardar referencias de actas nuevas en Supabase
+        description: Guardar referencias nuevas y versiones modificadas en Supabase
         type: boolean
         default: false
 concurrency:
@@ -478,7 +478,7 @@ jobs:
                       rankings[(scope,kind,metric)]=ranking(rows,fn,desc)
               print('Rankings ámbito',scope,'equipos',len(scoped_teams),'jugadores únicos',len(scoped_players))
           print('Rankings calculados',len(rankings),'ámbitos',len(scopes),'sin publicar identidades')
-          # Read-only preflight: never overwrite or publish act data here.
+          # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
               ids=[str(x['partido_id']) for x in version_plan[start:start+50]]
@@ -504,13 +504,23 @@ jobs:
           else:
               from datetime import datetime,timezone
               if urllib.parse.urlparse(base).scheme!='https' or not urllib.parse.urlparse(base).hostname.endswith('.supabase.co'): raise SystemExit('Destino no admitido')
-              if changes['modificada']: raise SystemExit('Hay versiones modificadas; histórico aún no habilitado')
               now=datetime.now(timezone.utc).isoformat()
               rows=[dict(c,version=1,datos={'alcance':'referencia_y_validacion_anotacion_temporal'},descargada_en=now,comprobada_en=now,actualizada_en=now,version_procesador='m14-metadata-1') for c in version_plan if c['partido_id'] not in existing]
               if rows:
                   req=urllib.request.Request(base+'/rest/v1/actas?on_conflict=partido_id',data=json.dumps(rows).encode(),headers={'apikey':key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},method='POST')
                   with opener.open(req,timeout=60) as response:
                       if response.status not in (200,201,204): raise SystemExit('Inserción no confirmada')
+              updated=0
+              for c in version_plan:
+                  old=existing.get(c['partido_id'])
+                  if old is None or old['hash_contenido']==c['hash_contenido']: continue
+                  args=dict(p_partido_id=c['partido_id'],p_version_esperada=old['version'],p_hash_anterior=old['hash_contenido'],p_hash_nuevo=c['hash_contenido'],p_url_pdf=c['url_pdf'],p_estado=c['estado_validacion'],p_datos={'alcance':'referencia_y_validacion_anotacion_temporal','reprocesamiento_pendiente':True})
+                  req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_version_acta',data=json.dumps(args).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  with opener.open(req,timeout=60) as response: version=json.load(response)
+                  if version!=old['version']+1: raise SystemExit('Versión nueva inesperada')
+                  history=get('actas_versiones',{'acta_id':'eq.'+str(old['id']),'version':'eq.'+str(old['version']),'select':'hash_contenido'})
+                  if len(history)!=1 or history[0]['hash_contenido']!=old['hash_contenido']: raise SystemExit('Histórico no confirmado')
+                  updated+=1
               confirmed={}
               for start in range(0,len(version_plan),50):
                   ids=[str(x['partido_id']) for x in version_plan[start:start+50]]
@@ -519,5 +529,12 @@ jobs:
                       confirmed[row['partido_id']]=row
               if len(confirmed)!=accepted or any(confirmed.get(c['partido_id'],{}).get('hash_contenido')!=c['hash_contenido'] for c in version_plan): raise SystemExit('Verificación de escritura incorrecta')
               print('Importación referencias confirmadas',len(confirmed),'nuevas previstas',len(rows),'existentes',len(existing))
-              print('Sin datos personales ni sustitución de versiones')
+              for c in version_plan:
+                  old=existing.get(c['partido_id'])
+                  changed=old is not None and old['hash_contenido']!=c['hash_contenido']
+                  expected=1 if old is None else old['version']+int(changed)
+                  if confirmed[c['partido_id']]['version']!=expected: raise SystemExit('Versión final inesperada')
+                  if changed and confirmed[c['partido_id']]['estado_validacion']!='pendiente': raise SystemExit('Reprocesamiento no marcado')
+              print('Versiones modificadas confirmadas',updated,'pendientes de reprocesamiento',updated)
+              print('Sin datos personales; histórico habilitado')
           PY
