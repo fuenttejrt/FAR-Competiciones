@@ -171,17 +171,22 @@ jobs:
                                           print('Validación eventos',m['id'],heading,side,'minutos ausentes',missing_minute,'dorsales inválidos',unknown_dorsal,'entra igual sale',same_dorsal)
                                           print(heading,side,'eventos',len(events),'incompletos',invalid,'tokens desconocidos',len(unknown))
                               if found!={'local','visitante'}: print(heading,'bloques incompletos',len(found))
-                      # Diagnostic simulation only: ordinary M14 duration 36, temporary suspension 5.
+                      # Compare simultaneous events by shared dorsals; independent events commute.
+                      occupancy={}
                       for side in ('local','visitante'):
                           active=set(starting[side]); banned=set(); suspended={}; minutes={d:0 for d in roster[side]}
-                          issues=[]; previous=0; events=sorted(timeline[side],key=lambda e:e[0])
+                          issues=[]; compatible=0; ambiguous=0; counts=[]
+                          events=sorted(timeline[side],key=lambda e:e[0])
                           for t in range(37):
-                              for d,end in list(suspended.items()):
-                                  if end==t:
-                                      del suspended[d]
-                                      if d not in banned: active.add(d)
+                              returning={d for d,end in suspended.items() if end==t}
+                              for d in returning:
+                                  del suspended[d]
+                                  if d not in banned: active.add(d)
                               current=[e for e in events if e[0]==t]
-                              if len(current)>1: issues.append('simultáneos')
+                              touched=[d for e in current for d in e[2]]
+                              if len(touched)!=len(set(touched)) or returning.intersection(touched):
+                                  ambiguous+=1; issues.append('orden ambiguo')
+                              elif len(current)>1: compatible+=1
                               for _,kind,ds,code in current:
                                   if kind=='Cambios':
                                       enter,leave=ds
@@ -195,9 +200,15 @@ jobs:
                                       else: suspended[d]=t+5
                               if len(active)>15: issues.append('exceso jugadores')
                               if t<36:
+                                  counts.append(len(active))
                                   for d in active: minutes[d]+=1
                           if any(e[0]<0 or e[0]>36 for e in events): issues.append('minuto fuera duración')
-                          print('Simulación participación',m['id'],side,'titulares',len(starting[side]),'jugadores con minutos',sum(v>0 for v in minutes.values()),'minutos acumulados',sum(minutes.values()),'incidencias',len(issues),'tipos',','.join(sorted(set(issues))) or 'ninguna')
+                          if sum(minutes.values())!=sum(counts) or any(v<0 or v>36 for v in minutes.values()): issues.append('balance minutos')
+                          occupancy[side]=counts
+                          print('Simulación participación',m['id'],side,'titulares',len(starting[side]),'jugadores con minutos',sum(v>0 for v in minutes.values()),'minutos acumulados',sum(minutes.values()),'simultáneos compatibles',compatible,'ambiguos',ambiguous,'incidencias',len(issues),'tipos',','.join(sorted(set(issues))) or 'ninguna')
+                      differences=[a-b for a,b in zip(occupancy['local'],occupancy['visitante'])]
+                      equal=sum(d==0 for d in differences); superior=sum(d>0 for d in differences); inferior=sum(d<0 for d in differences)
+                      print('Balance numérico',m['id'],'igualdad',equal,'superior local',superior,'superior visitante',inferior,'minutos diferencia local',sum(max(0,d) for d in differences),'minutos diferencia visitante',sum(max(0,-d) for d in differences),'coincide',equal+superior+inferior==36)
                       with pdfplumber.open(io.BytesIO(raw)) as doc:
                           page=doc.pages[0]
                           for side in (0,1):
