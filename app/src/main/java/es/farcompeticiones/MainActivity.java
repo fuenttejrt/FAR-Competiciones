@@ -1302,7 +1302,7 @@ public class MainActivity extends Activity {
                 for(org.json.JSONObject game:games){String url=game.optString("actUrl","");if(url.startsWith("https://farugby.matchready.es/")&&!cache.contains(url)&&!attemptedActs.contains(url)&&!missing.contains(url))missing.add(url);}
                 if(!loadingActs[0]&&!missing.isEmpty()){
                     loadingActs[0]=true;attemptedActs.addAll(missing);
-                    new Thread(()->{com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());for(String url:missing){try{org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);if(!parsed.optString("lineups","").trim().isEmpty())cache.edit().putString(url,parsed.toString()).apply();}catch(Exception ignored){}}
+                    new Thread(()->{com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());for(String url:missing){try{org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);if(!parsed.optString("lineups","").trim().isEmpty())cache.edit().putString(url,parsed.toString()).putLong("validated_at:"+url,System.currentTimeMillis()).apply();}catch(Exception ignored){}}
                     runOnUiThread(()->{loadingActs[0]=false;if(dialog.isShowing()&&active[0]==4&&redrawRef[0]!=null)redrawRef[0].run();});}).start();
                 }
                 if(loadingActs[0])content.addView(txt("Consultando actas oficiales…",12,0xff75e6b2));
@@ -1396,6 +1396,15 @@ public class MainActivity extends Activity {
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
                 if(active[0]==7){
                     renderActValidation(content,matches,team);
+                    android.content.SharedPreferences validationCache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
+                    java.util.ArrayList<String> stale=new java.util.ArrayList<>();
+                    for(org.json.JSONObject match:matches){String url=match.optString("actUrl");if(standingMatchScore(match.optString("score"))!=null&&url.startsWith("https://farugby.matchready.es/")&&System.currentTimeMillis()-validationCache.getLong("validated_at:"+url,0)>86400000L&&!attemptedActs.contains("validation:"+url)&&!stale.contains(url))stale.add(url);}
+                    if(!loadingActs[0]&&!stale.isEmpty()){
+                        loadingActs[0]=true;for(String url:stale)attemptedActs.add("validation:"+url);
+                        content.addView(txt("Comprobando actualizaciones de actas…",12,0xff75e6b2),0);
+                        new Thread(()->{com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());for(String url:stale){try{org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);if(!parsed.optString("lineups").trim().isEmpty())validationCache.edit().putString(url,parsed.toString()).putLong("validated_at:"+url,System.currentTimeMillis()).apply();}catch(Exception ignored){}}
+                        runOnUiThread(()->{loadingActs[0]=false;if(dialog.isShowing()&&active[0]==7&&redrawRef[0]!=null)redrawRef[0].run();});}).start();
+                    }
                 }else if(active[0]==6){
                     renderTeamSanctions(content,matches,team,CompetitionRules.matchMinutes(season,category,selectedCompetition));
                 }else if(active[0]==3||active[0]==5){
@@ -1437,7 +1446,7 @@ public class MainActivity extends Activity {
                                     try{
                                         org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);
                                         if(parsed.optString("lineups","").trim().isEmpty())throw new java.io.IOException("El lector no ha identificado las alineaciones");
-                                        actCache.edit().putString(url,parsed.toString()).apply();
+                                        actCache.edit().putString(url,parsed.toString()).putLong("validated_at:"+url,System.currentTimeMillis()).apply();
                                         actErrors.remove(url);
                                     }catch(Exception error){
                                         synchronized(actErrors){actErrors.put(url,error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage()));}
