@@ -592,6 +592,25 @@ jobs:
           print('SIMULACION IDENTIDADES',len(identities_expected),'relaciones',len(simulated_players),'equipos',len(simulated_teams),'actas',accepted)
           print('SIMULACION TOTALES ensayos',sum(r['ensayos'] for r in simulated_players),'minutos',sum(r['minutos_jugados'] for r in simulated_players),'puntos',sum(r['puntos'] for r in simulated_players))
           print('SIMULACION solo memoria; sin IDs definitivos ni escrituras')
+          # Resolve existing identities and validate references before allocating database IDs.
+          identity_rows=inventory.get('jugadores')
+          if identity_rows is None: raise SystemExit('Inventario jugadores no disponible')
+          existing_identity={str(row['licencia']):row['id'] for row in identity_rows if row.get('licencia')}
+          if len(existing_identity)!=sum(bool(row.get('licencia')) for row in identity_rows): raise SystemExit('Licencia duplicada')
+          candidate_teams=set(team_totals)
+          confirmed_teams=set()
+          for team in candidate_teams:
+              rows=get('equipos',{'id':'eq.'+str(team),'select':'id'})
+              if len(rows)!=1 or rows[0]['id']!=team: raise SystemExit('Equipo sin referencia válida')
+              confirmed_teams.add(team)
+          # Temporary negative IDs are used only in memory; real IDs must be returned by PostgreSQL.
+          mapping={ident:existing_identity.get(str(ident),-i) for i,ident in enumerate(sorted(identities_expected,key=str),1)}
+          if len(set(mapping.values()))!=len(mapping): raise SystemExit('Colisión identidad')
+          links={(mapping[ident],team) for team,ident in players}
+          if len(links)!=len(players): raise SystemExit('Relación duplicada')
+          print('IDENTIDAD PLAN existentes',sum(v>0 for v in mapping.values()),'nuevos',sum(v<0 for v in mapping.values()),'equipos confirmados',len(confirmed_teams),'relaciones',len(links))
+          print('IDENTIDAD PLAN jugadores multiequipo',sum(n>1 for n in Counter(j for j,t in links).values()))
+          print('IDENTIDAD PLAN solo lectura; IDs temporales no persistidos')
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
