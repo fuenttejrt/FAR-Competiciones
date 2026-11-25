@@ -46,15 +46,18 @@ jobs:
                   words=page.extract_words(x_tolerance=3,y_tolerance=2)
                   licences=set()
                   roster={}
+                  rejected={}
+                  staff_ids=set()
                   for side in (0,1):
                       col=[w for w in words if (w['x0']<page.width/2)==(side==0)]
                       anchors=[w for w in col if re.fullmatch(r'\d{7}',w['text'])]
                       headers=sorted(w['top'] for w in col if 'dorsal' in w['text'].casefold())
                       parsed=[]; unmatched=0
+                      rejected[side]=[]
                       for anchor in anchors:
                           line=' '.join(w['text'] for w in sorted([w for w in col if abs(w['top']-anchor['top'])<2],key=lambda w:w['x0']))
                           player=re.fullmatch(r'\s*(\d{1,3})\s+(?:[XC]\s+)?(.+?)\s+(\d{7})(?:\s+F)?\s*',line)
-                          if not player or 'licencia' in player.group(2).casefold(): unmatched+=1; continue
+                          if not player or 'licencia' in player.group(2).casefold(): unmatched+=1; rejected[side].append(anchor['text']); continue
                           parsed.append((anchor['top'],int(player.group(1)),player.group(3)))
                       roster['local' if side==0 else 'visitante']={x[1] for x in parsed}
                       split=next((y for y in headers if parsed and y>min(x[0] for x in parsed)+2),None)
@@ -136,6 +139,27 @@ jobs:
                                       if minute is None or any(d is None or d not in roster.get(side,set()) for d in dorsals) or (len(dorsals)==2 and dorsals[0]==dorsals[1]): invalid+=1
                                   print(heading,side,'eventos',len(events),'incompletos',invalid,'tokens desconocidos',len(unknown))
                       if found!={'local','visitante'}: print(heading,'bloques incompletos',len(found))
+              with pdfplumber.open(io.BytesIO(raw)) as doc:
+                  page=doc.pages[0]
+                  for side in (0,1):
+                      region=page.crop((side*page.width/2,0,(side+1)*page.width/2,page.height))
+                      lines=(region.extract_text(x_tolerance=3,y_tolerance=2) or '').splitlines()
+                      for role in ('Entrenador','Delegado','Juez línea'):
+                          hits=[]
+                          for i,line in enumerate(lines):
+                              match=re.match(r'^\s*'+re.escape(role)+r'\s*:\s*(.*)$',line,re.I)
+                              if not match: continue
+                              name=match.group(1).strip()
+                              licence=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{7})\b',lines[i+1]) if i+1<len(lines) else None
+                              if name and licence and any(c.isalpha() for c in name):
+                                  hits.append(licence.group(1))
+                          if len(hits)==1: staff_ids.add(hits[0])
+                          print('Personal',role,'local' if side==0 else 'visitante','registros completos',len(hits))
+                  first=doc.pages[0].extract_text(x_tolerance=3,y_tolerance=2) or ''
+                  referee=re.search(r'(?is)Árbitro\s+N[ºo]\s*Licencia del árbitro[^\n]*\n\s*([^\d\n]+?)\s+(\d{7})\b',first)
+                  if referee: staff_ids.add(referee.group(2))
+                  print('Árbitro principal completo',bool(referee))
+                  print('Filas excluidas de alineación explicadas por personal',sum(x in staff_ids for ids in rejected.values() for x in ids),'de',sum(map(len,rejected.values())))
               for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
                   print(term, 'detectado' if term in content.casefold() else 'no detectado')
           PY
