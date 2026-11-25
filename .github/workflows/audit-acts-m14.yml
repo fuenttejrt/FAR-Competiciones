@@ -1,5 +1,8 @@
 name: Auditar formatos de todas las actas M14
 on:
+  push:
+    paths:
+      - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
       guardar_actas:
@@ -18,7 +21,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
-          GUARDAR_ACTAS: ${{ inputs.guardar_actas }}
+          GUARDAR_ACTAS: ${{ github.event_name == 'workflow_dispatch' && inputs.guardar_actas || false }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
