@@ -31,6 +31,7 @@ jobs:
           accepted=0
           expected_acts=0
           round_totals=defaultdict(Counter)
+          team_competition={}
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1: raise SystemExit('Competición ambigua')
@@ -357,6 +358,7 @@ jobs:
                           continue
                       for side,other in [('local','visitante'),('visitante','local')]:
                           team_id=m['equipo_'+side+'_id']
+                          team_competition[team_id]=cid
                           tc=team_totals[team_id]
                           tc['actas']+=1
                           pf=sum(weights[k] for k,t,d in scores[side])
@@ -427,4 +429,41 @@ jobs:
           if sum(c['superioridad'] for c in team_totals.values())!=sum(c['inferioridad'] for c in team_totals.values()): raise SystemExit('Balance superioridad incorrecto')
           if any(c['minutos']>c['minutos_posibles'] for c in players.values()): raise SystemExit('Participación incorrecta')
           print('Avanzadas registros equipos',len(team_metrics),'jugadores',len(player_metrics),'equipo jornada',len(round_totals))
+          from fractions import Fraction
+          def rate(c,n,d):
+              return Fraction(c[n],c[d]) if c[d] else None
+          def ranking(rows,metric,descending=True):
+              values=[(i,metric(c)) for i,c in rows.items()]
+              values=[(i,v) for i,v in values if v is not None]
+              values.sort(key=lambda x:x[1],reverse=descending)
+              result=[]
+              previous=None
+              position=0
+              for index,(i,v) in enumerate(values,1):
+                  if v!=previous: position=index
+                  result.append((i,position,v))
+                  previous=v
+              if len({i for i,p,v in result})!=len(result): raise SystemExit('Ranking duplicado')
+              for index,(i,p,v) in enumerate(result):
+                  if index and v==result[index-1][2] and p!=result[index-1][1]: raise SystemExit('Empate incorrecto')
+                  if (not index or v!=result[index-1][2]) and p!=index+1: raise SystemExit('Posición incorrecta')
+              return result
+          player_specs={'puntos':(lambda c:c['puntos'],True),'ensayos':(lambda c:c['E'],True),'transformaciones':(lambda c:c['T'],True),'minutos':(lambda c:c['minutos'] if c['actas_participacion'] else None,True),'participacion':(lambda c:rate(c,'minutos','minutos_posibles'),True),'titularidades':(lambda c:c['titularidades'],True),'amarillas':(lambda c:c['Expulsiones temporales'],True),'rojas':(lambda c:c['Expulsiones definitivas'],True)}
+          team_specs={'ataque':(lambda c:rate(c,'puntos_favor','partidos'),True),'defensa':(lambda c:rate(c,'puntos_contra','partidos'),False),'ensayos':(lambda c:c['E'],True),'victorias':(lambda c:rate(c,'victorias','partidos'),True),'superioridad':(lambda c:rate(c,'superioridad','minutos_balance'),True),'amarillas':(lambda c:c['Expulsiones temporales'],True),'rojas':(lambda c:c['Expulsiones definitivas'],True)}
+          scopes={'M14':set(team_totals),'Segunda':{i for i in team_totals if team_competition[i] in ('12','15')}}
+          scopes.update({cid:{i for i in team_totals if team_competition[i]==cid} for cid in ('11','12','15')})
+          scopes.update({'equipo:'+str(i):{i} for i in team_totals})
+          rankings={}
+          for scope,ids in scopes.items():
+              # Combine the same licence across teams within the selected scope.
+              scoped_players=defaultdict(Counter)
+              for (team,ident),c in players.items():
+                  if team in ids: scoped_players[ident].update(c)
+              scoped_teams={i:c for i,c in team_totals.items() if i in ids}
+              for kind,rows,specs in [('jugadores',scoped_players,player_specs),('equipos',scoped_teams,team_specs)]:
+                  if kind=='equipos' and scope.startswith('equipo:'): continue
+                  for metric,(fn,desc) in specs.items():
+                      rankings[(scope,kind,metric)]=ranking(rows,fn,desc)
+              print('Rankings ámbito',scope,'equipos',len(scoped_teams),'jugadores únicos',len(scoped_players))
+          print('Rankings calculados',len(rankings),'ámbitos',len(scopes),'sin publicar identidades')
           PY
