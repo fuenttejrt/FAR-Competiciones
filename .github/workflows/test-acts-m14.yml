@@ -7,7 +7,7 @@ jobs:
   probar:
     runs-on: ubuntu-latest
     steps:
-      - run: python -m pip install pypdf
+      - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -16,6 +16,7 @@ jobs:
           python - <<'PY'
           import os,json,urllib.request,urllib.parse,io,hashlib,re
           from pypdf import PdfReader
+          import pdfplumber
           base=os.environ['SUPABASE_URL'].rstrip('/')
           key=os.environ['SUPABASE_SECRET_KEY']
           class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -40,6 +41,26 @@ jobs:
               if not content.strip(): raise SystemExit('PDF sin texto extraíble')
               print('Competición',cid,'partido interno',m['id'],'páginas',len(pdf.pages),'caracteres',len(content),'SHA256',hashlib.sha256(raw).hexdigest())
               print('Marcador calendario:',m['puntos_local'],m['puntos_visitante'])
+              with pdfplumber.open(io.BytesIO(raw)) as doc:
+                  page=doc.pages[0]
+                  words=page.extract_words(x_tolerance=3,y_tolerance=2)
+                  licences=set()
+                  for side in (0,1):
+                      col=[w for w in words if (w['x0']<page.width/2)==(side==0)]
+                      anchors=[w for w in col if re.fullmatch(r'\d{7}',w['text'])]
+                      headers=sorted(w['top'] for w in col if 'dorsal' in w['text'].casefold())
+                      parsed=[]; unmatched=0
+                      for anchor in anchors:
+                          line=' '.join(w['text'] for w in sorted([w for w in col if abs(w['top']-anchor['top'])<2],key=lambda w:w['x0']))
+                          player=re.fullmatch(r'\s*(\d{1,3})\s+(?:[XC]\s+)?(.+?)\s+(\d{7})(?:\s+F)?\s*',line)
+                          if not player or 'licencia' in player.group(2).casefold(): unmatched+=1; continue
+                          parsed.append((anchor['top'],int(player.group(1)),player.group(3)))
+                      split=next((y for y in headers if parsed and y>min(x[0] for x in parsed)+2),None)
+                      starters=sum(x[0]<split for x in parsed) if split is not None else None
+                      duplicates=len(parsed)-len({x[1] for x in parsed})
+                      repeated=sum(x[2] in licences for x in parsed)
+                      licences.update(x[2] for x in parsed)
+                      print('Alineación', 'local' if side==0 else 'visitante','filas',len(parsed),'titulares',starters,'suplentes',len(parsed)-starters if starters is not None else None,'filas no reconocidas',unmatched,'dorsales repetidos',duplicates,'licencias cruzadas',repeated,'separación explícita',split is not None)
               for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
                   print(term, 'detectado' if term in content.casefold() else 'no detectado')
           PY
