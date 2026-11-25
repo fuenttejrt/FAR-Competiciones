@@ -573,6 +573,25 @@ jobs:
           print('Auditoría nombres y marcas',dict(sorted(roster_audit.items())))
           print('Calidad nombres: distribución de palabras y anomalías',dict(sorted((k,v) for k,v in roster_audit.items() if k.startswith(('nombre_palabras_','nombre_contiene_','nombre_posible_')))))
           print('Identidades con variantes de nombre',sum(len(v)>1 for v in name_variants.values()),'identidades con nombre candidato',len(name_variants))
+          # Simulate aggregate import using logical identities; no database IDs allocated.
+          simulated_players=[]
+          for (team,ident),c in players.items():
+              simulated_players.append(dict(equipo_id=team,identity=ident,convocatorias=c['convocatorias'],titularidades=c['titularidades'],partidos_jugados=c['jugados'],minutos_jugados=c['minutos'],minutos_posibles=c['minutos_posibles'],ensayos=c['E'],transformaciones=c['T'],puntos=c['puntos'],amarillas=c['Expulsiones temporales'],rojas=c['Expulsiones definitivas'],actas_participacion_verificada=c['actas_participacion'],datos_adicionales=player_metrics[(team,ident)]))
+          simulated_teams=[dict(equipo_id=team,partidos_jugados=c['partidos'],victorias=c['victorias'],empates=c['empates'],derrotas=c['derrotas'],puntos_favor=c['puntos_favor'],puntos_contra=c['puntos_contra'],ensayos_favor=c['E'],ensayos_contra=c['ensayos_contra'],transformaciones=c['T'],ensayos_castigo_favor=c['EC'],amarillas=c['Expulsiones temporales'],rojas=c['Expulsiones definitivas'],minutos_superioridad=c['superioridad'],minutos_inferioridad=c['inferioridad'],actas_comprobadas=c['actas'],datos_adicionales=team_metrics[team]) for team,c in team_totals.items()]
+          identities_expected={ident for team,ident in players}
+          if identities_expected-set(name_variants): raise SystemExit('Identidad sin nombre candidato')
+          if any(len(name_variants[i])!=1 for i in identities_expected): raise SystemExit('Nombre ambiguo')
+          for table,rows,keys in [('estadisticas_jugadores',simulated_players,('equipo_id','identity')),('estadisticas_equipos',simulated_teams,('equipo_id',))]:
+              indexed={tuple(row[k] for k in keys):row for row in rows}
+              if len(indexed)!=len(rows): raise SystemExit('Clave simulada duplicada')
+              # Repeat replacement, not addition, and verify identical serialized result.
+              before=json.dumps(list(indexed.values()),sort_keys=True)
+              indexed.update({tuple(row[k] for k in keys):row for row in rows})
+              if before!=json.dumps(list(indexed.values()),sort_keys=True): raise SystemExit('Simulación no idempotente')
+              print('SIMULACION AGREGADOS',table,'filas',len(rows),'repetición sin duplicados',True)
+          print('SIMULACION IDENTIDADES',len(identities_expected),'relaciones',len(simulated_players),'equipos',len(simulated_teams),'actas',accepted)
+          print('SIMULACION TOTALES ensayos',sum(r['ensayos'] for r in simulated_players),'minutos',sum(r['minutos_jugados'] for r in simulated_players),'puntos',sum(r['puntos'] for r in simulated_players))
+          print('SIMULACION solo memoria; sin IDs definitivos ni escrituras')
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
