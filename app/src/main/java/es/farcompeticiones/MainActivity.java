@@ -971,6 +971,33 @@ public class MainActivity extends Activity {
         return overlap;
     }
 
+    private void renderActValidation(LinearLayout content,java.util.ArrayList<org.json.JSONObject> matches,String team){
+        android.content.SharedPreferences cache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
+        int total=0,complete=0,partial=0,pending=0;
+        LinearLayout rows=new LinearLayout(this);rows.setOrientation(1);
+        for(org.json.JSONObject game:matches){
+            if(standingMatchScore(game.optString("score"))==null)continue;
+            total++;String url=game.optString("actUrl");boolean local=teamKey(team).equals(teamKey(game.optString("home")));
+            standingSection(rows,game.optString("home")+" – "+game.optString("away")+" · "+game.optString("score"));
+            try{
+                org.json.JSONObject act=new org.json.JSONObject(cache.getString(url,"{}"));
+                if(act.optString("lineups").trim().isEmpty()){pending++;rows.addView(txt("Acta no disponible en caché",12,0xffffc365));continue;}
+                java.util.ArrayList<String[]> events=reconciledScoring(act,game.optString("score"));
+                boolean collective=events!=null,individual=scoringPlayersKnown(act,events);
+                int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
+                boolean changes=duration>0&&verifiedActMinutes(act.optString("lineups"),act.optString("changes"),local,duration,new java.util.HashMap<>())!=null;
+                boolean cards=!act.optString("temporaryCards").isEmpty()&&!act.optString("definitiveCards").isEmpty()&&!hasUnknownCard(act.optString("lineups"),act.optString("temporaryCards"),act.optString("definitiveCards"),local);
+                String[] labels={"Marcador colectivo conciliado","Anotadores identificados","Cambios del equipo comprobados","Tarjetas del equipo identificadas"};
+                boolean[] checks={collective,individual,changes,cards};
+                for(int n=0;n<checks.length;n++)rows.addView(txt((checks[n]?"✓ ":"⚠ ")+labels[n]+(checks[n]?"":" · pendiente"),12,checks[n]?0xff75e6b2:0xffffc365));
+                if(collective&&individual&&changes&&cards)complete++;else partial++;
+            }catch(Exception e){pending++;rows.addView(txt("Acta pendiente de lectura",12,0xffffc365));}
+        }
+        standingSection(content,"Cobertura de validación · "+total+" resultados");
+        LinearLayout metrics=new LinearLayout(this);content.addView(metrics);standingMetric(metrics,""+complete,"Comprobadas");standingMetric(metrics,""+partial,"Parciales");standingMetric(metrics,""+pending,"Pendientes");
+        content.addView(txt("Comprobaciones iniciales sobre actas almacenadas. No certifican todos los datos del documento oficial.",11,0xffb8d4cc));content.addView(rows);
+    }
+
     private void renderTeamSanctions(LinearLayout content,java.util.ArrayList<org.json.JSONObject> matches,String team,int duration){
         int suspension=CompetitionRules.temporarySuspensionMinutes(season,category);
         int checked=0,played=0,shortTime=0,multiple=0,playerTime=0,yellow=0,red=0;
@@ -1027,6 +1054,15 @@ public class MainActivity extends Activity {
                 toggle.setOnClickListener(view->{boolean show=matchDetail.getVisibility()!=View.VISIBLE;matchDetail.setVisibility(show?View.VISIBLE:View.GONE);toggle.setText(show?"Ocultar intervalos  ▴":"Ver intervalos y anotación  ▾");});
                 int[] losses=new int[duration];java.util.TreeMap<Integer,int[]> breakdown=new java.util.TreeMap<>();
                 for(int n=0;n<duration;n++){for(boolean[] x:intervals.values())if(x[n])losses[n]++;breakdown.computeIfAbsent(losses[n],k->new int[3])[0]++;}
+                matchDetail.addView(new View(this){
+                    @Override protected void onDraw(android.graphics.Canvas c){
+                        android.graphics.Paint p=new android.graphics.Paint(3);float left=dp(8),w=getWidth()-2*left,top=dp(12),bottom=dp(36);
+                        for(int n=0;n<duration;n++){int color=losses[n]==0?0xff48dca2:losses[n]==1?0xffffc365:0xffed7979;p.setColor(color);c.drawRect(left+w*n/duration,top,left+w*(n+1)/duration,bottom,p);}
+                        p.setColor(0xffd2e4ef);p.setTextSize(dp(10));p.setTextAlign(android.graphics.Paint.Align.CENTER);
+                        for(int n=0;n<=4;n++){int minute=duration*n/4;float x=left+w*minute/duration;c.drawLine(x,bottom,x,bottom+dp(4),p);c.drawText(""+minute,x,bottom+dp(16),p);}
+                    }
+                },new LinearLayout.LayoutParams(-1,dp(60)));
+                matchDetail.addView(txt("Verde: sin sanciones · Amarillo: uno menos · Rojo: dos o más",11,0xffb8d4cc));
                 int start=0;for(int n=1;n<=duration;n++){if(n==duration||losses[n]!=losses[start]){matchDetail.addView(txt("Min "+start+"–"+n+" · "+(losses[start]==0?"Sin sanciones":losses[start]+" jugador(es) menos"),12,losses[start]==0?0xff75e6b2:0xffffc365));start=n;}}
                 boolean scoringValid=false;
                 try{org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl"),"{}"));java.util.ArrayList<String[]> events=reconciledScoring(act,game.optString("score"));scoringValid=events!=null;
@@ -1196,7 +1232,7 @@ public class MainActivity extends Activity {
         TextView title=txt(team+" · ESTADÍSTICAS",18,0xff75e6b2);
         title.setTypeface(null,android.graphics.Typeface.BOLD);frame.addView(title);
         frame.addView(txt("Temporada "+season+" · "+selectedCompetition,11,0xffb8d4cc));
-        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(1);tabs.setPadding(dp(6),dp(4),dp(6),dp(4));tabs.setBackgroundColor(0xff102233);frame.addView(tabs); android.view.View navDivider=new android.view.View(this);navDivider.setBackgroundColor(0xff45677d);LinearLayout.LayoutParams navDividerLp=new LinearLayout.LayoutParams(-1,dp(2));navDividerLp.setMargins(dp(10),dp(5),dp(10),dp(9));frame.addView(navDivider,navDividerLp); final TextView[] tabButtons=new TextView[7];
+        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(1);tabs.setPadding(dp(6),dp(4),dp(6),dp(4));tabs.setBackgroundColor(0xff102233);frame.addView(tabs); android.view.View navDivider=new android.view.View(this);navDivider.setBackgroundColor(0xff45677d);LinearLayout.LayoutParams navDividerLp=new LinearLayout.LayoutParams(-1,dp(2));navDividerLp.setMargins(dp(10),dp(5),dp(10),dp(9));frame.addView(navDivider,navDividerLp); final TextView[] tabButtons=new TextView[8];
         android.widget.ScrollView scroll=new android.widget.ScrollView(this);
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
         content.setPadding(dp(8),dp(4),dp(8),dp(12));
@@ -1211,7 +1247,7 @@ public class MainActivity extends Activity {
         closeLp.setMargins(dp(14),dp(6),dp(14),dp(10));
         close.setOnClickListener(v->dialog.dismiss());frame.addView(close,closeLp);
         dialog.setContentView(frame);
-        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ataque/Def.","Ranking","Disciplina"};
+        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ataque/Def.","Ranking","Disciplina","Validación"};
         final int[] active={0};
         final boolean[] loadingActs={false};
         final java.util.HashSet<String> attemptedActs=new java.util.HashSet<>();
@@ -1222,7 +1258,7 @@ public class MainActivity extends Activity {
             for(int i=0;i<tabButtons.length;i++){
                 TextView tab=tabButtons[i];
                 tab.setTextColor(i==active[0]?0xff092c25:0xffd9eaff);
-                tab.setCompoundDrawables(null,standingNavIcon(i==6?8:i,i==active[0]?0xff092c25:0xffd9eaff),null,null);
+                tab.setCompoundDrawables(null,standingNavIcon(i==6?8:i==7?9:i,i==active[0]?0xff092c25:0xffd9eaff),null,null);
                 android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{i==active[0]?0xff83e9bf:0xff244f86,i==active[0]?0xff40bc92:0xff17365c});tabBg.setCornerRadius(dp(7));tabBg.setStroke(dp(1),i==active[0]?0xffa5f6d4:0xff507eb1);tab.setBackground(tabBg);
             }
             if(active[0]==4){
@@ -1324,7 +1360,9 @@ public class MainActivity extends Activity {
             }else{
                 if(active[0]!=6)standingSection(content,labels[active[0]]);
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
-                if(active[0]==6){
+                if(active[0]==7){
+                    renderActValidation(content,matches,team);
+                }else if(active[0]==6){
                     renderTeamSanctions(content,matches,team,CompetitionRules.matchMinutes(season,category,selectedCompetition));
                 }else if(active[0]==3||active[0]==5){
                     int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
@@ -2087,6 +2125,8 @@ public class MainActivity extends Activity {
                 q.moveTo(7,3);q.lineTo(17,3);q.lineTo(17,10);q.quadTo(17,15,12,15);q.quadTo(7,15,7,10);q.close();c.drawPath(q,p);q.reset();q.moveTo(7,5);q.lineTo(3,5);q.quadTo(3,12,8,12);q.moveTo(17,5);q.lineTo(21,5);q.quadTo(21,12,16,12);c.drawPath(q,p);c.drawLine(12,15,12,20,p);c.drawLine(7,21,17,21,p);break;
             case 6:
                 c.drawArc(4,4,20,20,35,285,false,p);c.drawLine(20,4,20,10,p);c.drawLine(20,10,14,10,p);break;
+            case 9:
+                c.drawRoundRect(4,2,20,22,2,2,p);q.moveTo(7,12);q.lineTo(10,15);q.lineTo(17,8);c.drawPath(q,p);break;
             case 8:
                 c.save();c.rotate(17,16,12);c.drawRoundRect(12,4,21,20,1.4f,1.4f,p);c.restore();
                 c.save();c.rotate(-13,8,12);p.setStyle(android.graphics.Paint.Style.FILL);c.drawRoundRect(3,4,12,20,1.4f,1.4f,p);c.restore();break;
