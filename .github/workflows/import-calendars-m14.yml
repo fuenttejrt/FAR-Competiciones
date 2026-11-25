@@ -1,0 +1,81 @@
+name: Importar calendarios M14
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: far-supabase-import
+  cancel-in-progress: false
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python -m pip install beautifulsoup4
+      - name: Importar equipos y jornadas
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request,urllib.parse,urllib.error,re,hashlib
+          from datetime import datetime
+          from bs4 import BeautifulSoup
+          base=os.environ['SUPABASE_URL'].rstrip('/')
+          key=os.environ['SUPABASE_SECRET_KEY']
+          u=urllib.parse.urlparse(base)
+          if u.scheme!='https' or not u.hostname or not u.hostname.endswith('.supabase.co') or u.path or u.query or u.username or u.password or not key.startswith('sb_secret_'): raise SystemExit('Configuración incorrecta')
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): return None
+          opener=urllib.request.build_opener(NoRedirect())
+          def api(table,params,row=None):
+              req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),data=None if row is None else json.dumps(row).encode(),headers={'apikey':key,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'})
+              try:
+                  with opener.open(req,timeout=30) as r: return json.load(r)
+              except urllib.error.HTTPError as e: raise SystemExit(f'{table}: HTTP {e.code}')
+          def put(table,conflict,row):
+              result=api(table,{'on_conflict':conflict},row)
+              if len(result)!=1: raise SystemExit('Respuesta inesperada: '+table)
+              return result[0]['id']
+          def norm(s): return ' '.join(s.split())
+          plans=[]
+          for cid in ('11','12','15'):
+              url=f'https://farugby.matchready.es/es/public/calendar/35/{cid}/combined/'
+              with opener.open(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=40) as r: soup=BeautifulSoup(r.read(),'html.parser')
+              comps=api('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
+              if len(comps)!=1: raise SystemExit('Competición no identificada')
+              teams=set(); rounds={}; count=0
+              for t in soup.find_all('table'):
+                  rows=t.find_all('tr')
+                  header=next((r for r in rows if r.find('th')),None)
+                  if not header: continue
+                  labels=[norm(c.get_text(' ',strip=True)).lower() for c in header.find_all(['td','th'],recursive=False)]
+                  if not all(x in labels for x in ('fecha/hora','equipo local','equipo visitante','resultado')): continue
+                  h=t.find_previous(['h1','h2','h3','h4','h5'])
+                  heading=norm(h.get_text(' ',strip=True)) if h else ''
+                  m=re.search(r'Jornada\s+(\d+(?:\.\d+)?)',heading,re.I)
+                  if not m: continue
+                  code=m.group(1)
+                  org=re.split(r'Organizador\s*:',heading,flags=re.I)
+                  dates=set(); venues=set()
+                  if code in rounds: raise SystemExit('Jornada repetida: '+code)
+                  for row in rows[rows.index(header)+1:]:
+                      cells=[norm(c.get_text(' ',strip=True)) for c in row.find_all(['td','th'],recursive=False)]
+                      if len(cells)!=len(labels): continue
+                      a=re.split(r'Árbitro\s*:',cells[labels.index('equipo local')],flags=re.I)[0].strip()
+                      b=re.split(r'Campo\s*:',cells[labels.index('equipo visitante')],flags=re.I)
+                      for name in (a,b[0].strip()):
+                          if name and name.lower()!='descanso': teams.add(name)
+                      if len(b)>1 and b[1].strip(): venues.add(b[1].strip())
+                      d=re.search(r'\d{2}/\d{2}/\d{4}',cells[labels.index('fecha/hora')])
+                      if d: dates.add(datetime.strptime(d.group(),'%d/%m/%Y').date().isoformat())
+                      if a and b[0].strip() and 'descanso' not in (a.lower(),b[0].strip().lower()): count+=1
+                  rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
+              if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
+              plans.append((cid,comps[0]['id'],teams,rounds,count))
+          for cid,comp,teams,rounds,count in plans:
+              for name in sorted(teams):
+                  identity='nombre:'+hashlib.sha256(name.casefold().encode()).hexdigest()
+                  put('equipos','competicion_id,id_oficial',{'competicion_id':comp,'id_oficial':identity,'nombre':name})
+              for row in rounds.values(): put('jornadas','competicion_id,codigo',dict(row,competicion_id=comp))
+              print(f'Competición {cid}: {len(teams)} equipos, {len(rounds)} jornadas, {count} partidos detectados (sin guardar)')
+          PY
