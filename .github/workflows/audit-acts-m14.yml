@@ -629,6 +629,10 @@ jobs:
           expected_probe=dict(identidades=len(identities_expected),relaciones=len(links),nuevos=sum(v<0 for v in mapping.values()),simulacion=True)
           if identity_probe!=expected_probe: raise SystemExit('Validación SQL identidades no coincide')
           print('VALIDACION SQL IDENTIDADES',len(identities_expected),'relaciones',len(links),'nuevos',expected_probe['nuevos'],'solo simulación')
+          # Repeat the installed importer's read-only validation to confirm stable results.
+          with opener.open(req,timeout=60) as response: repeat_probe=json.load(response)
+          if repeat_probe!=expected_probe: raise SystemExit('Repetición SQL no coincide')
+          print('IMPORTADOR 37 simulación repetida correcta; escritura real no ejecutada')
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
