@@ -975,7 +975,7 @@ public class MainActivity extends Activity {
         int[] score=standingMatchScore(official),sums=new int[2];if(score==null)return null;
         boolean[] sides=new boolean[2];int side=-1;
         java.util.ArrayList<String[]> events=new java.util.ArrayList<>();
-        java.util.regex.Pattern pattern=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)\\s*[-·]\\s*Dorsal\\s*(\\d+)");
+        java.util.regex.Pattern pattern=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)(?:\\s*[-·]\\s*Dorsal\\s*(\\d+))?");
         for(String raw:act.optString("scoreboard").split("\\r?\\n")){
             String line=raw.trim();
             if(line.startsWith("Equipo local:")){side=0;sides[0]=true;continue;}
@@ -986,7 +986,7 @@ public class MainActivity extends Activity {
                 String kind=m.group(2).toLowerCase(java.util.Locale.ROOT);
                 if(!(kind.contains("ensayo")||kind.contains("transform")||kind.contains("castigo")||kind.contains("penal")||kind.contains("drop")))return null;
                 sums[side]+=Integer.parseInt(m.group(3));
-                events.add(new String[]{""+side,m.group(4),kind,m.group(3),m.group(1)});
+                events.add(new String[]{""+side,m.group(4)==null?"":m.group(4),kind,m.group(3),m.group(1)});
             }else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))return null;
         }
         return sides[0]&&sides[1]&&sums[0]==score[0]&&sums[1]==score[1]?events:null;
