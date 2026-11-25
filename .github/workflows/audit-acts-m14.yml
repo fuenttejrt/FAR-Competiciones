@@ -25,11 +25,15 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
+          from collections import Counter,defaultdict
+          teams=defaultdict(Counter)
+          players=defaultdict(Counter)
+          accepted=0
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1: raise SystemExit('Competición ambigua')
               rounds=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'})
-              matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante','order':'id.asc'})
+              matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante,equipo_local_id,equipo_visitante_id','order':'id.asc'})
               if not matches: raise SystemExit('Sin actas: '+cid)
               print('Actas a revisar',cid,len(matches))
               for m in matches:
@@ -49,6 +53,11 @@ jobs:
                           words=page.extract_words(x_tolerance=3,y_tolerance=2)
                           licences=set()
                           roster={}
+                          identities={}
+                          scores={}
+                          participation={}
+                          duration_warning=False
+                          score_ok={}
                           starting={}
                           timeline={'local':[],'visitante':[]}
                           rejected={}
@@ -76,6 +85,7 @@ jobs:
                                   if not namewords:
                                       unmatched+=1; rejected[side].append(anchor['text']); continue
                                   parsed.append((anchor['top'],int(dorsal[0]['text']),anchor['text']))
+                              identities['local' if side==0 else 'visitante']={x[1]:x[2] for x in parsed}
                               roster['local' if side==0 else 'visitante']={x[1] for x in parsed}
                               split=next((y for y in headers if parsed and y>min(x[0] for x in parsed)+2),None)
                               starters=sum(x[0]<split for x in parsed) if split is not None else None
@@ -156,6 +166,9 @@ jobs:
                           exact=len(scoring_columns)==len(types) and [k for k,t,d in scoring_columns]==types and [str(t) for k,t,d in scoring_columns]==minutes and attribution_errors==0
                           print('Atribución exacta',m['id'],side,'eventos',len(scoring_columns),'esperados',len(types),'errores',attribution_errors,'coincide',exact)
                           print('Validación temporal anotaciones',m['id'],side,'advertencias',temporal_warnings,'duración referencia',36)
+                          scores[side]=scoring_columns
+                          score_ok[side]=exact and valid and sum(weights.get(x,0) for x in types)==expected
+                          duration_warning=duration_warning or bool(temporal_warnings)
                           if temporal_warnings:
                               print('Participación requiere revisión de duración',m['id'],'minuto máximo anotación',max(t for k,t,d in scoring_columns if t is not None))
                           total=sum(weights.get(x,0) for x in types)
@@ -243,6 +256,7 @@ jobs:
                                   for d in active: minutes[d]+=1
                           if any(e[0]<0 or e[0]>36 for e in events): issues.append('minuto fuera duración')
                           if sum(minutes.values())!=sum(counts) or any(v<0 or v>36 for v in minutes.values()): issues.append('balance minutos')
+                          participation[side]=(minutes,not issues)
                           occupancy[side]=counts
                           print('Simulación participación',m['id'],side,'titulares',len(starting[side]),'jugadores con minutos',sum(v>0 for v in minutes.values()),'minutos acumulados',sum(minutes.values()),'simultáneos compatibles',compatible,'ambiguos',ambiguous,'incidencias',len(issues),'tipos',','.join(sorted(set(issues))) or 'ninguna')
                       differences=[a-b for a,b in zip(occupancy['local'],occupancy['visitante'])]
@@ -335,8 +349,45 @@ jobs:
                                       print('Ancla pendiente','local' if side==0 else 'visitante','altura relativa',round(a['top']/page.height,3),'etiquetas próximas',','.join(labels),'números en fila',sum(w['text'].isdigit() for w in row))
                           print('Árbitro principal completo',bool(referee_id))
                           print('Filas excluidas de alineación explicadas por personal',sum(x in staff_ids for ids in rejected.values() for x in ids),'de',sum(map(len,rejected.values())))
+                      if not all(score_ok.get(side,False) for side in ('local','visitante')):
+                          print('Consolidación rechazada',m['id'])
+                          continue
+                      for side,other in [('local','visitante'),('visitante','local')]:
+                          team_id=m['equipo_'+side+'_id']
+                          tc=teams[team_id]
+                          tc['actas']+=1
+                          tc['puntos_favor']+=sum(weights[k] for k,t,d in scores[side])
+                          tc['puntos_contra']+=sum(weights[k] for k,t,d in scores[other])
+                          tc['convocatorias']+=len(roster[side])
+                          mins,ok=participation[side]
+                          reliable=ok and not duration_warning
+                          tc['actas_participacion']+=int(reliable)
+                          for d,ident in identities[side].items():
+                              pc=players[(team_id,ident)]
+                              pc['convocatorias']+=1
+                              pc['titularidades']+=int(d in starting[side])
+                              if reliable:
+                                  pc['minutos']+=mins[d]
+                                  pc['jugados']+=int(mins[d]>0)
+                                  pc['actas_participacion']+=1
+                          for k,t,d in scores[side]:
+                              tc[k]+=1
+                              if k!='EC':
+                                  pc=players[(team_id,identities[side][d])]
+                                  pc[k]+=1
+                                  pc['puntos']+=weights[k]
+                          for minute,kind,ds,code in timeline[side]:
+                              if kind!='Cambios':
+                                  tc[kind]+=1
+                                  players[(team_id,identities[side][ds[0]])][kind]+=1
+                      accepted+=1
                       for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
                           print(term, 'detectado' if term in content.casefold() else 'no detectado')
                   except Exception as exc:
                       print('Error de auditoría partido',m['id'],type(exc).__name__)
+          print('Consolidación actas aceptadas',accepted,'equipos',len(teams),'jugadores por equipo',len(players))
+          for field in ('convocatorias','E','T','EC','puntos_favor','puntos_contra','actas_participacion','Expulsiones temporales','Expulsiones definitivas'):
+              print('Consolidación equipos',field,sum(c[field] for c in teams.values()))
+          for field in ('convocatorias','titularidades','E','T','puntos','minutos','actas_participacion','Expulsiones temporales','Expulsiones definitivas'):
+              print('Consolidación jugadores',field,sum(c[field] for c in players.values()))
           PY
