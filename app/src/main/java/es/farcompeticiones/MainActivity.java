@@ -974,6 +974,7 @@ public class MainActivity extends Activity {
     private void renderTeamSanctions(LinearLayout content,java.util.ArrayList<org.json.JSONObject> matches,String team,int duration){
         int suspension=CompetitionRules.temporarySuspensionMinutes(season,category);
         int checked=0,played=0,shortTime=0,multiple=0,playerTime=0,yellow=0,red=0;
+        int superior=0,equal=0,inferior=0,relativeChecked=0;
         int[][] venue=new int[2][3];
         java.util.ArrayList<String> labels=new java.util.ArrayList<>();
         java.util.ArrayList<Integer> times=new java.util.ArrayList<>();
@@ -982,34 +983,35 @@ public class MainActivity extends Activity {
         for(org.json.JSONObject game:matches){
             if(standingMatchScore(game.optString("score"))==null)continue;
             played++;boolean local=teamKey(team).equals(teamKey(game.optString("home")));int v=local?0:1;
-            int y=0,r=0,one=0,many=0,loss=0;boolean valid=duration>0;
-            java.util.Map<String,boolean[]> intervals=new java.util.HashMap<>();
+            int y=0,r=0,one=0,many=0,loss=0;boolean valid=duration>0,rivalValid=duration>0;
+            java.util.Map<String,boolean[]> intervals=new java.util.HashMap<>(),rivalIntervals=new java.util.HashMap<>();
             try{
                 org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl"),"{}"));
                 for(String key:new String[]{"temporaryCards","definitiveCards"}){
-                    int side=-1;boolean found=false;String raw=act.optString(key);
+                    int side=-1;boolean found=false,rivalFound=false;String raw=act.optString(key);
                     for(String line:raw.split("\\r?\\n")){
                         String t=line.trim();
-                        if(t.matches("(?i)Equipo local:.*")){side=0;if(local)found=true;continue;}
-                        if(t.matches("(?i)Equipo visitante:.*")){side=1;if(!local)found=true;continue;}
+                        if(t.matches("(?i)Equipo local:.*")){side=0;if(local)found=true;else rivalFound=true;continue;}
+                        if(t.matches("(?i)Equipo visitante:.*")){side=1;if(!local)found=true;else rivalFound=true;continue;}
                         if(!t.matches("(?i)^\\d+\\.\\s*Min.*"))continue;
-                        if(side<0){valid=false;continue;}if(side!=(local?0:1))continue;
+                        if(side<0){valid=false;rivalValid=false;continue;}boolean own=side==(local?0:1);
                         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+).*?Dorsal\\s*(\\d+)").matcher(t);
                         boolean definitive=key.equals("definitiveCards");
-                        if(!m.find()||duration<=0||(!definitive&&suspension<=0)){valid=false;continue;}
-                        int from=Integer.parseInt(m.group(1));if(from<0||from>duration){valid=false;continue;}
-                        if(definitive)r++;else y++;
-                        boolean[] interval=intervals.computeIfAbsent(m.group(2),k->new boolean[duration]);
+                        if(!m.find()||duration<=0||(!definitive&&suspension<=0)){if(own)valid=false;else rivalValid=false;continue;}
+                        int from=Integer.parseInt(m.group(1));if(from<0||from>duration){if(own)valid=false;else rivalValid=false;continue;}
+                        if(own){if(definitive)r++;else y++;}
+                        boolean[] interval=(own?intervals:rivalIntervals).computeIfAbsent(m.group(2),k->new boolean[duration]);
                         for(int n=from;n<(definitive?duration:Math.min(duration,from+suspension));n++)interval[n]=true;
                     }
-                    if(!found)valid=false;
+                    if(!found)valid=false;if(!rivalFound)rivalValid=false;
                 }
-            }catch(Exception e){valid=false;}
+            }catch(Exception e){valid=false;rivalValid=false;}
             labels.add("P"+played);
             if(valid){
                 for(int n=0;n<duration;n++){int count=0;for(boolean[] interval:intervals.values())if(interval[n])count++;if(count>0)one++;if(count>1)many++;loss+=count;}
                 checked++;shortTime+=one;multiple+=many;playerTime+=loss;yellow+=y;red+=r;venue[v][0]++;venue[v][1]+=y;venue[v][2]+=r;
             }
+            if(valid&&rivalValid){relativeChecked++;for(int n=0;n<duration;n++){int ownCount=0,rivalCount=0;for(boolean[] x:intervals.values())if(x[n])ownCount++;for(boolean[] x:rivalIntervals.values())if(x[n])rivalCount++;if(ownCount>rivalCount)inferior++;else if(ownCount<rivalCount)superior++;else equal++;}}
             times.add(valid?one:-1);
             details.addView(txt("P"+played+" · "+game.optString(local?"away":"home")+" · "+(valid?y+" amarillas / "+r+" rojas · "+one+" min con sanción":"Sin verificar"),12,valid?0xffb8d4cc:0xffffc365));
         }
@@ -1028,6 +1030,8 @@ public class MainActivity extends Activity {
             standingColumns3D(content,new String[]{"Local A","Local R","Fuera A","Fuera R"},new int[]{venue[0][1],venue[0][2],venue[1][1],venue[1][2]},new int[]{0xffffc365,0xffed7979,0xffffc365,0xffed7979});
         }
         if(!times.isEmpty()){standingSection(content,"Minutos con sanción por partido");int[] vals=new int[times.size()],colors=new int[times.size()];for(int n=0;n<vals.length;n++){vals[n]=times.get(n);colors[n]=0xffffc365;}standingColumns3D(content,labels.toArray(new String[0]),vals,colors);}
+        standingSection(content,"Balance numérico por sanciones · "+relativeChecked+"/"+played+" actas");
+        if(relativeChecked>0){standingColumns3D(content,new String[]{"Superioridad","Igualdad","Inferioridad"},new int[]{superior,equal,inferior},new int[]{0xff48dca2,0xff65c5ef,0xffed7979});content.addView(txt("Minutos según sanciones de ambos equipos; no incluye posibles reemplazos ni diferencias iniciales de plantilla.",11,0xffb8d4cc));}
         content.addView(details);
     }
 
@@ -1167,7 +1171,7 @@ public class MainActivity extends Activity {
         TextView title=txt(team+" · ESTADÍSTICAS",18,0xff75e6b2);
         title.setTypeface(null,android.graphics.Typeface.BOLD);frame.addView(title);
         frame.addView(txt("Temporada "+season+" · "+selectedCompetition,11,0xffb8d4cc));
-        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(1);tabs.setPadding(dp(6),dp(4),dp(6),dp(4));tabs.setBackgroundColor(0xff102233);frame.addView(tabs); android.view.View navDivider=new android.view.View(this);navDivider.setBackgroundColor(0xff45677d);LinearLayout.LayoutParams navDividerLp=new LinearLayout.LayoutParams(-1,dp(2));navDividerLp.setMargins(dp(10),dp(5),dp(10),dp(9));frame.addView(navDivider,navDividerLp); final TextView[] tabButtons=new TextView[6];
+        LinearLayout tabs=new LinearLayout(this);tabs.setOrientation(1);tabs.setPadding(dp(6),dp(4),dp(6),dp(4));tabs.setBackgroundColor(0xff102233);frame.addView(tabs); android.view.View navDivider=new android.view.View(this);navDivider.setBackgroundColor(0xff45677d);LinearLayout.LayoutParams navDividerLp=new LinearLayout.LayoutParams(-1,dp(2));navDividerLp.setMargins(dp(10),dp(5),dp(10),dp(9));frame.addView(navDivider,navDividerLp); final TextView[] tabButtons=new TextView[7];
         android.widget.ScrollView scroll=new android.widget.ScrollView(this);
         LinearLayout content=new LinearLayout(this);content.setOrientation(1);
         content.setPadding(dp(8),dp(4),dp(8),dp(12));
@@ -1182,7 +1186,7 @@ public class MainActivity extends Activity {
         closeLp.setMargins(dp(14),dp(6),dp(14),dp(10));
         close.setOnClickListener(v->dialog.dismiss());frame.addView(close,closeLp);
         dialog.setContentView(frame);
-        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ataque/Def.","Ranking"};
+        String[] labels={"Resumen","Evolución","Partidos","Jugadores","Ataque/Def.","Ranking","Disciplina"};
         final int[] active={0};
         final boolean[] loadingActs={false};
         final java.util.HashSet<String> attemptedActs=new java.util.HashSet<>();
@@ -1295,13 +1299,15 @@ public class MainActivity extends Activity {
             }else{
                 standingSection(content,labels[active[0]]);
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
-                if(active[0]==3||active[0]==5){
+                if(active[0]==6){
+                    renderTeamSanctions(content,matches,team,CompetitionRules.matchMinutes(season,category,selectedCompetition));
+                }else if(active[0]==3||active[0]==5){
                     int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
                     LinearLayout durationCards=new LinearLayout(this);if(active[0]==3)content.addView(durationCards);
                     standingMetric(durationCards,duration>0?duration+" min":"—","Partido completo");
                     standingMetric(durationCards,duration>0?(duration/2)+" min":"—","Cada tiempo");
                     if(active[0]==3)content.addView(txt(duration>0?"Duración prevista según las reglas verificadas de esta competición.":"Duración pendiente de la circular oficial de esta categoría y temporada.",12,0xffb8d4cc));
-                    if(active[0]==5)renderTeamSanctions(content,matches,team,duration);
+                    
                     int actCount=0;
                     java.util.Map<String,Integer> appearances=new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
                     java.util.Map<String,Integer> starts=new java.util.HashMap<>();
