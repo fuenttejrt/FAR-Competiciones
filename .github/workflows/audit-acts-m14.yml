@@ -64,6 +64,12 @@ jobs:
                       if not content.strip(): raise SystemExit('PDF sin texto extraíble')
                       print('Competición',cid,'partido interno',m['id'],'páginas',len(pdf.pages),'caracteres',len(content),'SHA256',hashlib.sha256(raw).hexdigest())
                       print('Marcador calendario:',m['puntos_local'],m['puntos_visitante'])
+                      # Inspect explicit duration labels without logging free text or identities.
+                      duration_candidates=[]
+                      for line in content.splitlines():
+                          for match in re.finditer(r'(?i)\b(duraci[oó]n(?:\s+del\s+partido)?|tiempo\s+de\s+juego|minutos\s+por\s+parte)\s*[:=]?\s*(\d{1,3})\b',line):
+                              duration_candidates.append((match.group(1).casefold(),int(match.group(2))))
+                      print('Duración explícita PDF',m['id'],duration_candidates)
                       with pdfplumber.open(io.BytesIO(raw)) as doc:
                           page=doc.pages[0]
                           words=page.extract_words(x_tolerance=3,y_tolerance=2)
@@ -458,6 +464,7 @@ jobs:
                               if kind!='Cambios':
                                   tc[kind]+=1
                                   players[(team_id,identities[side][ds[0]])][kind]+=1
+                      print('Auditoría duración',m['id'],'máximo anotación',max((t for events in scores.values() for k,t,d in events if t is not None),default=None),'máximo cambios y sanciones',max((e[0] for events in timeline.values() for e in events),default=None),'referencia',36)
                       if duration_warning or not all(participation[x][1] for x in ('local','visitante')):
                           print('ACTA PARCIAL',m['id'],'PDF',url,'advertencia duración',duration_warning,'participación local válida',participation['local'][1],'participación visitante válida',participation['visitante'][1])
                       version_plan.append({'url_pdf':url,'partido_id':m['id'],'hash_contenido':content_hash,'estado_validacion':'parcial' if duration_warning or not all(participation[x][1] for x in ('local','visitante')) else 'correcto'})
