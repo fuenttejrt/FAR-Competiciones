@@ -59,16 +59,26 @@ jobs:
                               rejected[side]=[]
                               for anchor in anchors:
                                   line=' '.join(w['text'] for w in sorted([w for w in col if abs(w['top']-anchor['top'])<2],key=lambda w:w['x0']))
-                                  player=re.fullmatch(r'\s*(\d{1,3})\s+(?:[XC]\s+)?(.+?)\s+(\d{7})(?:\s+F)?\s*',line)
-                                  if not player:
-                                      # Combined captain/front-row flag can be C/X or X/C.
-                                      player=re.fullmatch(r'\s*(\d{1,3})\s+(?:(?:[XC](?:\s*/\s*[XC])?)\s+)?(.+?)\s+(\d{7})(?:\s+F)?\s*',line)
-                                  if not player or 'licencia' in player.group(2).casefold(): unmatched+=1; rejected[side].append(anchor['text']); continue
-                                  parsed.append((anchor['top'],int(player.group(1)),player.group(3)))
+                                  # Match the dorsal and licence by their physical columns, not the name's line.
+                                  row=sorted([w for w in col if abs(w['top']-anchor['top'])<2],key=lambda w:w['x0'])
+                                  offset=side*page.width/2
+                                  dorsal=[w for w in row if w['x0']-offset<page.width*.075 and re.fullmatch(r'\d{1,3}',w['text'])]
+                                  in_roster=bool(headers) and min(headers)<anchor['top']<page.height*.65
+                                  licence_column=page.width*.38<anchor['x0']-offset<page.width*.48
+                                  if not (in_roster and licence_column and len(dorsal)==1):
+                                      unmatched+=1; rejected[side].append(anchor['text']); continue
+                                  namewords=[w for w in row if page.width*.085<w['x0']-offset<page.width*.35 and any(c.isalpha() for c in w['text'])]
+                                  if not namewords:
+                                      # A wrapped name can sit above or below the dorsal baseline.
+                                      namewords=[w for w in col if abs(w['top']-anchor['top'])<12 and page.width*.085<w['x0']-offset<page.width*.35 and any(c.isalpha() for c in w['text'])]
+                                  if not namewords:
+                                      unmatched+=1; rejected[side].append(anchor['text']); continue
+                                  parsed.append((anchor['top'],int(dorsal[0]['text']),anchor['text']))
                               roster['local' if side==0 else 'visitante']={x[1] for x in parsed}
                               split=next((y for y in headers if parsed and y>min(x[0] for x in parsed)+2),None)
                               starters=sum(x[0]<split for x in parsed) if split is not None else None
                               duplicates=len(parsed)-len({x[1] for x in parsed})
+                              print('Licencias repetidas dentro del equipo',len(parsed)-len({x[2] for x in parsed}))
                               repeated=sum(x[2] in licences for x in parsed)
                               licences.update(x[2] for x in parsed)
                               print('Alineación', 'local' if side==0 else 'visitante','filas',len(parsed),'titulares',starters,'suplentes',len(parsed)-starters if starters is not None else None,'filas no reconocidas',unmatched,'dorsales repetidos',duplicates,'licencias cruzadas',repeated,'separación explícita',split is not None)
@@ -156,7 +166,7 @@ jobs:
                                       match=re.match(r'^\s*'+re.escape(role)+r'\s*:\s*(.*)$',line,re.I)
                                       if not match: continue
                                       name=match.group(1).strip()
-                                      licence=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{7})\b',lines[i+1]) if i+1<len(lines) else None
+                                      licence=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{7})\b',' '.join(lines[i+1:i+4]).split('Entrenador:')[0].split('Delegado:')[0].split('Juez línea:')[0])
                                       if name and licence and any(c.isalpha() for c in name):
                                           hits.append(licence.group(1))
                                   if len(hits)==1: staff_ids.add(hits[0])
