@@ -32,6 +32,7 @@ jobs:
           expected_acts=0
           round_totals=defaultdict(Counter)
           team_competition={}
+          version_plan=[]
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1: raise SystemExit('Competición ambigua')
@@ -101,7 +102,8 @@ jobs:
                               repeated=sum(x[2] in licences for x in parsed)
                               licences.update(x[2] for x in parsed)
                               print('Alineación', 'local' if side==0 else 'visitante','filas',len(parsed),'titulares',starters,'suplentes',len(parsed)-starters if starters is not None else None,'filas no reconocidas',unmatched,'dorsales repetidos',duplicates,'licencias cruzadas',repeated,'separación explícita',split is not None)
-                      print('Huella texto normalizado:',hashlib.sha256(' '.join(content.split()).encode()).hexdigest())
+                      content_hash=hashlib.sha256(' '.join(content.split()).encode()).hexdigest()
+                      print('Huella texto normalizado:',content_hash)
                       weights={'E':5,'T':2,'D':3,'PC':3,'EC':7}
                       sections=[]
                       with pdfplumber.open(io.BytesIO(raw)) as doc:
@@ -405,6 +407,7 @@ jobs:
                               if kind!='Cambios':
                                   tc[kind]+=1
                                   players[(team_id,identities[side][ds[0]])][kind]+=1
+                      version_plan.append({'partido_id':m['id'],'hash_contenido':content_hash,'estado_validacion':'parcial' if duration_warning or not all(participation[x][1] for x in ('local','visitante')) else 'correcto'})
                       accepted+=1
                       for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
                           print(term, 'detectado' if term in content.casefold() else 'no detectado')
@@ -466,4 +469,26 @@ jobs:
                       rankings[(scope,kind,metric)]=ranking(rows,fn,desc)
               print('Rankings ámbito',scope,'equipos',len(scoped_teams),'jugadores únicos',len(scoped_players))
           print('Rankings calculados',len(rankings),'ámbitos',len(scopes),'sin publicar identidades')
+          # Read-only preflight: never overwrite or publish act data here.
+          existing={}
+          for start in range(0,len(version_plan),50):
+              ids=[str(x['partido_id']) for x in version_plan[start:start+50]]
+              for row in get('actas',{'partido_id':'in.('+','.join(ids)+')','select':'id,partido_id,hash_contenido,version,estado_validacion'}):
+                  if row['partido_id'] in existing: raise SystemExit('Acta vigente duplicada')
+                  existing[row['partido_id']]=row
+          changes=Counter()
+          for candidate in version_plan:
+              old=existing.get(candidate['partido_id'])
+              if old is None:
+                  action='nueva'; next_version=1
+              elif old['hash_contenido']==candidate['hash_contenido']:
+                  action='sin_cambios'; next_version=old['version']
+              else:
+                  action='modificada'; next_version=old['version']+1
+              if not isinstance(next_version,int) or next_version<1: raise SystemExit('Versión inválida')
+              changes[action]+=1
+              changes['estado_'+candidate['estado_validacion']]+=1
+          if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
+          print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          print('Plan de versiones solo lectura; ninguna escritura')
           PY
