@@ -34,6 +34,11 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
+          # Verify the installed diagnostic RPC using only synthetic temporary rows.
+          req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+          with opener.open(req,timeout=30) as response: probe=json.load(response)
+          if probe!={'idempotencia':True,'rollback':True,'filas_produccion':0}: raise SystemExit('Prueba transaccional incorrecta')
+          print('PRUEBA TRANSACCIONAL idempotencia correcta; rollback correcto; filas producción 0')
           # Read-only schema inventory: never print row data, credentials or schema descriptions.
           try:
               schema_req=urllib.request.Request(base+'/rest/v1/',headers={'apikey':key,'Accept':'application/openapi+json'})
