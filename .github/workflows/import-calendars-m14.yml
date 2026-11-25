@@ -88,7 +88,7 @@ jobs:
                           matches.append((code,a,away,{'id_oficial':'calendario:'+identity,'fecha_hora':timestamp,'campo':b[1].strip() if len(b)>1 and b[1].strip() else None,'puntos_local':int(score.group(1)) if score else None,'puntos_visitante':int(score.group(2)) if score else None,'estado':'finalizado' if score else 'pendiente','url_oficial':stats,'url_acta':act}))
                   rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
               if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
-              standings=[]
+              standings=[]; crests={}
               for t in soup.find_all('table'):
                   rows=t.find_all('tr')
                   header=next((r for r in rows if r.find('th')),None)
@@ -103,16 +103,30 @@ jobs:
                       if name not in teams: raise SystemExit('Equipo de clasificación no reconocido: '+name)
                       values={x:int(cells[labels.index(x)]) for x in required[1:]}
                       standings.append((name,values))
+                      imgs=row.select('img[alt="logoTeam"][src]')
+                      if len(imgs)!=1: raise SystemExit('Escudo ambiguo: '+name)
+                      crest=urllib.parse.urljoin(url,imgs[0]['src'])
+                      if not crest.startswith('https://farugby.matchready.es/uploads/calendar_team/images/'): raise SystemExit('Escudo no reconocido')
+                      crests[name]=crest
               if len(standings)!=len(teams) or len({x[0] for x in standings})!=len(teams): raise SystemExit('Clasificación incompleta: '+cid)
               completed=[code for code in rounds if any(x[0]==code for x in matches) and all(x[3]['puntos_local'] is not None for x in matches if x[0]==code)]
               if not completed: raise SystemExit('Sin jornada finalizada: '+cid)
               snapshot=max(completed,key=lambda c:tuple(map(int,c.split('.'))))
-              plans.append((cid,comps[0]['id'],teams,rounds,count,matches,standings,snapshot))
-          for cid,comp,teams,rounds,count,matches,standings,snapshot in plans:
+              plans.append((cid,comps[0]['id'],teams,rounds,count,matches,standings,snapshot,crests))
+          clubs={}
+          for cid,comp,teams,rounds,count,matches,standings,snapshot,crests in plans:
+              for name,crest in crests.items():
+                  canonical='C.A.R. Sevilla' if name in ('C.A.R. Sevilla','C.A.R. Sevilla "B"','CAR Sevilla "C"') else 'Marbella R.C.' if name in ('Marbella R.C.','Marbella R.C. "B"') else name
+                  if canonical in clubs and clubs[canonical]!=crest: raise SystemExit('Escudos distintos para '+canonical)
+                  clubs[canonical]=crest
+          club_ids={name:put('clubes','id_oficial',{'id_oficial':'interno:'+hashlib.sha256(name.casefold().encode()).hexdigest(),'nombre':name,'escudo_url':crest}) for name,crest in clubs.items()}
+          print('Clubes o agrupaciones guardados:',len(club_ids))
+          for cid,comp,teams,rounds,count,matches,standings,snapshot,crests in plans:
               team_ids={}; round_ids={}
               for name in sorted(teams):
                   identity='nombre:'+hashlib.sha256(name.casefold().encode()).hexdigest()
-                  team_ids[name]=put('equipos','competicion_id,id_oficial',{'competicion_id':comp,'id_oficial':identity,'nombre':name})
+                  canonical='C.A.R. Sevilla' if name in ('C.A.R. Sevilla','C.A.R. Sevilla "B"','CAR Sevilla "C"') else 'Marbella R.C.' if name in ('Marbella R.C.','Marbella R.C. "B"') else name
+                  team_ids[name]=put('equipos','competicion_id,id_oficial',{'competicion_id':comp,'id_oficial':identity,'nombre':name,'club_id':club_ids[canonical]})
               for row in rounds.values(): round_ids[row['codigo']]=put('jornadas','competicion_id,codigo',dict(row,competicion_id=comp))
               for code,a,b,row in matches:
                   put('partidos','id_oficial',dict(row,jornada_id=round_ids[code],equipo_local_id=team_ids[a],equipo_visitante_id=team_ids[b]))
