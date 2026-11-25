@@ -1,0 +1,46 @@
+name: Importar estructura M14
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: far-supabase-import
+  cancel-in-progress: false
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Registrar temporada, categoría y competiciones
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os,json,urllib.request,urllib.error,urllib.parse
+          base=os.environ['SUPABASE_URL'].rstrip('/')
+          key=os.environ['SUPABASE_SECRET_KEY']
+          u=urllib.parse.urlparse(base)
+          if u.scheme!='https' or not u.hostname or not u.hostname.endswith('.supabase.co') or u.path or u.query or u.username or u.password or not key.startswith('sb_secret_'):
+              raise SystemExit('Configuración no válida')
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): return None
+          opener=urllib.request.build_opener(NoRedirect())
+          def upsert(table, conflict, row):
+              url=base+'/rest/v1/'+table+'?'+urllib.parse.urlencode({'on_conflict':conflict})
+              req=urllib.request.Request(url,data=json.dumps(row).encode(),headers={'apikey':key,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'},method='POST')
+              try:
+                  with opener.open(req,timeout=30) as r: rows=json.load(r)
+              except urllib.error.HTTPError as e:
+                  raise SystemExit(f'{table}: HTTP {e.code}')
+              except Exception:
+                  raise SystemExit(f'{table}: error de conexión')
+              if len(rows)!=1 or not rows[0].get('id'): raise SystemExit(f'{table}: respuesta inesperada')
+              print(table, 'OK')
+              return rows[0]['id']
+          season=upsert('temporadas','nombre',{'nombre':'2026/27','activa':True})
+          category=upsert('categorias','codigo',{'codigo':'M14','nombre':'M14'})
+          for cid,name,division,group in [('11','Primera División','Primera',None),('12','Segunda División · Grupo 1','Segunda','1'),('15','Segunda División · Grupo 2','Segunda','2'),('83','Copa FAR','Copa',None)]:
+              upsert('competiciones','temporada_id,id_oficial',{'temporada_id':season,'categoria_id':category,'nombre':name,'division':division,'grupo':group,'id_oficial':'35/'+cid,'url_oficial':'https://farugby.matchready.es/es/public/calendar/35/'+cid+'/combined/'})
+              print(name)
+          print('Estructura inicial M14 registrada')
+          PY
