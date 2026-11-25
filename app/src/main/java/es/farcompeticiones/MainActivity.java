@@ -1155,15 +1155,17 @@ public class MainActivity extends Activity {
                     int[] result=standingMatchScore(game.optString("score",""));if(result==null)continue;
                     boolean local=teamKey(team).equals(teamKey(game.optString("home","")));
                     int pf=result[local?0:1],pa=result[local?1:0];pfTotal+=pf;paTotal+=pa;playedGames++;pfSeries.add(pf);paSeries.add(pa);
-                    String opponent=game.optString(local?"away":"home"); int v=local?0:1;venue[v][0]++;venue[v][1]+=pf;venue[v][2]+=pa; if(pf>bestF){bestF=pf;bf=opponent;}if(pf<worstF){worstF=pf;wf=opponent;}if(pa<bestD){bestD=pa;bd=opponent;}if(pa>worstD){worstD=pa;wd=opponent;} int[][] counts=new int[2][4], eventPoints=new int[2][4];int[] sums=new int[2];boolean valid=true;boolean[] sides=new boolean[2];int side=-1;
-                    try{org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl",""),"{}"));
-                    for(String raw:act.optString("scoreboard","").split("\\r?\\n")){
-                        String line=raw.trim();if(line.startsWith("Equipo local:")){side=0;sides[0]=true;continue;}if(line.startsWith("Equipo visitante:")){side=1;sides[1]=true;continue;}if(side<0)continue;
-                        java.util.regex.Matcher event=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)").matcher(line);
-                        if(event.find()){String kind=event.group(2).toLowerCase(java.util.Locale.ROOT);int pts=Integer.parseInt(event.group(3));sums[side]+=pts;int k=kind.contains("ensayo")?0:kind.contains("transform")?1:kind.contains("castigo")||kind.contains("penal")?2:kind.contains("drop")?3:-1;if(k>=0){counts[side][k]++;eventPoints[side][k]+=pts;}else valid=false;}
-                        else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))valid=false;
-                    }}catch(Exception e){valid=false;}
-                    valid=valid&&sides[0]&&sides[1]&&sums[0]==result[0]&&sums[1]==result[1];
+                    String opponent=game.optString(local?"away":"home"); int v=local?0:1;venue[v][0]++;venue[v][1]+=pf;venue[v][2]+=pa; if(pf>bestF){bestF=pf;bf=opponent;}if(pf<worstF){worstF=pf;wf=opponent;}if(pa<bestD){bestD=pa;bd=opponent;}if(pa>worstD){worstD=pa;wd=opponent;} int[][] counts=new int[2][4], eventPoints=new int[2][4];boolean valid=false;
+                    try{
+                        org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl",""),"{}"));
+                        java.util.ArrayList<String[]> events=reconciledScoring(act,game.optString("score"));
+                        valid=events!=null;
+                        if(valid)for(String[] e:events){
+                            int side=Integer.parseInt(e[0]),pts=Integer.parseInt(e[3]);String kind=e[2];
+                            int k=kind.contains("ensayo")?0:kind.contains("transform")?1:kind.contains("castigo")||kind.contains("penal")?2:3;
+                            counts[side][k]++;eventPoints[side][k]+=pts;
+                        }
+                    }catch(Exception e){valid=false;}
                     LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(10),dp(10),dp(10),dp(10));
                     android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(0xff203b4c);bg.setCornerRadius(dp(9));card.setBackground(bg);
                     LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(4),0,dp(4));history.addView(card,lp);
@@ -1180,10 +1182,17 @@ public class MainActivity extends Activity {
                 standingSection(content,"Evolución de tantos");if(playedGames>0)standingEvolutionChart(content,pfSeries,paSeries);
                 standingSection(content,"Anotaciones · "+checked+"/"+playedGames+" actas conciliadas");
                 if(checked>0){
+                    LinearLayout tryAvg=new LinearLayout(this);content.addView(tryAvg);
+                    standingMetric(tryAvg,String.format(java.util.Locale.getDefault(),"%.1f",totals[0][0]/(double)checked),"Ensayos / partido");
+                    standingMetric(tryAvg,String.format(java.util.Locale.getDefault(),"%.1f",totals[1][0]/(double)checked),"Recibidos / partido");
+                    content.addView(txt("Medias calculadas sobre "+checked+" actas conciliadas.",11,0xffb8d4cc));
                     standingColumns3D(content,new String[]{"E+","E−","T+","T−","C+","C−","D+","D−"},new int[]{totals[0][0],totals[1][0],totals[0][1],totals[1][1],totals[0][2],totals[1][2],totals[0][3],totals[1][3]},new int[]{0xff48dca2,0xffed7979,0xff48dca2,0xffed7979,0xff48dca2,0xffed7979,0xff48dca2,0xffed7979});
                     content.addView(txt("E: ensayos · T: transformaciones · C: castigos · D: drops. + favor / − contra",11,0xffb8d4cc));
                     standingSection(content,"Origen de los puntos a favor");
                     if(java.util.Arrays.stream(typePoints[0]).sum()>0)standingPie(content,typePoints[0],new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff9b8be8},new String[]{"Ensayos","Transformaciones","Castigos","Drops"});
+                    standingSection(content,"Origen de los puntos en contra");
+                    if(java.util.Arrays.stream(typePoints[1]).sum()>0)standingPie(content,typePoints[1],new int[]{0xff48dca2,0xff56aaf2,0xffffc365,0xff9b8be8},new String[]{"Ensayos","Transformaciones","Castigos","Drops"});
+                    else content.addView(txt("Sin puntos recibidos en las actas conciliadas.",12,0xffb8d4cc));
                 }
                 if(playedGames>0){
                     standingSection(content,"Mejores y peores partidos");
@@ -1193,7 +1202,7 @@ public class MainActivity extends Activity {
                     content.addView(txt("Más puntos recibidos · "+wd+" · "+worstD,14,0xffffc365));
                     standingSection(content,"Local y visitante");
                     for(int v=0;v<2;v++){standingSection(content,(v==0?"Local":"Visitante")+" · "+venue[v][0]+" partidos");if(venue[v][0]>0){LinearLayout vr=new LinearLayout(this);content.addView(vr);standingMetric(vr,String.format(java.util.Locale.getDefault(),"%.1f",venue[v][1]/(double)venue[v][0]),"Media favor");standingMetric(vr,String.format(java.util.Locale.getDefault(),"%.1f",venue[v][2]/(double)venue[v][0]),"Media contra");}}
-                    standingColumns3D(content,new String[]{"Local +","Local −","Fuera +","Fuera −"},new int[]{venue[0][1],venue[0][2],venue[1][1],venue[1][2]},new int[]{0xff48dca2,0xffed7979,0xff48dca2,0xffed7979});
+                    standingSection(content,"Totales local y visitante");standingColumns3D(content,new String[]{"Local +","Local −","Fuera +","Fuera −"},new int[]{venue[0][1],venue[0][2],venue[1][1],venue[1][2]},new int[]{0xff48dca2,0xffed7979,0xff48dca2,0xffed7979});
                 }
                 content.addView(txt("El desglose incluye únicamente actas cuyo total de anotaciones coincide con ambos marcadores oficiales.",11,0xffb8d4cc));
                 standingSection(content,"Comprobación por partido");content.addView(history);
