@@ -971,6 +971,36 @@ public class MainActivity extends Activity {
         return overlap;
     }
 
+    private java.util.ArrayList<String[]> reconciledScoring(org.json.JSONObject act,String official){
+        int[] score=standingMatchScore(official),sums=new int[2];if(score==null)return null;
+        boolean[] sides=new boolean[2];int side=-1;
+        java.util.ArrayList<String[]> events=new java.util.ArrayList<>();
+        java.util.regex.Pattern pattern=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)\\s*[-·]\\s*Dorsal\\s*(\\d+)");
+        for(String raw:act.optString("scoreboard").split("\\r?\\n")){
+            String line=raw.trim();
+            if(line.startsWith("Equipo local:")){side=0;sides[0]=true;continue;}
+            if(line.startsWith("Equipo visitante:")){side=1;sides[1]=true;continue;}
+            java.util.regex.Matcher m=pattern.matcher(line);
+            if(m.find()){
+                if(side<0)return null;
+                String kind=m.group(2).toLowerCase(java.util.Locale.ROOT);
+                if(!(kind.contains("ensayo")||kind.contains("transform")||kind.contains("castigo")||kind.contains("penal")||kind.contains("drop")))return null;
+                sums[side]+=Integer.parseInt(m.group(3));
+                events.add(new String[]{""+side,m.group(4),kind,m.group(3),m.group(1)});
+            }else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))return null;
+        }
+        return sides[0]&&sides[1]&&sums[0]==score[0]&&sums[1]==score[1]?events:null;
+    }
+    private boolean scoringPlayersKnown(org.json.JSONObject act,java.util.ArrayList<String[]> events){
+        if(events==null)return false;
+        java.util.Set<String> ids=new java.util.HashSet<>();int side=-1;
+        for(String raw:act.optString("lineups").split("\\r?\\n")){
+            String t=raw.trim();if(t.equals("EQUIPO LOCAL"))side=0;else if(t.equals("EQUIPO VISITANTE"))side=1;
+            else if(side>=0){java.util.regex.Matcher m=java.util.regex.Pattern.compile("^(\\d+)\\s*·.*\\|\\s*\\d{7}.*$").matcher(t);if(m.matches())ids.add(side+":"+m.group(1));}
+        }
+        for(String[] e:events)if(!ids.contains(e[0]+":"+e[1]))return false;
+        return true;
+    }
     private boolean hasUnknownCard(String lineup,String temporary,String definitive,boolean local){
         java.util.Set<String> dorsals=new java.util.HashSet<>();
         int side=-1;
@@ -1285,20 +1315,10 @@ public class MainActivity extends Activity {
                         if(!thisMatch.isEmpty()){
                             String scoreTable=cached.optString("scoreboard","");
                             if(!scoreTable.trim().isEmpty()){
-                                boolean activeScore=false, validScore=true, sideFound=false;
+                                java.util.ArrayList<String[]> reconciled=reconciledScoring(cached,match.optString("score"));
+                                boolean validScore=scoringPlayersKnown(cached,reconciled),sideFound=true;
                                 java.util.ArrayList<String[]> scoreEvents=new java.util.ArrayList<>();
-                                for(String raw:scoreTable.split("\\r?\\n")){
-                                    String line=raw.trim();
-                                    if(line.startsWith("Equipo local:")){activeScore=local;sideFound|=activeScore;continue;}
-                                    if(line.startsWith("Equipo visitante:")){activeScore=!local;sideFound|=activeScore;continue;}
-                                    if(!activeScore)continue;
-                                    java.util.regex.Matcher ev=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)\\s*[-·]\\s*Dorsal\\s*(\\d+)").matcher(line);
-                                    if(ev.find()){
-                                        String id=statDorsals.get(ev.group(4));
-                                        if(id==null){validScore=false;continue;}
-                                        scoreEvents.add(new String[]{id,ev.group(2).toLowerCase(java.util.Locale.ROOT),ev.group(3),ev.group(1)});
-                                    }else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))validScore=false;
-                                }
+                                if(validScore)for(String[] e:reconciled){if(!e[0].equals(local?"0":"1"))continue;String id=statDorsals.get(e[1]);if(id==null){validScore=false;break;}scoreEvents.add(new String[]{id,e[2],e[3],e[4]});}
                                 if(validScore&&sideFound){
                                     for(String id:thisMatch){scoringCoverage.merge(id,1,Integer::sum);scoreGames.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(match.optString("home")+" – "+match.optString("away"));}
                                     for(String[] ev:scoreEvents){
@@ -2306,18 +2326,9 @@ public class MainActivity extends Activity {
                         }
                     }
                     for(String id:seen)history.computeIfAbsent(id,k->new java.util.ArrayList<>()).add(g.optString("home")+" – "+g.optString("away")+" · "+(matchMinutes.containsKey(id)?matchMinutes.get(id)+" min verificados":"Minutos no verificados"));
-                    int[] score=standingMatchScore(g.optString("score"));int[] sums=new int[2];boolean valid=score!=null;boolean[] sides=new boolean[2];
-                    java.util.ArrayList<String[]> events=new java.util.ArrayList<>();side=-1;
-                    for(String raw:act.optString("scoreboard").split("\\r?\\n")){
-                        String line=raw.trim();
-                        if(line.startsWith("Equipo local:")){side=0;sides[0]=true;continue;}
-                        if(line.startsWith("Equipo visitante:")){side=1;sides[1]=true;continue;}
-                        if(side<0)continue;
-                        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(?i)Min\\s*(\\d+)\\s*[-·]\\s*([^\\n]*?)\\s*\\((\\d+)\\s*puntos?\\)\\s*[-·]\\s*Dorsal\\s*(\\d+)").matcher(line);
-                        if(m.find()){String id=dorsals.get(side+":"+m.group(4));if(id==null){valid=false;continue;}sums[side]+=Integer.parseInt(m.group(3));events.add(new String[]{id,m.group(2).toLowerCase(java.util.Locale.ROOT),m.group(3)});}
-                        else if(line.matches("(?i)^\\d+\\.\\s*Min.*"))valid=false;
-                    }
-                    if(valid&&sides[0]&&sides[1]&&sums[0]==score[0]&&sums[1]==score[1]){scoreCoverage++;try{g.put("playerScoreVerified",true);}catch(Exception ignored){}for(String[] e:events){int[] a=totals.get(e[0]);a[2]+=Integer.parseInt(e[2]);String k=e[1];if(k.contains("ensayo"))a[3]++;else if(k.contains("transform"))a[4]++;else if(k.contains("castigo")||k.contains("penal"))a[5]++;else if(k.contains("drop"))a[6]++;}}
+                    java.util.ArrayList<String[]> events=reconciledScoring(act,g.optString("score"));
+                    g.put("playerScoreVerified",false);
+                    if(scoringPlayersKnown(act,events)&&events.stream().allMatch(e->dorsals.containsKey(e[0]+":"+e[1]))){scoreCoverage++;g.put("playerScoreVerified",true);for(String[] e:events){int[] a=totals.get(dorsals.get(e[0]+":"+e[1]));a[2]+=Integer.parseInt(e[3]);String k=e[2];if(k.contains("ensayo"))a[3]++;else if(k.contains("transform"))a[4]++;else if(k.contains("castigo")||k.contains("penal"))a[5]++;else if(k.contains("drop"))a[6]++;}}
                     for(String key:new String[]{"temporaryCards","definitiveCards"}){side=-1;for(String raw:act.optString(key).split("\\r?\\n")){String line=raw.trim();if(line.matches("(?i)Equipo local:.*"))side=0;else if(line.matches("(?i)Equipo visitante:.*"))side=1;else if(side>=0&&line.matches("^\\d+\\. Min .*")){java.util.regex.Matcher m=java.util.regex.Pattern.compile("Dorsal (\\d+)").matcher(line);if(m.find()){String id=dorsals.get(side+":"+m.group(1));if(id!=null)totals.get(id)[key.equals("temporaryCards")?7:8]++;}}}}
                 }catch(Exception ignored){}finally{String round=entry.getValue().optString("round","").trim();if(round.isEmpty())round="Sin jornada identificada";java.util.Map<String,int[]> bucket=byRound.computeIfAbsent(round,k->new java.util.HashMap<>());for(String k:totals.keySet()){int[] now=totals.get(k),old=before.get(k);if(old!=null&&java.util.Arrays.equals(now,old))continue;int[] dest=bucket.computeIfAbsent(k,x->new int[12]);int[] delta=new int[12];for(int m=0;m<12;m++){delta[m]=now[m]-(old==null?0:old[m]);dest[m]+=delta[m];}playerMatches.computeIfAbsent(k,x->new java.util.LinkedHashMap<>()).put(entry.getKey(),delta);}}
             }
