@@ -88,8 +88,27 @@ jobs:
                           matches.append((code,a,away,{'id_oficial':'calendario:'+identity,'fecha_hora':timestamp,'campo':b[1].strip() if len(b)>1 and b[1].strip() else None,'puntos_local':int(score.group(1)) if score else None,'puntos_visitante':int(score.group(2)) if score else None,'estado':'finalizado' if score else 'pendiente','url_oficial':stats,'url_acta':act}))
                   rounds[code]={'codigo':code,'nombre':heading,'organizador':org[1].strip() if len(org)>1 else None,'fecha_inicio':min(dates) if dates else None,'fecha_fin':max(dates) if dates else None,'sede':next(iter(venues)) if len(venues)==1 else None}
               if not teams or not rounds: raise SystemExit('Calendario vacío: '+cid)
-              plans.append((cid,comps[0]['id'],teams,rounds,count,matches))
-          for cid,comp,teams,rounds,count,matches in plans:
+              standings=[]
+              for t in soup.find_all('table'):
+                  rows=t.find_all('tr')
+                  header=next((r for r in rows if r.find('th')),None)
+                  if not header: continue
+                  labels=[norm(c.get_text(' ',strip=True)).upper() for c in header.find_all(['td','th'],recursive=False)]
+                  required=['EQUIPO','J','G','E','P','TF','TC','EF','EC','BO','BD','PUNTOS']
+                  if not all(x in labels for x in required): continue
+                  for row in rows[rows.index(header)+1:]:
+                      cells=[norm(c.get_text(' ',strip=True)) for c in row.find_all(['td','th'],recursive=False)]
+                      if len(cells)!=len(labels): continue
+                      name=cells[labels.index('EQUIPO')]
+                      if name not in teams: raise SystemExit('Equipo de clasificación no reconocido: '+name)
+                      values={x:int(cells[labels.index(x)]) for x in required[1:]}
+                      standings.append((name,values))
+              if len(standings)!=len(teams) or len({x[0] for x in standings})!=len(teams): raise SystemExit('Clasificación incompleta: '+cid)
+              completed=[code for code in rounds if any(x[0]==code for x in matches) and all(x[3]['puntos_local'] is not None for x in matches if x[0]==code)]
+              if not completed: raise SystemExit('Sin jornada finalizada: '+cid)
+              snapshot=max(completed,key=lambda c:tuple(map(int,c.split('.'))))
+              plans.append((cid,comps[0]['id'],teams,rounds,count,matches,standings,snapshot))
+          for cid,comp,teams,rounds,count,matches,standings,snapshot in plans:
               team_ids={}; round_ids={}
               for name in sorted(teams):
                   identity='nombre:'+hashlib.sha256(name.casefold().encode()).hexdigest()
@@ -97,6 +116,9 @@ jobs:
               for row in rounds.values(): round_ids[row['codigo']]=put('jornadas','competicion_id,codigo',dict(row,competicion_id=comp))
               for code,a,b,row in matches:
                   put('partidos','id_oficial',dict(row,jornada_id=round_ids[code],equipo_local_id=team_ids[a],equipo_visitante_id=team_ids[b]))
+              for position,(name,v) in enumerate(standings,1):
+                  put('clasificaciones','jornada_id,equipo_id',{'jornada_id':round_ids[snapshot],'equipo_id':team_ids[name],'posicion':position,'partidos_jugados':v['J'],'victorias':v['G'],'empates':v['E'],'derrotas':v['P'],'puntos_favor':v['TF'],'puntos_contra':v['TC'],'ensayos_favor':v['EF'],'ensayos_contra':v['EC'],'bonus_ofensivo':v['BO'],'bonus_defensivo':v['BD'],'puntos_clasificacion':v['PUNTOS'],'datos_adicionales':{'origen':'MatchReady','tipo':'clasificacion_actual','capturada_en':datetime.now(ZoneInfo('Europe/Madrid')).isoformat()}})
+              print('Clasificación:',len(standings),'equipos; última jornada completa:',snapshot)
               print('Resultados:',sum(x[3]['puntos_local'] is not None for x in matches),'Horarios:',sum(x[3]['fecha_hora'] is not None for x in matches),'Actas:',sum(x[3]['url_acta'] is not None for x in matches))
               print(f'Competición {cid}: {len(teams)} equipos, {len(rounds)} jornadas, {count} partidos guardados')
           PY
