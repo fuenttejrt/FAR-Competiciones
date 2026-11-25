@@ -975,27 +975,57 @@ public class MainActivity extends Activity {
         android.content.SharedPreferences cache=getSharedPreferences("far_official_acts",MODE_PRIVATE);
         int total=0,complete=0,partial=0,pending=0;
         LinearLayout rows=new LinearLayout(this);rows.setOrientation(1);
+        java.util.ArrayList<View> cardsList=new java.util.ArrayList<>();java.util.ArrayList<Integer> states=new java.util.ArrayList<>();
         for(org.json.JSONObject game:matches){
             if(standingMatchScore(game.optString("score"))==null)continue;
             total++;String url=game.optString("actUrl");boolean local=teamKey(team).equals(teamKey(game.optString("home")));
-            standingSection(rows,game.optString("home")+" – "+game.optString("away")+" · "+game.optString("score"));
+            LinearLayout card=new LinearLayout(this);card.setOrientation(1);card.setPadding(dp(10),dp(9),dp(10),dp(9));
+            standingSection(card,game.optString("home")+" – "+game.optString("away")+" · "+game.optString("score"));
+            int state=3;java.util.ArrayList<String> issues=new java.util.ArrayList<>();
             try{
                 org.json.JSONObject act=new org.json.JSONObject(cache.getString(url,"{}"));
-                if(act.optString("lineups").trim().isEmpty()){pending++;rows.addView(txt("Acta no disponible en caché",12,0xffffc365));continue;}
-                java.util.ArrayList<String[]> events=reconciledScoring(act,game.optString("score"));
-                boolean collective=events!=null,individual=scoringPlayersKnown(act,events);
-                int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
-                boolean changes=duration>0&&verifiedActMinutes(act.optString("lineups"),act.optString("changes"),local,duration,new java.util.HashMap<>())!=null;
-                boolean cards=!act.optString("temporaryCards").isEmpty()&&!act.optString("definitiveCards").isEmpty()&&!hasUnknownCard(act.optString("lineups"),act.optString("temporaryCards"),act.optString("definitiveCards"),local);
-                String[] labels={"Marcador colectivo conciliado","Anotadores identificados","Cambios del equipo comprobados","Tarjetas del equipo identificadas"};
-                boolean[] checks={collective,individual,changes,cards};
-                for(int n=0;n<checks.length;n++)rows.addView(txt((checks[n]?"✓ ":"⚠ ")+labels[n]+(checks[n]?"":" · pendiente"),12,checks[n]?0xff75e6b2:0xffffc365));
-                if(collective&&individual&&changes&&cards)complete++;else partial++;
-            }catch(Exception e){pending++;rows.addView(txt("Acta pendiente de lectura",12,0xffffc365));}
+                if(act.optString("lineups").trim().isEmpty())issues.add("Acta no disponible en caché");
+                else{
+                    java.util.ArrayList<String[]> events=reconciledScoring(act,game.optString("score"));
+                    boolean collective=events!=null,individual=scoringPlayersKnown(act,events);
+                    int duration=CompetitionRules.matchMinutes(season,category,selectedCompetition);
+                    boolean changes=duration>0&&verifiedActMinutes(act.optString("lineups"),act.optString("changes"),local,duration,new java.util.HashMap<>())!=null;
+                    boolean cards=!act.optString("temporaryCards").isEmpty()&&!act.optString("definitiveCards").isEmpty()&&!hasUnknownCard(act.optString("lineups"),act.optString("temporaryCards"),act.optString("definitiveCards"),local);
+                    java.util.Set<String> dorsals=new java.util.HashSet<>(),licenses=new java.util.HashSet<>();int side=-1;boolean unique=true;
+                    for(String raw:act.optString("lineups").split("\\r?\\n")){
+                        String z=raw.trim();if(z.equals("EQUIPO LOCAL"))side=0;else if(z.equals("EQUIPO VISITANTE"))side=1;else if(z.startsWith("JUGADORES SIN EQUIPO"))side=-1;
+                        else if(side>=0){java.util.regex.Matcher m=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$").matcher(z);if(m.matches()){
+                            String club=game.optString(side==0?"home":"away");
+                            if(!dorsals.add(side+":"+m.group(1))){unique=false;issues.add(club+" · dorsal duplicado "+m.group(1));}
+                            if(!licenses.add(m.group(3))){unique=false;issues.add(club+" · licencia repetida · "+m.group(2));}
+                        }}
+                    }
+                    if(events!=null)for(String[] e:events){if(!dorsals.contains(e[0]+":"+e[1]))issues.add(game.optString(e[0].equals("0")?"home":"away")+" · min "+e[4]+" · "+e[2]+" ("+e[3]+" puntos) · "+(e[1].isEmpty()?"sin dorsal":"dorsal "+e[1]+" no identificado"));}
+                    String[] labels={"Marcador colectivo conciliado","Anotadores identificados","Cambios del equipo comprobados","Tarjetas del equipo identificadas","Sin dorsales ni licencias duplicados"};
+                    boolean[] checks={collective,individual,changes,cards,unique};
+                    for(int n=0;n<checks.length;n++)card.addView(txt((checks[n]?"✓ ":"⚠ ")+labels[n]+(checks[n]?"":" · pendiente"),12,checks[n]?0xff75e6b2:0xffffc365));
+                    state=collective&&individual&&changes&&cards&&unique?1:2;
+                }
+            }catch(Exception e){issues.add("Acta pendiente de lectura");}
+            if(state==1)complete++;else if(state==2)partial++;else pending++;
+            int color=state==1?0xff75e6b2:state==2?0xffffc365:0xffed7979;
+            android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(0xff1b3447);bg.setCornerRadius(dp(8));bg.setStroke(dp(1),color);card.setBackground(bg);
+            card.addView(txt(state==1?"COMPROBADA":state==2?"PARCIAL":"PENDIENTE",12,color),1);
+            for(String issue:issues)card.addView(txt("• "+issue,12,0xffffc365));
+            if(url.startsWith("https://farugby.matchready.es/")){
+                LinearLayout actions=new LinearLayout(this);card.addView(actions);
+                TextView open=txt("Abrir acta",13,0xff75e6b2),refresh=txt("Actualizar acta",13,0xff75e6b2);
+                for(TextView button:new TextView[]{open,refresh}){button.setGravity(android.view.Gravity.CENTER);button.setPadding(dp(4),dp(12),dp(4),dp(8));actions.addView(button,new LinearLayout.LayoutParams(0,-2,1));}
+                open.setOnClickListener(v->{try{startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(url)));}catch(Exception e){android.widget.Toast.makeText(this,"No se pudo abrir el acta",0).show();}});
+                refresh.setOnClickListener(v->{refresh.setEnabled(false);refresh.setText("Actualizando…");new Thread(()->{boolean ok=false;try{com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(getApplicationContext());org.json.JSONObject parsed=RugbyHubActivity.extractOfficialAct(url);if(!parsed.optString("lineups").trim().isEmpty()){cache.edit().putString(url,parsed.toString()).apply();ok=true;}}catch(Exception ignored){}final boolean success=ok;runOnUiThread(()->{if(success){content.removeAllViews();renderActValidation(content,matches,team);}else{refresh.setEnabled(true);refresh.setText("Reintentar");android.widget.Toast.makeText(this,"No se pudo actualizar; se conserva el acta anterior",1).show();}});}).start();});
+            }
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(5),0,dp(5));rows.addView(card,lp);cardsList.add(card);states.add(state);
         }
         standingSection(content,"Cobertura de validación · "+total+" resultados");
         LinearLayout metrics=new LinearLayout(this);content.addView(metrics);standingMetric(metrics,""+complete,"Comprobadas");standingMetric(metrics,""+partial,"Parciales");standingMetric(metrics,""+pending,"Pendientes");
-        content.addView(txt("Comprobaciones iniciales sobre actas almacenadas. No certifican todos los datos del documento oficial.",11,0xffb8d4cc));content.addView(rows);
+        android.widget.Spinner filter=new android.widget.Spinner(this);filter.setAdapter(new android.widget.ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Todas","Comprobadas","Parciales","Pendientes"}));content.addView(filter);
+        filter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){for(int n=0;n<cardsList.size();n++)cardsList.get(n).setVisibility(position==0||states.get(n)==position?View.VISIBLE:View.GONE);}public void onNothingSelected(android.widget.AdapterView<?> parent){}});
+        content.addView(txt("Comprobaciones sobre actas almacenadas. No certifican todos los datos del documento oficial.",11,0xffb8d4cc));content.addView(rows);
     }
 
     private void renderTeamSanctions(LinearLayout content,java.util.ArrayList<org.json.JSONObject> matches,String team,int duration){
@@ -1358,7 +1388,7 @@ public class MainActivity extends Activity {
                 int bonusO=standingNumber(values[11]),bonusD=standingNumber(values[12]);
                 standingColumns3D(content,new String[]{"Ofens.","Defens."},new int[]{bonusO,bonusD},new int[]{0xff48dca2,0xff56aaf2});
             }else{
-                if(active[0]!=6)standingSection(content,labels[active[0]]);
+                if(active[0]!=6&&active[0]!=7)standingSection(content,labels[active[0]]);
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
                 if(active[0]==7){
                     renderActValidation(content,matches,team);
