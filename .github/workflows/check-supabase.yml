@@ -1,0 +1,45 @@
+name: Comprobar Supabase
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar acceso sin mostrar claves
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.request, urllib.error
+          from urllib.parse import urlparse
+          base=os.environ['SUPABASE_URL'].rstrip('/')
+          u=urlparse(base)
+          if u.scheme!='https' or not u.hostname or not u.hostname.endswith('.supabase.co') or u.path or u.query or u.username or u.password:
+              raise SystemExit('URL de Supabase no válida')
+          public=os.environ['SUPABASE_PUBLISHABLE_KEY']
+          secret=os.environ['SUPABASE_SECRET_KEY']
+          if not public.startswith('sb_publishable_') or not secret.startswith('sb_secret_'):
+              raise SystemExit('Revisar las claves configuradas')
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): return None
+          opener=urllib.request.build_opener(NoRedirect())
+          def check(table,key,expected):
+              req=urllib.request.Request(base+'/rest/v1/'+table+'?select=id&limit=0',headers={'apikey':key})
+              try:
+                  with opener.open(req,timeout=20) as r: status=r.status
+              except urllib.error.HTTPError as e: status=e.code
+              except Exception: raise SystemExit('Error de conexión')
+              print(table, status, 'OK' if status in expected else 'ERROR')
+              return status in expected
+          tables='temporadas categorias competiciones clubes equipos jornadas partidos reglamentos clasificaciones versiones_datos'.split()
+          private='actas actas_versiones jugadores jugadores_equipos alineaciones personal_partidos anotaciones sustituciones sanciones participaciones estadisticas_equipos estadisticas_jugadores validaciones sincronizaciones sincronizacion_detalles'.split()
+          results=[check(t,public,{200}) for t in tables]
+          results += [check(t,public,{401,403,404}) for t in private]
+          results += [check(t,secret,{200}) for t in tables+private]
+          if not all(results): raise SystemExit('Hay comprobaciones pendientes de corregir')
+          print('Conexión y permisos de lectura comprobados')
+          PY
