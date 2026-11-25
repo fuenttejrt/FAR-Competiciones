@@ -157,8 +157,30 @@ jobs:
                           print('Personal',role,'local' if side==0 else 'visitante','registros completos',len(hits))
                   first=doc.pages[0].extract_text(x_tolerance=3,y_tolerance=2) or ''
                   referee=re.search(r'(?is)Árbitro\s+N[ºo]\s*Licencia del árbitro[^\n]*\n\s*([^\d\n]+?)\s+(\d{7})\b',first)
-                  if referee: staff_ids.add(referee.group(2))
-                  print('Árbitro principal completo',bool(referee))
+                  # Locate the referee licence column independently of wrapped names.
+                  referee_id=referee.group(2) if referee else None
+                  words=page.extract_words(x_tolerance=2,y_tolerance=2)
+                  headings=[w for w in words if w['text'].casefold()=='árbitro']
+                  for h in headings:
+                      same=[w for w in words if abs(w['top']-h['top'])<3]
+                      if not any(w['text'].casefold()=='licencia' for w in same): continue
+                      candidates=[w for w in words if re.fullmatch(r'\d{7}',w['text']) and 2<w['top']-h['top']<35]
+                      for a in candidates:
+                          row=[w for w in words if abs(w['top']-a['top'])<2 and h['x0']-5<=w['x0']<a['x0']]
+                          if sum(any(c.isalpha() for c in w['text']) for w in row)>=2 and a['text'] not in licences and a['text'] not in staff_ids:
+                              if len(candidates)==1: referee_id=a['text']
+                  if referee_id: staff_ids.add(referee_id)
+                  # Diagnose remaining anchors without exposing names or numbers.
+                  for side,ids in rejected.items():
+                      for ident in ids:
+                          if ident in staff_ids: continue
+                          anchors=[w for w in words if w['text']==ident and (w['x0']<page.width/2)==(side==0)]
+                          for a in anchors:
+                              row=[w for w in words if abs(w['top']-a['top'])<2]
+                              nearby=[w for w in words if abs(w['top']-a['top'])<25]
+                              labels=[label for label in ('licencia','árbitro','delegado','entrenador','juez','médico','sanitario','capitán','firma') if any(label in w['text'].casefold() for w in nearby)]
+                              print('Ancla pendiente','local' if side==0 else 'visitante','altura relativa',round(a['top']/page.height,3),'etiquetas próximas',','.join(labels),'números en fila',sum(w['text'].isdigit() for w in row))
+                  print('Árbitro principal completo',bool(referee_id))
                   print('Filas excluidas de alineación explicadas por personal',sum(x in staff_ids for ids in rejected.values() for x in ids),'de',sum(map(len,rejected.values())))
               for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
                   print(term, 'detectado' if term in content.casefold() else 'no detectado')
