@@ -1,0 +1,45 @@
+name: Probar lectura de actas M14
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python -m pip install pypdf
+      - name: Comprobar PDF sin publicar datos personales
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request,urllib.parse,io,hashlib,re
+          from pypdf import PdfReader
+          base=os.environ['SUPABASE_URL'].rstrip('/')
+          key=os.environ['SUPABASE_SECRET_KEY']
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): return None
+          opener=urllib.request.build_opener(NoRedirect())
+          def get(table,params):
+              req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
+              with opener.open(req,timeout=30) as r: return json.load(r)
+          for cid in ('11','12','15'):
+              comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
+              if len(comps)!=1: raise SystemExit('Competición ambigua')
+              rounds=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'})
+              matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante','order':'id.asc','limit':'1'})
+              if not matches: raise SystemExit('Sin actas: '+cid)
+              m=matches[0]; url=m['url_acta']
+              u=urllib.parse.urlparse(url)
+              if u.scheme!='https' or u.netloc!='farugby.matchready.es' or not re.fullmatch(r'/es/public/competition/match_pdf/\d+/act/?',u.path): raise SystemExit('URL no admitida')
+              with opener.open(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=40) as r: raw=r.read(15000001)
+              if len(raw)>15000000 or not raw.startswith(b'%PDF'): raise SystemExit('PDF no válido')
+              pdf=PdfReader(io.BytesIO(raw))
+              content='\n'.join(p.extract_text() or '' for p in pdf.pages)
+              if not content.strip(): raise SystemExit('PDF sin texto extraíble')
+              print('Competición',cid,'partido interno',m['id'],'páginas',len(pdf.pages),'caracteres',len(content),'SHA256',hashlib.sha256(raw).hexdigest())
+              print('Marcador calendario:',m['puntos_local'],m['puntos_visitante'])
+              for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
+                  print(term, 'detectado' if term in content.casefold() else 'no detectado')
+          PY
