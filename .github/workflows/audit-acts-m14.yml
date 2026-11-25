@@ -77,6 +77,8 @@ jobs:
                               roster['local' if side==0 else 'visitante']={x[1] for x in parsed}
                               split=next((y for y in headers if parsed and y>min(x[0] for x in parsed)+2),None)
                               starters=sum(x[0]<split for x in parsed) if split is not None else None
+                              if starters!=15 or len(parsed)==starters:
+                                  print('Diagnóstico plantilla reducida',m['id'],'lado',side,'titulares',starters,'total',len(parsed),'licencias columna plantilla',sum(min(headers,default=page.height)<w['top']<page.height*.65 and page.width*.38<w['x0']-side*page.width/2<page.width*.48 for w in anchors),'cabeceras dorsal',len(headers))
                               duplicates=len(parsed)-len({x[1] for x in parsed})
                               print('Licencias repetidas dentro del equipo',len(parsed)-len({x[2] for x in parsed}))
                               repeated=sum(x[2] in licences for x in parsed)
@@ -170,6 +172,12 @@ jobs:
                                       if name and licence and any(c.isalpha() for c in name):
                                           hits.append(licence.group(1))
                                   if len(hits)==1: staff_ids.add(hits[0])
+                                  if role=='Juez línea' and not hits:
+                                      labels=[i for i,line in enumerate(lines) if re.search(r'(?i)juez\s+l[ií]nea',line)]
+                                      for idx in labels:
+                                          segment=' '.join(lines[idx:idx+3])
+                                          print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',True,'licencia presente',bool(re.search(r'\b\d{7}\b',segment)),'nombre presente',bool(re.search(r'(?i)juez\s+l[ií]nea\s*:\s*[A-Za-zÁÉÍÓÚÑáéíóúñ]',lines[idx])))
+                                      if not labels: print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',False)
                                   print('Personal',role,'local' if side==0 else 'visitante','registros completos',len(hits))
                           words=page.extract_words(x_tolerance=2,y_tolerance=2)
                           referee_id=None
