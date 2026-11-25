@@ -619,6 +619,16 @@ jobs:
           print('IDENTIDAD PLAN existentes',sum(v>0 for v in mapping.values()),'nuevos',sum(v<0 for v in mapping.values()),'equipos confirmados',len(confirmed_teams),'relaciones',len(links))
           print('IDENTIDAD PLAN jugadores multiequipo',sum(n>1 for n in Counter(j for j,t in links).values()))
           print('IDENTIDAD PLAN solo lectura; IDs temporales no persistidos')
+          # Validate the real identity payload inside PostgreSQL, without persisting personal data.
+          identity_payload=[dict(licencia=str(ident),nombre=next(iter(name_variants[ident])),equipo_id=team) for team,ident in players]
+          req=urllib.request.Request(base+'/rest/v1/rpc/importar_identidades_m14',data=json.dumps(dict(p_filas=identity_payload,p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+          try:
+              with opener.open(req,timeout=60) as response: identity_probe=json.load(response)
+          except urllib.error.HTTPError as exc:
+              raise SystemExit('Validación SQL identidades HTTP '+str(exc.code)) from None
+          expected_probe=dict(identidades=len(identities_expected),relaciones=len(links),nuevos=sum(v<0 for v in mapping.values()),simulacion=True)
+          if identity_probe!=expected_probe: raise SystemExit('Validación SQL identidades no coincide')
+          print('VALIDACION SQL IDENTIDADES',len(identities_expected),'relaciones',len(links),'nuevos',expected_probe['nuevos'],'solo simulación')
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
