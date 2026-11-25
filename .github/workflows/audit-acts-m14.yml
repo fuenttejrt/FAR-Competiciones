@@ -30,11 +30,12 @@ jobs:
           players=defaultdict(Counter)
           accepted=0
           expected_acts=0
+          round_totals=defaultdict(Counter)
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1: raise SystemExit('Competición ambigua')
               rounds=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'})
-              matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante,equipo_local_id,equipo_visitante_id','order':'id.asc'})
+              matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante,equipo_local_id,equipo_visitante_id,jornada_id','order':'id.asc'})
               if not matches: raise SystemExit('Sin actas: '+cid)
               expected_acts+=len(matches)
               print('Actas a revisar',cid,len(matches))
@@ -358,6 +359,25 @@ jobs:
                           team_id=m['equipo_'+side+'_id']
                           tc=team_totals[team_id]
                           tc['actas']+=1
+                          pf=sum(weights[k] for k,t,d in scores[side])
+                          pa=sum(weights[k] for k,t,d in scores[other])
+                          for bucket in (tc,round_totals[(team_id,m['jornada_id'])]):
+                              bucket['partidos']+=1
+                              bucket['victorias']+=int(pf>pa)
+                              bucket['empates']+=int(pf==pa)
+                              bucket['derrotas']+=int(pf<pa)
+                              bucket['pf_'+side]+=pf
+                              bucket['pc_'+side]+=pa
+                              bucket['partidos_'+side]+=1
+                              bucket['ensayos_contra']+=sum(k=='E' for k,t,d in scores[other])
+                              bucket['ensayos']+=sum(k=='E' for k,t,d in scores[side])
+                              bucket['transformaciones']+=sum(k=='T' for k,t,d in scores[side])
+                              bucket['ensayos_castigo']+=sum(k=='EC' for k,t,d in scores[side])
+                              if all(participation[x][1] for x in ('local','visitante')) and not duration_warning:
+                                  bucket['igualdad']+=equal
+                                  bucket['superioridad']+=superior if side=='local' else inferior
+                                  bucket['inferioridad']+=inferior if side=='local' else superior
+                                  bucket['minutos_balance']+=36
                           tc['puntos_favor']+=sum(weights[k] for k,t,d in scores[side])
                           tc['puntos_contra']+=sum(weights[k] for k,t,d in scores[other])
                           tc['convocatorias']+=len(roster[side])
@@ -370,6 +390,7 @@ jobs:
                               pc['titularidades']+=int(d in starting[side])
                               if reliable:
                                   pc['minutos']+=mins[d]
+                                  pc['minutos_posibles']+=36
                                   pc['jugados']+=int(mins[d]>0)
                                   pc['actas_participacion']+=1
                           for k,t,d in scores[side]:
@@ -394,4 +415,16 @@ jobs:
               print('Consolidación jugadores',field,sum(c[field] for c in players.values()))
           if accepted!=expected_acts: raise SystemExit('Consolidación incompleta')
           if sum(c['puntos_favor'] for c in team_totals.values())!=sum(c['puntos'] for c in players.values())+7*sum(c['EC'] for c in team_totals.values()): raise SystemExit('Balance anotación incorrecto')
+          def ratio(n,d): return round(n/d,4) if d else None
+          team_metrics={i:{'puntos_por_partido':ratio(c['puntos_favor'],c['partidos']),'puntos_contra_por_partido':ratio(c['puntos_contra'],c['partidos']),'proporcion_ensayos_transformados':ratio(c['T'],c['E']),'victorias':ratio(c['victorias'],c['partidos']),'superioridad':ratio(c['superioridad'],c['minutos_balance']),'inferioridad':ratio(c['inferioridad'],c['minutos_balance']),'puntos_local_por_partido':ratio(c['pf_local'],c['partidos_local']),'puntos_visitante_por_partido':ratio(c['pf_visitante'],c['partidos_visitante'])} for i,c in team_totals.items()}
+          player_metrics={i:{'participacion':ratio(c['minutos'],c['minutos_posibles']),'puntos_por_convocatoria':ratio(c['puntos'],c['convocatorias']),'titularidad':ratio(c['titularidades'],c['convocatorias'])} for i,c in players.items()}
+          for field in ('partidos','victorias','empates','derrotas','igualdad','superioridad','inferioridad','minutos_balance','ensayos_contra'):
+              total=sum(c[field] for c in team_totals.values())
+              if total!=sum(c[field] for c in round_totals.values()): raise SystemExit('Balance jornadas incorrecto')
+              print('Avanzadas',field,total)
+          for c in team_totals.values():
+              if c['victorias']+c['empates']+c['derrotas']!=c['partidos'] or c['igualdad']+c['superioridad']+c['inferioridad']!=c['minutos_balance']: raise SystemExit('Balance equipo incorrecto')
+          if sum(c['superioridad'] for c in team_totals.values())!=sum(c['inferioridad'] for c in team_totals.values()): raise SystemExit('Balance superioridad incorrecto')
+          if any(c['minutos']>c['minutos_posibles'] for c in players.values()): raise SystemExit('Participación incorrecta')
+          print('Avanzadas registros equipos',len(team_metrics),'jugadores',len(player_metrics),'equipo jornada',len(round_totals))
           PY
