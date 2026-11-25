@@ -26,15 +26,17 @@ jobs:
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
           from collections import Counter,defaultdict
-          teams=defaultdict(Counter)
+          team_totals=defaultdict(Counter)
           players=defaultdict(Counter)
           accepted=0
+          expected_acts=0
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1: raise SystemExit('Competición ambigua')
               rounds=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'})
               matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante,equipo_local_id,equipo_visitante_id','order':'id.asc'})
               if not matches: raise SystemExit('Sin actas: '+cid)
+              expected_acts+=len(matches)
               print('Actas a revisar',cid,len(matches))
               for m in matches:
                   try:
@@ -354,7 +356,7 @@ jobs:
                           continue
                       for side,other in [('local','visitante'),('visitante','local')]:
                           team_id=m['equipo_'+side+'_id']
-                          tc=teams[team_id]
+                          tc=team_totals[team_id]
                           tc['actas']+=1
                           tc['puntos_favor']+=sum(weights[k] for k,t,d in scores[side])
                           tc['puntos_contra']+=sum(weights[k] for k,t,d in scores[other])
@@ -385,9 +387,11 @@ jobs:
                           print(term, 'detectado' if term in content.casefold() else 'no detectado')
                   except Exception as exc:
                       print('Error de auditoría partido',m['id'],type(exc).__name__)
-          print('Consolidación actas aceptadas',accepted,'equipos',len(teams),'jugadores por equipo',len(players))
+          print('Consolidación actas aceptadas',accepted,'equipos',len(team_totals),'jugadores por equipo',len(players))
           for field in ('convocatorias','E','T','EC','puntos_favor','puntos_contra','actas_participacion','Expulsiones temporales','Expulsiones definitivas'):
-              print('Consolidación equipos',field,sum(c[field] for c in teams.values()))
+              print('Consolidación equipos',field,sum(c[field] for c in team_totals.values()))
           for field in ('convocatorias','titularidades','E','T','puntos','minutos','actas_participacion','Expulsiones temporales','Expulsiones definitivas'):
               print('Consolidación jugadores',field,sum(c[field] for c in players.values()))
+          if accepted!=expected_acts: raise SystemExit('Consolidación incompleta')
+          if sum(c['puntos_favor'] for c in team_totals.values())!=sum(c['puntos'] for c in players.values())+7*sum(c['EC'] for c in team_totals.values()): raise SystemExit('Balance anotación incorrecto')
           PY
