@@ -975,6 +975,7 @@ public class MainActivity extends Activity {
         int suspension=CompetitionRules.temporarySuspensionMinutes(season,category);
         int checked=0,played=0,shortTime=0,multiple=0,playerTime=0,yellow=0,red=0;
         int superior=0,equal=0,inferior=0,relativeChecked=0;
+        java.util.Map<String,int[]> ranking=new java.util.HashMap<>();java.util.Map<String,String> names=new java.util.HashMap<>();
         int[][] venue=new int[2][3];
         java.util.ArrayList<String> labels=new java.util.ArrayList<>();
         java.util.ArrayList<Integer> times=new java.util.ArrayList<>();
@@ -983,10 +984,15 @@ public class MainActivity extends Activity {
         for(org.json.JSONObject game:matches){
             if(standingMatchScore(game.optString("score"))==null)continue;
             played++;boolean local=teamKey(team).equals(teamKey(game.optString("home")));int v=local?0:1;
-            int y=0,r=0,one=0,many=0,loss=0;boolean valid=duration>0,rivalValid=duration>0;
+            int y=0,r=0,one=0,many=0,loss=0,ms=0,me=0,mi=0;java.util.Map<String,int[]> matchCards=new java.util.HashMap<>();java.util.Map<String,String> ids=new java.util.HashMap<>();boolean valid=duration>0,rivalValid=duration>0;
             java.util.Map<String,boolean[]> intervals=new java.util.HashMap<>(),rivalIntervals=new java.util.HashMap<>();
             try{
                 org.json.JSONObject act=new org.json.JSONObject(cache.getString(game.optString("actUrl"),"{}"));
+                int lineupSide=-1;
+                for(String line:act.optString("lineups").split("\\r?\\n")){
+                    String z=line.trim();if(z.equals("EQUIPO LOCAL"))lineupSide=0;else if(z.equals("EQUIPO VISITANTE"))lineupSide=1;else if(z.startsWith("JUGADORES SIN EQUIPO"))lineupSide=-1;
+                    else if(lineupSide==(local?0:1)){java.util.regex.Matcher lm=java.util.regex.Pattern.compile("^(\\d+)\\s*·\\s*(.*?)\\s*\\|\\s*(\\d{7}).*$").matcher(z);if(lm.matches()){ids.put(lm.group(1),lm.group(3));names.put(lm.group(3),lm.group(2));}}
+                }
                 for(String key:new String[]{"temporaryCards","definitiveCards"}){
                     int side=-1;boolean found=false,rivalFound=false;String raw=act.optString(key);
                     for(String line:raw.split("\\r?\\n")){
@@ -999,7 +1005,7 @@ public class MainActivity extends Activity {
                         boolean definitive=key.equals("definitiveCards");
                         if(!m.find()||duration<=0||(!definitive&&suspension<=0)){if(own)valid=false;else rivalValid=false;continue;}
                         int from=Integer.parseInt(m.group(1));if(from<0||from>duration){if(own)valid=false;else rivalValid=false;continue;}
-                        if(own){if(definitive)r++;else y++;}
+                        if(own){if(definitive)r++;else y++;int[] cr=matchCards.computeIfAbsent(m.group(2),k->new int[2]);cr[definitive?1:0]++;}
                         boolean[] interval=(own?intervals:rivalIntervals).computeIfAbsent(m.group(2),k->new boolean[duration]);
                         for(int n=from;n<(definitive?duration:Math.min(duration,from+suspension));n++)interval[n]=true;
                     }
@@ -1009,11 +1015,12 @@ public class MainActivity extends Activity {
             labels.add("P"+played);
             if(valid){
                 for(int n=0;n<duration;n++){int count=0;for(boolean[] interval:intervals.values())if(interval[n])count++;if(count>0)one++;if(count>1)many++;loss+=count;}
+                for(java.util.Map.Entry<String,int[]> entry:matchCards.entrySet()){String id=ids.get(entry.getKey());if(id==null)continue;int[] total=ranking.computeIfAbsent(id,k->new int[3]);total[0]+=entry.getValue()[0];total[1]+=entry.getValue()[1];for(boolean minute:intervals.get(entry.getKey()))if(minute)total[2]++;}
                 checked++;shortTime+=one;multiple+=many;playerTime+=loss;yellow+=y;red+=r;venue[v][0]++;venue[v][1]+=y;venue[v][2]+=r;
             }
-            if(valid&&rivalValid){relativeChecked++;for(int n=0;n<duration;n++){int ownCount=0,rivalCount=0;for(boolean[] x:intervals.values())if(x[n])ownCount++;for(boolean[] x:rivalIntervals.values())if(x[n])rivalCount++;if(ownCount>rivalCount)inferior++;else if(ownCount<rivalCount)superior++;else equal++;}}
+            if(valid&&rivalValid){relativeChecked++;for(int n=0;n<duration;n++){int ownCount=0,rivalCount=0;for(boolean[] x:intervals.values())if(x[n])ownCount++;for(boolean[] x:rivalIntervals.values())if(x[n])rivalCount++;if(ownCount>rivalCount){inferior++;mi++;}else if(ownCount<rivalCount){superior++;ms++;}else{equal++;me++;}}}
             times.add(valid?one:-1);
-            details.addView(txt("P"+played+" · "+game.optString(local?"away":"home")+" · "+(valid?y+" amarillas / "+r+" rojas · "+one+" min con sanción":"Sin verificar"),12,valid?0xffb8d4cc:0xffffc365));
+            details.addView(txt("P"+played+" · "+game.optString(local?"away":"home")+" · "+(valid?y+" amarillas / "+r+" rojas · "+one+" min con sanción"+(rivalValid?" · Sup. "+ms+" / Igual "+me+" / Inf. "+mi+" min":" · Balance sin verificar"):"Sin verificar"),12,valid?0xffb8d4cc:0xffffc365));
         }
         standingSection(content,"Disciplina colectiva · "+checked+"/"+played+" actas");
         LinearLayout cards=new LinearLayout(this);content.addView(cards);
@@ -1031,8 +1038,12 @@ public class MainActivity extends Activity {
         }
         if(!times.isEmpty()){standingSection(content,"Minutos con sanción por partido");int[] vals=new int[times.size()],colors=new int[times.size()];for(int n=0;n<vals.length;n++){vals[n]=times.get(n);colors[n]=0xffffc365;}standingColumns3D(content,labels.toArray(new String[0]),vals,colors);}
         standingSection(content,"Balance numérico por sanciones · "+relativeChecked+"/"+played+" actas");
-        if(relativeChecked>0){standingColumns3D(content,new String[]{"Superioridad","Igualdad","Inferioridad"},new int[]{superior,equal,inferior},new int[]{0xff48dca2,0xff65c5ef,0xffed7979});content.addView(txt("Minutos según sanciones de ambos equipos; no incluye posibles reemplazos ni diferencias iniciales de plantilla.",11,0xffb8d4cc));}
-        content.addView(details);
+        if(relativeChecked>0){standingPie(content,new int[]{superior,equal,inferior},new int[]{0xff48dca2,0xff65c5ef,0xffed7979},new String[]{"Superioridad (min)","Igualdad (min)","Inferioridad (min)"});content.addView(txt("Minutos según sanciones de ambos equipos; no incluye posibles reemplazos ni diferencias iniciales de plantilla.",11,0xffb8d4cc));}
+        standingSection(content,"Jugadores sancionados");
+        java.util.ArrayList<String> ranked=new java.util.ArrayList<>(ranking.keySet());ranked.sort((x,y)->Integer.compare(ranking.get(y)[2],ranking.get(x)[2]));
+        for(String id:ranked){int[] cr=ranking.get(id);content.addView(txt(names.getOrDefault(id,id)+" · "+cr[0]+" A / "+cr[1]+" R · "+cr[2]+" min",13,0xffe2f5fa));}
+        if(ranked.isEmpty())content.addView(txt("Sin jugadores sancionados identificados",12,0xffb8d4cc));
+        standingSection(content,"Detalle por partido");content.addView(details);
     }
 
     private java.util.ArrayList<String[]> reconciledScoring(org.json.JSONObject act,String official){
@@ -1197,7 +1208,7 @@ public class MainActivity extends Activity {
             for(int i=0;i<tabButtons.length;i++){
                 TextView tab=tabButtons[i];
                 tab.setTextColor(i==active[0]?0xff092c25:0xffd9eaff);
-                tab.setCompoundDrawables(null,standingNavIcon(i,i==active[0]?0xff092c25:0xffd9eaff),null,null);
+                tab.setCompoundDrawables(null,standingNavIcon(i==6?8:i,i==active[0]?0xff092c25:0xffd9eaff),null,null);
                 android.graphics.drawable.GradientDrawable tabBg=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{i==active[0]?0xff83e9bf:0xff244f86,i==active[0]?0xff40bc92:0xff17365c});tabBg.setCornerRadius(dp(7));tabBg.setStroke(dp(1),i==active[0]?0xffa5f6d4:0xff507eb1);tab.setBackground(tabBg);
             }
             if(active[0]==4){
@@ -1297,7 +1308,7 @@ public class MainActivity extends Activity {
                 int bonusO=standingNumber(values[11]),bonusD=standingNumber(values[12]);
                 standingColumns3D(content,new String[]{"Ofens.","Defens."},new int[]{bonusO,bonusD},new int[]{0xff48dca2,0xff56aaf2});
             }else{
-                standingSection(content,labels[active[0]]);
+                if(active[0]!=6)standingSection(content,labels[active[0]]);
                 java.util.ArrayList<org.json.JSONObject> matches=standingTeamMatches(data,team);
                 if(active[0]==6){
                     renderTeamSanctions(content,matches,team,CompetitionRules.matchMinutes(season,category,selectedCompetition));
@@ -2062,6 +2073,9 @@ public class MainActivity extends Activity {
                 q.moveTo(7,3);q.lineTo(17,3);q.lineTo(17,10);q.quadTo(17,15,12,15);q.quadTo(7,15,7,10);q.close();c.drawPath(q,p);q.reset();q.moveTo(7,5);q.lineTo(3,5);q.quadTo(3,12,8,12);q.moveTo(17,5);q.lineTo(21,5);q.quadTo(21,12,16,12);c.drawPath(q,p);c.drawLine(12,15,12,20,p);c.drawLine(7,21,17,21,p);break;
             case 6:
                 c.drawArc(4,4,20,20,35,285,false,p);c.drawLine(20,4,20,10,p);c.drawLine(20,10,14,10,p);break;
+            case 8:
+                c.save();c.rotate(17,16,12);c.drawRoundRect(12,4,21,20,1.4f,1.4f,p);c.restore();
+                c.save();c.rotate(-13,8,12);p.setStyle(android.graphics.Paint.Style.FILL);c.drawRoundRect(3,4,12,20,1.4f,1.4f,p);c.restore();break;
             case 7:
                 q.moveTo(11,5);q.lineTo(4,5);q.lineTo(4,20);q.lineTo(19,20);q.lineTo(19,13);c.drawPath(q,p);c.drawLine(12,3,21,3,p);c.drawLine(21,3,21,12,p);c.drawLine(11,13,21,3,p);break;
         }
