@@ -1,0 +1,38 @@
+name: Comprobar histórico de versiones
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request,urllib.parse
+          base=os.environ['SUPABASE_URL'].rstrip('/')
+          u=urllib.parse.urlparse(base)
+          if u.scheme!='https' or not u.hostname.endswith('.supabase.co'): raise SystemExit('Destino inválido')
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs): return None
+          opener=urllib.request.build_opener(NoRedirect())
+          headers={'apikey':os.environ['SUPABASE_SECRET_KEY'],'Content-Type':'application/json'}
+          def call(path,body=None):
+              req=urllib.request.Request(base+'/rest/v1/'+path,headers=headers,data=None if body is None else json.dumps(body).encode())
+              with opener.open(req,timeout=30) as res: return json.load(res)
+          rows=call('actas?select=id,partido_id,version,hash_contenido,url_pdf,estado_validacion,datos&order=id&limit=1000')
+          if not rows: raise SystemExit('No hay actas')
+          a=rows[0]
+          path='actas_versiones?select=id,version&acta_id=eq.'+str(a['id'])
+          before=call(path)
+          args=dict(p_partido_id=a['partido_id'],p_version_esperada=a['version'],p_hash_anterior=a['hash_contenido'],p_hash_nuevo=a['hash_contenido'],p_url_pdf=a['url_pdf'],p_estado=a['estado_validacion'],p_datos=a['datos'])
+          result=call('rpc/actualizar_version_acta',args)
+          after=call('actas?select=id,partido_id,version,hash_contenido,url_pdf,estado_validacion,datos&order=id&limit=1000')
+          if result!=a['version'] or rows!=after or before!=call(path): raise SystemExit('Verificación incorrecta')
+          print('RPC disponible; versión sin cambios:',result)
+          print('Actas intactas:',len(after))
+          print('Histórico de acta de prueba sin cambios')
+          PY
