@@ -1,6 +1,14 @@
 name: Auditar formatos de todas las actas M14
 on:
   workflow_dispatch:
+    inputs:
+      guardar_actas:
+        description: Guardar referencias de actas nuevas en Supabase
+        type: boolean
+        default: false
+concurrency:
+  group: far-m14-actas
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
@@ -10,6 +18,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          GUARDAR_ACTAS: ${{ inputs.guardar_actas }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
@@ -407,7 +416,7 @@ jobs:
                               if kind!='Cambios':
                                   tc[kind]+=1
                                   players[(team_id,identities[side][ds[0]])][kind]+=1
-                      version_plan.append({'partido_id':m['id'],'hash_contenido':content_hash,'estado_validacion':'parcial' if duration_warning or not all(participation[x][1] for x in ('local','visitante')) else 'correcto'})
+                      version_plan.append({'url_pdf':url,'partido_id':m['id'],'hash_contenido':content_hash,'estado_validacion':'parcial' if duration_warning or not all(participation[x][1] for x in ('local','visitante')) else 'correcto'})
                       accepted+=1
                       for term in ('ensayo','transformaci','sustituci','expulsi','titular','suplente','licencia','árbitro'):
                           print(term, 'detectado' if term in content.casefold() else 'no detectado')
@@ -490,5 +499,25 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
-          print('Plan de versiones solo lectura; ninguna escritura')
+          if os.environ.get('GUARDAR_ACTAS')!='true':
+              print('Plan de versiones solo lectura; ninguna escritura')
+          else:
+              from datetime import datetime,timezone
+              if urllib.parse.urlparse(base).scheme!='https' or not urllib.parse.urlparse(base).hostname.endswith('.supabase.co'): raise SystemExit('Destino no admitido')
+              if changes['modificada']: raise SystemExit('Hay versiones modificadas; histórico aún no habilitado')
+              now=datetime.now(timezone.utc).isoformat()
+              rows=[dict(c,version=1,datos={'alcance':'referencia_y_validacion_anotacion_temporal'},descargada_en=now,comprobada_en=now,actualizada_en=now,version_procesador='m14-metadata-1') for c in version_plan if c['partido_id'] not in existing]
+              if rows:
+                  req=urllib.request.Request(base+'/rest/v1/actas?on_conflict=partido_id',data=json.dumps(rows).encode(),headers={'apikey':key,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},method='POST')
+                  with opener.open(req,timeout=60) as response:
+                      if response.status not in (200,201,204): raise SystemExit('Inserción no confirmada')
+              confirmed={}
+              for start in range(0,len(version_plan),50):
+                  ids=[str(x['partido_id']) for x in version_plan[start:start+50]]
+                  for row in get('actas',{'partido_id':'in.('+','.join(ids)+')','select':'partido_id,hash_contenido,version,estado_validacion'}):
+                      if row['partido_id'] in confirmed: raise SystemExit('Duplicado')
+                      confirmed[row['partido_id']]=row
+              if len(confirmed)!=accepted or any(confirmed.get(c['partido_id'],{}).get('hash_contenido')!=c['hash_contenido'] for c in version_plan): raise SystemExit('Verificación de escritura incorrecta')
+              print('Importación referencias confirmadas',len(confirmed),'nuevas previstas',len(rows),'existentes',len(existing))
+              print('Sin datos personales ni sustitución de versiones')
           PY
