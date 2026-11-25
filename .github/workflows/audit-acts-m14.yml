@@ -110,6 +110,14 @@ jobs:
                                   print('Diagnóstico plantilla reducida',m['id'],'lado',side,'titulares',starters,'total',len(parsed),'licencias columna plantilla',sum(min(headers,default=page.height)<w['top']<page.height*.65 and page.width*.38<w['x0']-side*page.width/2<page.width*.48 for w in anchors),'cabeceras dorsal',len(headers))
                               # Compare geometric row reconstruction with baseline extraction.
                               ordered=sorted(parsed)
+                              offset=side*page.width/2
+                              for hy in headers:
+                                  for w in col:
+                                      if abs(w['top']-hy)<2:
+                                          label=w['text'].casefold().strip(':')
+                                          if label in ('dorsal','nombre','apellidos','jugador','licencia','c','x','f','capitán','capitan'):
+                                              roster_audit['cabecera_'+label+'_lado_'+str(side)+'_x_'+str(round((w['x0']-offset)/page.width,3))]+=1
+                              name_left=page.width*.075
                               for idx,(y,d,ident) in enumerate(ordered):
                                   roster_audit['filas']+=1
                                   offset=side*page.width/2
@@ -123,7 +131,7 @@ jobs:
                                   for w in nearby:
                                       if abs(w['top']-y)<2 and any(c.isalpha() for c in w['text']):
                                           roster_audit['texto_x_'+str(round((w['x0']-offset)/page.width,2))]+=1
-                                  tokens=[w for w in nearby if page.width*.10<w['x0']-offset<page.width*.38 and any(c.isalpha() for c in w['text'])]
+                                  tokens=[w for w in nearby if name_left<=w['x0']-offset<page.width*.38 and any(c.isalpha() for c in w['text']) and w['text'].upper() not in ('C','X','F')]
                                   lines=[]
                                   for w in sorted(tokens,key=lambda w:(w['top'],w['x0'])):
                                       if not lines or abs(w['top']-lines[-1][0]['top'])>=2: lines.append([])
