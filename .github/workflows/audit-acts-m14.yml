@@ -902,6 +902,63 @@ jobs:
                   if len(events)!=expected_count: raise SystemExit('Recuento eventos incorrecto')
                   if any((e['partido_id'],e['equipo_id'],e['jugador_id']) not in roster_keys for e in events if e['tipo']!='ensayo_castigo'): raise SystemExit('Evento sin alineación')
               print('INTEGRAL 55',json.dumps(dict(actas=len(match_ids),alineaciones=len(al),participaciones=len(seen),estadisticas_jugadores=len(stored_players),estadisticas_equipos=len(stored_teams),anotaciones=475,sanciones=27,discrepancias=0,solo_lectura=True),sort_keys=True))
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              rosters=defaultdict(dict)
+              for a in all_rows('alineaciones','id,partido_id,equipo_id,jugador_id,dorsal,titular'):
+                  if a['partido_id'] not in match_ids: continue
+                  k=(a['partido_id'],a['equipo_id'])
+                  if a['dorsal'] in rosters[k]: raise SystemExit('Dorsal duplicado')
+                  rosters[k][a['dorsal']]=a
+              timelines=defaultdict(list)
+              changes_db=[e for e in all_rows('sustituciones','id,partido_id,equipo_id,minuto,dorsal_entra,dorsal_sale,jugador_entra_id,jugador_sale_id') if e['partido_id'] in match_ids]
+              sanctions_db=[e for e in all_rows('sanciones','id,partido_id,equipo_id,minuto,dorsal,jugador_id,tipo') if e['partido_id'] in match_ids]
+              if Counter((e['partido_id'],e['equipo_id'],e['minuto'],e['dorsal_entra'],e['dorsal_sale']) for e in changes_db)!=Counter((e['partido_id'],e['equipo_id'],e['minuto'],e['dorsal_entra'],e['dorsal_sale']) for e in changes_payload): raise SystemExit('Sustituciones discrepantes')
+              if len(changes_db)!=271 or len(sanctions_db)!=27: raise SystemExit('Recuento cronología incorrecto')
+              for e in changes_db:
+                  k=(e['partido_id'],e['equipo_id']); a,b=e['dorsal_entra'],e['dorsal_sale']
+                  if rosters[k][a]['jugador_id']!=e['jugador_entra_id'] or rosters[k][b]['jugador_id']!=e['jugador_sale_id']: raise SystemExit('Identidad sustitución discrepante')
+                  timelines[k].append((e['minuto'],'cambio',a,b))
+              for e in sanctions_db:
+                  k=(e['partido_id'],e['equipo_id']); d=e['dorsal']
+                  if rosters[k][d]['jugador_id']!=e['jugador_id']: raise SystemExit('Identidad sanción discrepante')
+                  timelines[k].append((e['minuto'],e['tipo'],d,None))
+              stored_minutes={p['alineacion_id']:p['minutos_jugados'] for p in all_rows('participaciones','id,alineacion_id,minutos_jugados')}
+              occupancy_db={}; sanction_minutes=Counter(); total_minutes=0; returns=0
+              for k,roster in rosters.items():
+                  active={d for d,a in roster.items() if a['titular']}; suspended={}; banned=set(); minutes=Counter(); counts=[]
+                  events=timelines[k]
+                  if any(e[0] is None or not 0<=e[0]<=36 for e in events): raise SystemExit('Minuto evento inválido')
+                  for t in range(37):
+                      for d,end in list(suspended.items()):
+                          if end==t:
+                              del suspended[d]; active.add(d); returns+=int(t<36)
+                      for _,kind,d,leave in (e for e in events if e[0]==t):
+                          if kind=='cambio':
+                              if leave not in active or d in active or d in suspended or d in banned: raise SystemExit('Cambio almacenado incompatible')
+                              active.remove(leave); active.add(d)
+                          else:
+                              if d not in active: raise SystemExit('Sanción almacenada incompatible')
+                              active.remove(d)
+                              if kind=='temporal': suspended[d]=t+5
+                              elif kind=='definitiva': banned.add(d)
+                              else: raise SystemExit('Tipo sanción desconocido')
+                      if t<36:
+                          counts.append(len(active))
+                          minutes.update(active)
+                          sanction_minutes.update((k,d) for d in set(suspended)|banned)
+                  for d,a in roster.items():
+                      if stored_minutes.get(a['id'])!=minutes[d]: raise SystemExit('Minutos reconstruidos discrepantes')
+                  total_minutes+=sum(minutes.values()); occupancy_db[k]=counts
+              balances=defaultdict(Counter)
+              for m in match_map.values():
+                  l=m['equipo_local_id']; v=m['equipo_visitante_id']
+                  for a,b in zip(occupancy_db[(m['id'],l)],occupancy_db[(m['id'],v)]):
+                      balances[l]['superioridad']+=int(a>b); balances[v]['superioridad']+=int(b>a)
+                      balances[l]['inferioridad']+=int(a<b); balances[v]['inferioridad']+=int(b<a)
+                      balances[l]['igualdad']+=int(a==b); balances[v]['igualdad']+=int(a==b)
+              for k,c in balances.items():
+                  if c['superioridad']!=stored_teams[k]['minutos_superioridad'] or c['inferioridad']!=stored_teams[k]['minutos_inferioridad']: raise SystemExit('Balance numérico reconstruido discrepante')
+              print('TIEMPOS 56',json.dumps(dict(partidos=len(match_map),sustituciones=len(changes_db),sanciones=len(sanctions_db),minutos_jugados=total_minutes,minutos_sancionados=sum(sanction_minutes.values()),reincorporaciones=returns,igualdad=sum(c['igualdad'] for c in balances.values()),superioridad=sum(c['superioridad'] for c in balances.values()),inferioridad=sum(c['inferioridad'] for c in balances.values()),discrepancias=0,solo_lectura=True),sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
