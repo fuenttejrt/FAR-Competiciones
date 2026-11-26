@@ -451,6 +451,7 @@ jobs:
                                           lic=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{6})\b',' '.join(lines[i+1:i+4]))
                                           if lic and lic.group(1)==short.group(1):
                                               side61='local' if side==0 else 'visitante'
+                                              staff58.append(dict(partido_id=m['id'],equipo_id=m['equipo_'+side61+'_id'],funcion=role,licencia=lic.group(1),nombre_completo=None,en_alineacion=False))
                                               print('JUEZ 61 identificador repetido sin nombre',m['id'],side61,'coincide_alineacion',lic.group(1) in identities[side61].values())
                                   staff_slots58[(role,'completo' if len(hits)==1 else 'ausente_o_ambiguo')]+=1
                                   if len(hits)==1:
@@ -1013,14 +1014,23 @@ jobs:
           staff_keys58=[(x['partido_id'],x['equipo_id'],x['funcion']) for x in staff58]
           if len(staff_keys58)!=len(set(staff_keys58)): raise SystemExit('Personal duplicado por función y equipo')
           print('PERSONAL 58',json.dumps(dict(registros=len(staff58),por_funcion=dict(Counter(x['funcion'] for x in staff58)),jueces_en_alineacion=sum(x['en_alineacion'] for x in staff58 if x['funcion']=='Juez línea'),cobertura_partidos=len({x['partido_id'] for x in staff58}),huecos_equipo={r+':'+estado:n for (r,estado),n in staff_slots58.items()},solo_lectura=True),ensure_ascii=False,sort_keys=True))
-          if len(staff58) not in range(469,473) or len({x['partido_id'] for x in staff58})!=53: raise SystemExit('Cobertura personal pendiente de revisión')
+          if len(staff58)!=472 or len({x['partido_id'] for x in staff58})!=53: raise SystemExit('Cobertura personal pendiente de revisión')
           if not any(os.environ.get(k)=='true' for k in ('GUARDAR_MINUTOS_SANCION','IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
               staff_scope={(a['partido_id'],a['equipo_id']) for a in al}
               for x in staff58:
                   if x['partido_id'] not in match_ids or (x['equipo_id'] is not None and (x['partido_id'],x['equipo_id']) not in staff_scope): raise SystemExit('Personal fuera de alcance')
-                  if not x['nombre_completo'].strip() or not x['licencia'].strip(): raise SystemExit('Personal incompleto')
+                  if not x['licencia'].strip() or (x['nombre_completo'] is None and x['funcion']!='Juez línea') or (x['nombre_completo'] is not None and not x['nombre_completo'].strip()): raise SystemExit('Personal incompleto')
               existing_staff=[x for x in all_rows('personal_partidos','id,partido_id,equipo_id,funcion') if x['partido_id'] in match_ids]
               print('PERSONAL 59',json.dumps(dict(candidatos=len(staff58),existentes=len(existing_staff),funciones=dict(Counter(x['funcion'] for x in staff58)),relaciones_invalidas=0,solo_lectura=True),ensure_ascii=False,sort_keys=True))
+              if sum(x['nombre_completo'] is None for x in staff58)!=3: raise SystemExit('Personal parcial discrepante')
+              payload62=[{k:v for k,v in x.items() if k!='en_alineacion'} for x in staff58]
+              request62=urllib.request.Request(base+'/rest/v1/rpc/importar_personal_m14',data=json.dumps(dict(p_filas=payload62,p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with opener.open(request62,timeout=90) as response: result62=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit('Simulación personal HTTP '+str(exc.code)) from None
+              if result62!=dict(candidatos=472,parciales=3,insertados=0,simulacion=True): raise SystemExit('Simulación personal discrepante')
+              print('PERSONAL 62 simulación',json.dumps(result62,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
