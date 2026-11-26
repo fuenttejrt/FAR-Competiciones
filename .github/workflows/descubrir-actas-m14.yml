@@ -286,6 +286,12 @@ jobs:
               if history_results_before!=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'}):raise SystemExit('Historial alterado')
               print('TOTAL PRUEBAS 79',6,'sin escrituras')
           else:print('PRUEBAS 79 omitidas: no hay candidatos adecuados')
+          if test_pending and test_played:
+              req80=urllib.request.Request(base+'/rest/v1/rpc/probar_resultados_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(req80,timeout=60) as resp: prueba80=json.load(resp)
+              if not all(prueba80.get(k) is True for k in ('escritura','repeticion','historial','reversion')):raise SystemExit('Prueba transaccional 80 fallida')
+              if history_results_before!=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'}):raise SystemExit('Historial alterado tras reversión')
+              print('PRUEBA TRANSACCIONAL 80',json.dumps(prueba80,sort_keys=True))
           payload=dict(p_partidos=proposed,p_jornadas=proposed_rounds,p_simular=True)
           req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_calendario_m14',data=json.dumps(payload).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
