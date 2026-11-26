@@ -42,7 +42,7 @@ jobs:
           python - <<'PY'
           import os,json,re,urllib.request,urllib.parse,unicodedata,io,hashlib
           from pypdf import PdfReader
-          from scripts.extract_m14_core import extract_roster_scoring, extract_events
+          from scripts.extract_m14_core import extract_roster_scoring, extract_events, extract_staff
           import contextlib
           from datetime import datetime
           from zoneinfo import ZoneInfo
@@ -200,9 +200,9 @@ jobs:
                       pdf_id=next(iter(pdf_ids))
                       if m['url_acta'] and actid(m['url_acta'])!=pdf_id:raise SystemExit('Acta distinta para partido asociado')
                       if m['url_acta']:
-                          existing_actas.append(dict(partido=m['id'],acta=pdf_id,url=m['url_acta'],local=home,visitante=away,marcador_web=score,marcador_db=[m['puntos_local'],m['puntos_visitante']]))
+                          existing_actas.append(dict(partido=m['id'],acta=pdf_id,url=m['url_acta'],local=home,visitante=away,marcador_web=score,marcador_db=[m['puntos_local'],m['puntos_visitante']],equipo_local_id=m['equipo_local_id'],equipo_visitante_id=m['equipo_visitante_id']))
                       if not m['url_acta']:
-                          new_actas.append(dict(partido=m['id'],jornada=m['jornada_id'],acta=pdf_id,url=host+'/es/public/competition/match_pdf/'+pdf_id+'/act/',marcador_web=score,local=home,visitante=away,marcador_db=[m['puntos_local'],m['puntos_visitante']]))
+                          new_actas.append(dict(partido=m['id'],jornada=m['jornada_id'],acta=pdf_id,url=host+'/es/public/competition/match_pdf/'+pdf_id+'/act/',marcador_web=score,local=home,visitante=away,marcador_db=[m['puntos_local'],m['puntos_visitante']],equipo_local_id=m['equipo_local_id'],equipo_visitante_id=m['equipo_visitante_id']))
                   j=jmap[m['jornada_id']]
                   if norm(context)!=norm(j['nombre']):
                       counts['contexto_distinto']+=1
@@ -323,6 +323,14 @@ jobs:
                               pdf_counts['91_'+{'Cambios':'cambios','Expulsiones temporales':'amarillas','Expulsiones definitivas':'rojas'}[kind]]+=1
                       pdf_counts['91_minutos']+=sum(sum(mins.values()) for mins,ok in events['participation'].values())
                       for k in ('equal','superior','inferior'):pdf_counts['91_'+k]+=events[k]
+                      with contextlib.redirect_stdout(io.StringIO()):
+                          staff=extract_staff(raw,dict(id=a['partido'],equipo_local_id=a['equipo_local_id'],equipo_visitante_id=a['equipo_visitante_id']),core)
+                      staff_keys={(v['equipo_id'],v['funcion']) for v in staff}
+                      if len(staff_keys)!=len(staff):raise ValueError('Personal duplicado')
+                      pdf_counts['92_personal']+=len(staff)
+                      pdf_counts['92_completos']+=sum(bool(v['nombre_completo']) for v in staff)
+                      pdf_counts['92_parciales']+=sum(not v['nombre_completo'] for v in staff)
+                      for v in staff:pdf_counts['92_'+v['funcion']]+=1
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
