@@ -28,7 +28,7 @@ jobs:
   descubrir:
     runs-on: ubuntu-latest
     steps:
-      - run: pip install beautifulsoup4
+      - run: pip install beautifulsoup4 pypdf
       - name: Comparar calendarios y actualizar en ejecución autorizada
         env:
           ACTUALIZAR: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario) }}
@@ -39,7 +39,8 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           python - <<'PY'
-          import os,json,re,urllib.request,urllib.parse,unicodedata
+          import os,json,re,urllib.request,urllib.parse,unicodedata,io,hashlib
+          from pypdf import PdfReader
           from datetime import datetime
           from zoneinfo import ZoneInfo
           from bs4 import BeautifulSoup
@@ -78,6 +79,7 @@ jobs:
           test_pending=[]
           test_played=[]
           new_actas=[]
+          existing_actas=[]
           verified_links=0
           verified_times=0
           proposed_rounds=[]
@@ -194,8 +196,10 @@ jobs:
                   if pdf_ids:
                       pdf_id=next(iter(pdf_ids))
                       if m['url_acta'] and actid(m['url_acta'])!=pdf_id:raise SystemExit('Acta distinta para partido asociado')
+                      if m['url_acta']:
+                          existing_actas.append(dict(partido=m['id'],acta=pdf_id,url=m['url_acta'],local=home,visitante=away))
                       if not m['url_acta']:
-                          new_actas.append(dict(partido=m['id'],jornada=m['jornada_id'],acta=pdf_id,url=host+'/es/public/competition/match_pdf/'+pdf_id+'/act/',marcador_web=score))
+                          new_actas.append(dict(partido=m['id'],jornada=m['jornada_id'],acta=pdf_id,url=host+'/es/public/competition/match_pdf/'+pdf_id+'/act/',marcador_web=score,local=home,visitante=away))
                   j=jmap[m['jornada_id']]
                   if norm(context)!=norm(j['nombre']):
                       counts['contexto_distinto']+=1
@@ -269,6 +273,36 @@ jobs:
           if len({a['acta'] for a in new_actas})!=len(new_actas) or len({a['partido'] for a in new_actas})!=len(new_actas) or len(new_actas)!=totals['nuevas_candidatas']:raise SystemExit('Asociación de nuevas actas discrepante')
           for a in new_actas:print('CANDIDATA ACTA 87',json.dumps(a,sort_keys=True))
           print('ASOCIACION ACTAS 87',json.dumps(dict(nuevas=len(new_actas),existentes=verified_links,escritura=False),sort_keys=True))
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):return None
+          pdf_opener=urllib.request.build_opener(NoRedirect())
+          pdf_counts=Counter()
+          audit_pdfs=existing_actas if os.environ.get('EVENTO')!='schedule' else []
+          for a in audit_pdfs+new_actas:
+              try:
+                  if actid(a['url'])!=a['acta']:raise ValueError('URL')
+                  with pdf_opener.open(a['url'],timeout=45) as response:raw=response.read(15000001)
+                  if len(raw)>15000000 or not raw.startswith(b'%PDF-'):raise ValueError('Formato o tamaño')
+                  reader=PdfReader(io.BytesIO(raw))
+                  if reader.is_encrypted or not 1<=len(reader.pages)<=50:raise ValueError('Páginas o cifrado')
+                  content='\n'.join(p.extract_text() or '' for p in reader.pages)
+                  if not content.strip():raise ValueError('Texto vacío')
+                  digest=hashlib.sha256(' '.join(content.split()).encode()).hexdigest()
+                  old=get('actas',{'partido_id':'eq.'+str(a['partido']),'select':'id,hash_contenido'})
+                  if len(old)>1:raise ValueError('Acta duplicada')
+                  if old:
+                      if old[0]['hash_contenido']!=digest:raise ValueError('Huella discrepante')
+                      pdf_counts['huella_confirmada']+=1
+                  else:
+                      if a in audit_pdfs:raise ValueError('Acta histórica ausente')
+                      pdf_counts['nueva_legible']+=1
+                  pdf_counts['legibles']+=1
+                  print('PDF 88',a['partido'],'paginas',len(reader.pages),'sha256',digest)
+              except Exception as exc:
+                  pdf_counts['error']+=1
+                  print('ERROR PDF 88',a['partido'],type(exc).__name__)
+          print('VALIDACION PDF 88',json.dumps(dict(pdf_counts),sort_keys=True),'solo lectura')
+          if pdf_counts['error'] or pdf_counts['legibles']!=len(audit_pdfs)+len(new_actas):raise SystemExit('Validación PDF incompleta')
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
