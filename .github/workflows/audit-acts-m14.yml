@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_participaciones:
+        description: Importar realmente las participaciones M14 validadas
+        type: boolean
+        default: false
       importar_sanciones:
         description: Importar realmente las sanciones M14 validadas
         type: boolean
@@ -41,6 +45,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_PARTICIPACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_participaciones || false }}
           IMPORTAR_SANCIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_sanciones || false }}
           IMPORTAR_SUSTITUCIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_sustituciones || false }}
           IMPORTAR_ANOTACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_anotaciones || false }}
@@ -62,7 +67,7 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
-          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
+          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
           # Verify the installed diagnostic RPC using only synthetic temporary rows.
           req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with opener.open(req,timeout=30) as response: probe=json.load(response)
@@ -733,7 +738,7 @@ jobs:
           total_minutes=sum(x['minutos'] for x in participation_payload)
           if len(participation_payload)!=2124 or total_minutes!=56894 or total_minutes!=sum(x['minutos_jugados'] for x in simulated_players): raise SystemExit('Totales de participación discrepantes')
           print('PARTICIPACIONES 48',json.dumps(dict(total=len(participation_payload),partidos=len(set(x['partido_id'] for x in participation_payload)),minutos=total_minutes,titulares=sum(x['titular'] for x in participation_payload),suplentes_con_minutos=sum(not x['titular'] and x['minutos']>0 for x in participation_payload),suplentes_sin_minutos=sum(not x['titular'] and x['minutos']==0 for x in participation_payload),jugadores_con_minutos=sum(x['minutos']>0 for x in participation_payload),simulacion=True),sort_keys=True))
-          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
               request=urllib.request.Request(base+'/rest/v1/rpc/validar_participaciones_m14',data=json.dumps(dict(p_filas=participation_payload)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
               try:
                   with opener.open(request,timeout=90) as response: participation_probe=json.load(response)
@@ -764,6 +769,22 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          if os.environ.get('IMPORTAR_PARTICIPACIONES')=='true':
+              def participation_rpc(simulate):
+                  request=urllib.request.Request(base+'/rest/v1/rpc/validar_participaciones_m14',data=json.dumps(dict(p_filas=participation_payload,p_simular=simulate)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  try:
+                      with opener.open(request,timeout=90) as response: result=json.load(response)
+                  except urllib.error.HTTPError as exc:
+                      raise SystemExit('Importación participaciones HTTP '+str(exc.code)) from None
+                  result.pop('restricciones',None)
+                  expected=dict(total=2124,partidos=53,minutos=56894,titulares=1584,suplentes_con_minutos=256,suplentes_sin_minutos=284,jugadores_con_minutos=1840,simulacion=simulate)
+                  if any(result.get(k)!=v for k,v in expected.items()): raise SystemExit('Resultado participaciones discrepante')
+                  return result
+              participation_rpc(True)
+              first=participation_rpc(False)
+              second=participation_rpc(False)
+              if first.get('insertadas') not in (0,2124) or second.get('insertadas')!=0: raise SystemExit('Idempotencia participaciones incorrecta')
+              print('PARTICIPACIONES 50',json.dumps(first,sort_keys=True),'repetición',second['insertadas'])
           if os.environ.get('IMPORTAR_SANCIONES')=='true':
               if changes['estado_correcto']!=53 or changes['sin_cambios']!=53 or changes['modificada'] or changes['nueva']: raise SystemExit('Actas cambiadas; revisar antes de importar')
               def write_sanctions():
