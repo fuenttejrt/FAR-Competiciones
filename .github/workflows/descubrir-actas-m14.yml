@@ -70,6 +70,7 @@ jobs:
                   soup=BeautifulSoup(r.read(),'html.parser')
               found=set()
               fixtures=[]
+              round_keys=[]
               rows=0
               skipped=0
               score_counts=Counter()
@@ -83,6 +84,14 @@ jobs:
                   if not all(x in h for x in ('equipo local','equipo visitante','resultado','fecha/hora')):continue
                   headers=[' '.join(c.stripped_strings).lower() for c in trs[header].find_all(['td','th'],recursive=False)]
                   idx=[next(i for i,h in enumerate(headers) if label in h) for label in ('equipo local','equipo visitante','resultado','fecha/hora')]
+                  heading=table.find_previous(lambda tag: tag.name in ('h1','h2','h3','h4','h5','h6') and re.search(r'Jornada\s+\d+\.\d+',tag.get_text(' ',strip=True),re.I))
+                  context=heading.get_text(' ',strip=True) if heading else ''
+                  if not context:
+                      prev=table.find_previous(string=re.compile(r'Jornada\s+\d+\.\d+',re.I))
+                      context=str(prev).strip() if prev else ''
+                  rm=re.search(r'Jornada\s+(\d+\.\d+)',context,re.I)
+                  round_key=rm.group(1) if rm else None
+                  print('TABLA 71',cid,round_key,context[:180])
                   for tr in trs[header+1:]:
                       cells=tr.find_all(['td','th'],recursive=False)
                       if len(cells)<4:continue
@@ -103,6 +112,7 @@ jobs:
                           reconciliation['descansos']+=1
                           continue
                       fixtures.append((home,away,date,score))
+                      round_keys.append(round_key)
                       if live:print('DIRECTO 68',cid,home,away,date,score,live)
                       if not re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score):print('PENDIENTE 68',cid,home,away,date,score,'atributos',sorted(tr.attrs.keys()))
                       score_counts['con_marcador' if re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score) else 'sin_marcador']+=1
@@ -114,12 +124,21 @@ jobs:
                       elif ids:found.update(ids)
               matched=set()
               counts=Counter()
-              for home,away,date,score in fixtures:
+              for (home,away,date,score),round_key in zip(fixtures,round_keys):
                   try: day=datetime.strptime(date.split()[0],'%d/%m/%Y').date().isoformat()
                   except (ValueError,IndexError):
                       counts['fecha_web_invalida']+=1
                       continue
                   candidates=[m for m in db if norm(names.get(m['equipo_local_id'],''))==norm(home) and norm(names.get(m['equipo_visitante_id'],''))==norm(away) and dbdate(m['fecha_hora'])==day]
+                  if round_key:
+                      by_round=[m for m in db if norm(names.get(m['equipo_local_id'],''))==norm(home) and norm(names.get(m['equipo_visitante_id'],''))==norm(away) and re.search(r'Jornada\s+'+re.escape(round_key)+r'(?!\d)',jmap[m['jornada_id']]['nombre'],re.I)]
+                      if len(by_round)==1 and (not candidates or candidates[0]['id']==by_round[0]['id']):
+                          candidates=by_round
+                          counts['por_jornada']+=1
+                      else:
+                          counts['jornada_discrepante']+=1
+                          candidates=[]
+                  else:counts['jornada_web_no_detectada']+=1
                   if len(candidates)!=1:
                       counts['sin_asociar' if not candidates else 'ambiguos']+=1
                       print('DIFERENCIA 69',cid,home,away,day,'candidatos',len(candidates))
@@ -132,6 +151,10 @@ jobs:
                       counts['duplicados']+=1
                       continue
                   matched.add(m['id'])
+                  if jmap[m['jornada_id']]['fecha_inicio']!=day:
+                      counts['fecha_jornada_distinta']+=1
+                      print('CAMBIO 71',cid,m['id'],jmap[m['jornada_id']]['nombre'],jmap[m['jornada_id']]['fecha_inicio'],day)
+                  if not m['fecha_hora'] and len(date.split())>1 and date.split()[1]!='00:00':counts['hora_nueva']+=1
                   counts['asociados']+=1
                   sc=re.fullmatch(r'\s*(\d+)\s*[-:]\s*(\d+)\s*',score)
                   if sc and (m['puntos_local'],m['puntos_visitante'])!=tuple(map(int,sc.groups())):counts['marcador_distinto']+=1
