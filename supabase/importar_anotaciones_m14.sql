@@ -1,7 +1,8 @@
 begin;
-create or replace function public.importar_anotaciones_m14(p_filas jsonb)
+drop function if exists public.importar_anotaciones_m14(jsonb);
+create or replace function public.importar_anotaciones_m14(p_filas jsonb,p_simular boolean default true)
 returns jsonb language plpgsql security invoker set search_path=pg_catalog as $$
-declare n integer; np integer; ne integer; nt integer; nec integer; pts integer;
+declare n integer; np integer; ne integer; nt integer; nec integer; pts integer; inserted integer:=0;
 begin
  if jsonb_typeof(p_filas) is distinct from 'array' then raise exception 'Formato inválido'; end if;
  create temporary table far_anotacion_stage(partido_id bigint not null,equipo_id bigint not null,orden_evento integer not null,tipo text not null,minuto integer not null,dorsal integer,puntos integer not null,primary key(partido_id,equipo_id,orden_evento)) on commit drop;
@@ -11,9 +12,18 @@ begin
  if exists(select 1 from pg_temp.far_anotacion_stage s where s.tipo<>'EC' and (select count(*) from public.alineaciones a where a.partido_id=s.partido_id and a.equipo_id=s.equipo_id and a.dorsal=s.dorsal)<>1) then raise exception 'Anotador sin alineación única'; end if;
  if exists(select 1 from pg_temp.far_anotacion_stage s join public.partidos p on p.id=s.partido_id group by s.partido_id,s.equipo_id,p.equipo_local_id,p.puntos_local,p.puntos_visitante having sum(s.puntos) is distinct from case when s.equipo_id=p.equipo_local_id then p.puntos_local else p.puntos_visitante end) then raise exception 'Marcador discrepante'; end if;
  select count(*),count(distinct partido_id),count(*) filter(where tipo='E'),count(*) filter(where tipo='T'),count(*) filter(where tipo='EC'),coalesce(sum(puntos),0) into n,np,ne,nt,nec,pts from pg_temp.far_anotacion_stage;
+ if p_simular is distinct from true then
+   if p_simular is null or n<>475 or np<>53 or ne<>295 or nt<>177 or nec<>3 or pts<>1850 then raise exception 'Importación no autorizada o totales inesperados'; end if;
+   lock table public.anotaciones in share row exclusive mode;
+   if exists(select 1 from public.anotaciones a join (select distinct partido_id from pg_temp.far_anotacion_stage) p on p.partido_id=a.partido_id left join pg_temp.far_anotacion_stage s on s.partido_id=a.partido_id and s.equipo_id=a.equipo_id and s.orden_evento=a.orden_evento left join public.alineaciones al on al.partido_id=s.partido_id and al.equipo_id=s.equipo_id and al.dorsal=s.dorsal where s.partido_id is null or (a.tipo,a.minuto,a.dorsal,a.puntos,a.jugador_id,a.verificada) is distinct from (s.tipo,s.minuto,s.dorsal,s.puntos,al.jugador_id,true)) then raise exception 'Anotaciones existentes discrepantes'; end if;
+   insert into public.anotaciones(partido_id,equipo_id,orden_evento,tipo,minuto,dorsal,puntos,jugador_id,verificada)
+   select s.partido_id,s.equipo_id,s.orden_evento,s.tipo,s.minuto,s.dorsal,s.puntos,al.jugador_id,true from pg_temp.far_anotacion_stage s left join public.alineaciones al on al.partido_id=s.partido_id and al.equipo_id=s.equipo_id and al.dorsal=s.dorsal where not exists(select 1 from public.anotaciones a where a.partido_id=s.partido_id and a.equipo_id=s.equipo_id and a.orden_evento=s.orden_evento);
+   get diagnostics inserted = row_count;
+   if (select count(*) from public.anotaciones a join (select distinct partido_id from pg_temp.far_anotacion_stage) p on p.partido_id=a.partido_id)<>n then raise exception 'Total almacenado incorrecto o duplicados'; end if;
+ end if;
  drop table pg_temp.far_anotacion_stage;
- return jsonb_build_object('anotaciones',n,'partidos_con_anotaciones',np,'ensayos',ne,'transformaciones',nt,'ensayos_castigo',nec,'puntos',pts,'simulacion',true);
+ return jsonb_build_object('anotaciones',n,'partidos_con_anotaciones',np,'ensayos',ne,'transformaciones',nt,'ensayos_castigo',nec,'puntos',pts,'simulacion',p_simular)||case when p_simular then '{}'::jsonb else jsonb_build_object('insertadas',inserted) end;
 end; $$;
-revoke all on function public.importar_anotaciones_m14(jsonb) from public,anon,authenticated;
-grant execute on function public.importar_anotaciones_m14(jsonb) to service_role;
+revoke all on function public.importar_anotaciones_m14(jsonb,boolean) from public,anon,authenticated;
+grant execute on function public.importar_anotaciones_m14(jsonb,boolean) to service_role;
 commit;
