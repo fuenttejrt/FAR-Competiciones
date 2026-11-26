@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_sanciones:
+        description: Importar realmente las sanciones M14 validadas
+        type: boolean
+        default: false
       importar_sustituciones:
         description: Importar realmente las sustituciones M14 validadas
         type: boolean
@@ -37,6 +41,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_SANCIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_sanciones || false }}
           IMPORTAR_SUSTITUCIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_sustituciones || false }}
           IMPORTAR_ANOTACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_anotaciones || false }}
           IMPORTAR_ALINEACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_alineaciones || false }}
@@ -57,7 +62,7 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
-          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
+          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
           # Verify the installed diagnostic RPC using only synthetic temporary rows.
           req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with opener.open(req,timeout=30) as response: probe=json.load(response)
@@ -741,6 +746,31 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          if os.environ.get('IMPORTAR_SANCIONES')=='true':
+              if changes['estado_correcto']!=53 or changes['sin_cambios']!=53 or changes['modificada'] or changes['nueva']: raise SystemExit('Actas cambiadas; revisar antes de importar')
+              def write_sanctions():
+                  request=urllib.request.Request(base+'/rest/v1/rpc/validar_sanciones_m14',data=json.dumps(dict(p_filas=sanctions_payload,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  try:
+                      with opener.open(request,timeout=90) as response: result=json.load(response)
+                  except urllib.error.HTTPError as exc:
+                      try:
+                          error=json.loads(exc.read())
+                          code=str(error.get('code',''))
+                          constraint=re.search(r'constraint "([a-zA-Z0-9_]+)"',str(error.get('message','')))
+                          print('SANCIONES 47 diagnóstico SQL',code if re.fullmatch(r'[A-Z0-9]{5,12}',code) else 'desconocido','restricción',constraint.group(1) if constraint else 'no identificada')
+                      except Exception: pass
+                      raise SystemExit('Importación sanciones HTTP '+str(exc.code)) from None
+                  result.pop('restricciones',None)
+                  return result
+              expected_sanctions=dict(total=27,partidos=16,amarillas=23,rojas=4,simulacion=False)
+              first=write_sanctions()
+              inserted=first.pop('insertadas',None)
+              if first!=expected_sanctions or not isinstance(inserted,int) or not 0<=inserted<=27: raise SystemExit('Resultado de sanciones inesperado')
+              print('SANCIONES 47 insertadas',inserted)
+              if write_sanctions()!=dict(expected_sanctions,insertadas=0): raise SystemExit('Repetición de sanciones incorrecta')
+              print('SANCIONES 47 repetición sin duplicados correcta')
+          else:
+              print('SANCIONES 47 escritura no autorizada; solo simulación')
           if os.environ.get('IMPORTAR_SUSTITUCIONES')=='true':
               if expected_changes!=dict(sustituciones=271,partidos_con_sustituciones=39,simulacion=True): raise SystemExit('Alcance de sustituciones distinto del validado')
               if changes['estado_correcto']!=53 or changes['sin_cambios']!=53 or changes['modificada'] or changes['nueva']: raise SystemExit('Actas cambiadas; revisar antes de importar')
