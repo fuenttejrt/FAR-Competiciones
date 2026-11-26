@@ -64,6 +64,8 @@ jobs:
           proposed=[]
           score_audit=Counter()
           score_proposals=[]
+          test_pending=[]
+          test_played=[]
           verified_links=0
           verified_times=0
           proposed_rounds=[]
@@ -199,6 +201,7 @@ jobs:
                   sc=re.fullmatch(r'\s*(\d+)\s*[-:]\s*(\d+)\s*',score)
                   previous=(m['puntos_local'],m['puntos_visitante'])
                   if sc:
+                      test_played.append(dict(id=m['id'],jornada=jid,anterior=previous,nuevo=previous,tipo='nuevo'))
                       official=tuple(map(int,sc.groups()))
                       score_audit['publicados']+=1
                       score_audit['con_pdf_db' if m['url_acta'] else 'sin_pdf_db']+=1
@@ -208,7 +211,9 @@ jobs:
                           kind='nuevo' if previous==(None,None) else 'correccion'
                           score_audit[kind]+=1
                           score_proposals.append(dict(id=m['id'],jornada=jid,anterior=previous,nuevo=official,tipo=kind,acta_db=bool(m['url_acta'])))
-                  elif previous==(None,None):score_audit['pendientes']+=1
+                  elif previous==(None,None):
+                      score_audit['pendientes']+=1
+                      test_pending.append(dict(id=m['id'],jornada=jid,anterior=[None,None],nuevo=[12,7],tipo='nuevo'))
                   else:
                       score_audit['resultado_retirado']+=1
                       score_proposals.append(dict(id=m['id'],jornada=jid,anterior=previous,nuevo=None,tipo='retirado',acta_db=bool(m['url_acta'])))
@@ -261,6 +266,26 @@ jobs:
           if result_scores.get('simulacion') is not True or sum(result_scores[k] for k in ('candidatos','iguales','bloqueados'))!=len(score_proposals):raise SystemExit('Simulación resultados discrepante')
           if history_results_before!=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'}):raise SystemExit('Historial resultados modificado durante simulación')
           print('SIMULACION RESULTADOS 78',json.dumps(result_scores,sort_keys=True))
+          def test_rpc(rows):
+              req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_resultados_m14',data=json.dumps(dict(p_filas=rows,p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(req,timeout=60) as resp:return json.load(resp)
+          if test_pending and test_played:
+              a=test_pending[0]
+              b=test_played[0]
+              cases=[('nuevo',a,'candidatos'),('repetido',dict(b,anterior=[None,None]),'iguales'),('correccion',dict(b,tipo='correccion',nuevo=[99,0]),'bloqueados'),('retirado',dict(b,tipo='retirado',nuevo=None),'bloqueados')]
+              for label,row,expected in cases:
+                  res=test_rpc([row])
+                  if res.get(expected)!=1 or res.get('simulacion') is not True:raise SystemExit('Prueba 79 fallida '+label)
+                  print('PRUEBA 79',label,'correcta')
+              for label,rows in [('invalido',[dict(a,nuevo=[-1,7])]),('duplicado',[a,a])]:
+                  try:test_rpc(rows)
+                  except urllib.error.HTTPError as e:
+                      if e.code!=400:raise
+                      print('PRUEBA 79',label,'rechazado')
+                  else:raise SystemExit('Entrada inválida aceptada '+label)
+              if history_results_before!=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'}):raise SystemExit('Historial alterado')
+              print('TOTAL PRUEBAS 79',6,'sin escrituras')
+          else:print('PRUEBAS 79 omitidas: no hay candidatos adecuados')
           payload=dict(p_partidos=proposed,p_jornadas=proposed_rounds,p_simular=True)
           req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_calendario_m14',data=json.dumps(payload).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
