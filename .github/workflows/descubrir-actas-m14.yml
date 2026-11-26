@@ -42,7 +42,7 @@ jobs:
           python - <<'PY'
           import os,json,re,urllib.request,urllib.parse,unicodedata,io,hashlib
           from pypdf import PdfReader
-          from scripts.extract_m14_core import extract_roster_scoring
+          from scripts.extract_m14_core import extract_roster_scoring, extract_events
           import contextlib
           from datetime import datetime
           from zoneinfo import ZoneInfo
@@ -315,6 +315,14 @@ jobs:
                       with contextlib.redirect_stdout(io.StringIO()):
                           core=extract_roster_scoring(raw,content,dict(id=a['partido'],puntos_local=x,puntos_visitante=y))
                       if not all(core['score_ok'].get(side,False) for side in ('local','visitante')):raise ValueError('Marcador estructurado')
+                      with contextlib.redirect_stdout(io.StringIO()):
+                          events=extract_events(raw,dict(id=a['partido']),core)
+                      if not all(ok for mins,ok in events['participation'].values()):raise ValueError('Participación incoherente')
+                      for side,items in events['timeline'].items():
+                          for minute,kind,ds,code in items:
+                              pdf_counts['91_'+{'Cambios':'cambios','Expulsiones temporales':'amarillas','Expulsiones definitivas':'rojas'}[kind]]+=1
+                      pdf_counts['91_minutos']+=sum(sum(mins.values()) for mins,ok in events['participation'].values())
+                      for k in ('equal','superior','inferior'):pdf_counts['91_'+k]+=events[k]
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
