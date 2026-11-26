@@ -710,6 +710,16 @@ jobs:
           if sanction_types['Expulsiones temporales']!=sum(x['amarillas'] for x in simulated_players) or sanction_types['Expulsiones definitivas']!=sum(x['rojas'] for x in simulated_players) or sanction_types['Expulsiones temporales']!=sum(x['amarillas'] for x in simulated_teams) or sanction_types['Expulsiones definitivas']!=sum(x['rojas'] for x in simulated_teams):
               raise SystemExit('Totales de sanciones discrepantes')
           print('SANCIONES 45',json.dumps(dict(total=len(sanctions_payload),partidos=len(sanction_counts),amarillas=sanction_types['Expulsiones temporales'],rojas=sanction_types['Expulsiones definitivas'],simulacion=True),sort_keys=True))
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','GUARDAR_ACTAS')):
+              request=urllib.request.Request(base+'/rest/v1/rpc/validar_sanciones_m14',data=json.dumps(dict(p_filas=sanctions_payload)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with opener.open(request,timeout=90) as response: sanctions_probe=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit('Validación sanciones HTTP '+str(exc.code)) from None
+              constraints=sanctions_probe.pop('restricciones',None)
+              if sanctions_probe!=dict(total=27,partidos=16,amarillas=23,rojas=4,simulacion=True) or not isinstance(constraints,list) or not constraints: raise SystemExit('Validación SQL sanciones no coincide')
+              print('SANCIONES 46',json.dumps(sanctions_probe,sort_keys=True))
+              print('SANCIONES 46 restricciones',json.dumps(constraints,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
