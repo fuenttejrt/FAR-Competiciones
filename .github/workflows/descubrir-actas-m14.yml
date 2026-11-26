@@ -50,6 +50,10 @@ jobs:
           names={t['id']:t[namefield] for t in teams}
           totals=Counter()
           reconciliation=Counter()
+          proposed=[]
+          round_dates={}
+          round_meta={}
+          round_sizes=Counter()
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1:raise SystemExit('Competición ambigua')
@@ -71,6 +75,7 @@ jobs:
               found=set()
               fixtures=[]
               round_keys=[]
+              contexts=[]
               rows=0
               skipped=0
               score_counts=Counter()
@@ -113,6 +118,7 @@ jobs:
                           continue
                       fixtures.append((home,away,date,score))
                       round_keys.append(round_key)
+                      contexts.append(context)
                       if live:print('DIRECTO 68',cid,home,away,date,score,live)
                       if not re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score):print('PENDIENTE 68',cid,home,away,date,score,'atributos',sorted(tr.attrs.keys()))
                       score_counts['con_marcador' if re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score) else 'sin_marcador']+=1
@@ -124,7 +130,7 @@ jobs:
                       elif ids:found.update(ids)
               matched=set()
               counts=Counter()
-              for (home,away,date,score),round_key in zip(fixtures,round_keys):
+              for (home,away,date,score),round_key,context in zip(fixtures,round_keys,contexts):
                   try: day=datetime.strptime(date.split()[0],'%d/%m/%Y').date().isoformat()
                   except (ValueError,IndexError):
                       counts['fecha_web_invalida']+=1
@@ -151,6 +157,22 @@ jobs:
                       counts['duplicados']+=1
                       continue
                   matched.add(m['id'])
+                  j=jmap[m['jornada_id']]
+                  if norm(context)!=norm(j['nombre']):
+                      counts['contexto_distinto']+=1
+                      print('CONTEXTO 72',cid,j['id'],context,j['nombre'])
+                  jid=j['id']
+                  round_dates.setdefault(jid,set()).add(day)
+                  round_meta[jid]=j
+                  round_sizes[jid]+=1
+                  hm=re.fullmatch(r'\d{2}/\d{2}/\d{4}\s+(\d{2}:\d{2})',date.strip())
+                  if hm and hm.group(1)!='00:00':
+                      dt=datetime.strptime(date.strip(),'%d/%m/%Y %H:%M').replace(tzinfo=ZoneInfo('Europe/Madrid'))
+                      old=datetime.fromisoformat(m['fecha_hora'].replace('Z','+00:00')) if m['fecha_hora'] else None
+                      if old!=dt:
+                          proposed.append(dict(id=m['id'],jornada=jid,anterior=m['fecha_hora'],nueva=dt.isoformat(),tipo='hora_nueva' if old is None else 'hora_modificada'))
+                  elif not m['fecha_hora']:counts['sin_hora_publicada']+=1
+                  else:counts['hora_web_no_confirmada']+=1
                   if jmap[m['jornada_id']]['fecha_inicio']!=day:
                       counts['fecha_jornada_distinta']+=1
                       print('CAMBIO 71',cid,m['id'],jmap[m['jornada_id']]['nombre'],jmap[m['jornada_id']]['fecha_inicio'],day)
@@ -171,6 +193,18 @@ jobs:
               c=dict(partidos_db=len(db),filas_web=rows,actas_db=len(known),actas_web=len(found),coincidentes=len(known&found),nuevas_candidatas=len(found-known),no_localizadas=len(known-found),ambiguas=ambiguous)
               print('DESCUBRIMIENTO 66',cid,json.dumps(c,sort_keys=True))
               totals.update(c)
+          for jid,days in sorted(round_dates.items()):
+              j=round_meta[jid]
+              if round_sizes[jid]!=3:
+                  print('JORNADA 72 incompleta',jid,round_sizes[jid])
+                  continue
+              if len(days)>1:
+                  print('JORNADA 72 parcial',jid,j['nombre'],sorted(days),'conservar fecha base')
+              elif next(iter(days))!=j['fecha_inicio']:
+                  print('JORNADA 72 cambio completo',jid,j['nombre'],j['fecha_inicio'],next(iter(days)))
+          for p in proposed:print('PROPUESTA 72',json.dumps(p,sort_keys=True))
+          print('TOTAL 72',json.dumps(dict(Counter(p['tipo'] for p in proposed)),sort_keys=True))
+          if reconciliation['asociados']!=totals['partidos_db'] or reconciliation['asociados']!=totals['filas_web'] or reconciliation['contexto_distinto'] or reconciliation['jornada_web_no_detectada']:raise SystemExit('Simulación no autorizable: asociación o contexto incompleto')
           print('TOTAL 69',json.dumps(dict(reconciliation),sort_keys=True))
           print('TOTAL 66',json.dumps(dict(totals),sort_keys=True))
           if totals['no_localizadas'] or totals['ambiguas'] or not totals['filas_web']:raise SystemExit('Calendario no reconciliado')
