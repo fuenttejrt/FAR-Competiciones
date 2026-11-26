@@ -867,6 +867,41 @@ jobs:
               probe=team_stats_rpc(True)
               if probe.get('insertadas')!=0: raise SystemExit('Simulación equipos incorrecta')
               print('EQUIPOS 54 simulación',json.dumps(probe,sort_keys=True))
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              player_fields=('convocatorias','titularidades','partidos_jugados','minutos_jugados','minutos_posibles','ensayos','transformaciones','puntos','amarillas','rojas','actas_participacion_verificada','datos_adicionales')
+              team_fields=fields_team+('minutos_superioridad','minutos_inferioridad','datos_adicionales')
+              db_players=all_rows('estadisticas_jugadores','id,jugador_id,equipo_id,'+','.join(player_fields))
+              db_teams=all_rows('estadisticas_equipos','id,equipo_id,'+','.join(team_fields))
+              team_scope=set(expected_teams)
+              stored_players={}
+              for p in db_players:
+                  if p['equipo_id'] not in team_scope: continue
+                  k=(p['equipo_id'],identities_db.get(p['jugador_id']))
+                  if k in stored_players or k[1] is None: raise SystemExit('Estadística individual duplicada o huérfana')
+                  stored_players[k]=p
+              stored_teams={}
+              for t in db_teams:
+                  if t['equipo_id'] not in team_scope: continue
+                  k=t['equipo_id']
+                  if k in stored_teams: raise SystemExit('Estadística equipo duplicada')
+                  stored_teams[k]=t
+              if set(stored_players)!=set(expected) or set(stored_teams)!=team_scope: raise SystemExit('Cobertura estadísticas persistidas incorrecta')
+              dif_p={f:sum(stored_players[k][f]!=v[f] for k,v in expected.items()) for f in player_fields}
+              dif_t={f:sum(stored_teams[k][f]!=v[f] for k,v in expected_teams.items()) for f in team_fields}
+              print('INTEGRAL 55 jugadores',json.dumps(dif_p,sort_keys=True))
+              print('INTEGRAL 55 equipos',json.dumps(dif_t,sort_keys=True))
+              if any(dif_p.values()) or any(dif_t.values()): raise SystemExit('Estadísticas persistidas discrepantes')
+              for k,t in stored_teams.items():
+                  pp=[p for (team,_),p in stored_players.items() if team==k]
+                  for f,g in (('ensayos','ensayos_favor'),('transformaciones','transformaciones'),('amarillas','amarillas'),('rojas','rojas')):
+                      if sum(p[f] for p in pp)!=t[g]: raise SystemExit('Balance individual colectivo incorrecto')
+                  if sum(p['puntos'] for p in pp)+7*t['ensayos_castigo_favor']!=t['puntos_favor']: raise SystemExit('Balance puntos individual colectivo incorrecto')
+              roster_keys={(a['partido_id'],a['equipo_id'],a['jugador_id']) for a in al}
+              for table,fields,expected_count in (('anotaciones','id,partido_id,equipo_id,jugador_id,tipo',475),('sanciones','id,partido_id,equipo_id,jugador_id,tipo',27)):
+                  events=[e for e in all_rows(table,fields) if e['partido_id'] in match_ids]
+                  if len(events)!=expected_count: raise SystemExit('Recuento eventos incorrecto')
+                  if any((e['partido_id'],e['equipo_id'],e['jugador_id']) not in roster_keys for e in events if e['tipo']!='ensayo_castigo'): raise SystemExit('Evento sin alineación')
+              print('INTEGRAL 55',json.dumps(dict(actas=len(match_ids),alineaciones=len(al),participaciones=len(seen),estadisticas_jugadores=len(stored_players),estadisticas_equipos=len(stored_teams),anotaciones=475,sanciones=27,discrepancias=0,solo_lectura=True),sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
