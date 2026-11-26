@@ -51,6 +51,9 @@ jobs:
                   soup=BeautifulSoup(r.read(),'html.parser')
               found=set()
               rows=0
+              skipped=0
+              score_counts=Counter()
+              link_patterns=Counter()
               ambiguous=0
               for table in soup.select('table'):
                   trs=table.find_all('tr')
@@ -58,13 +61,28 @@ jobs:
                   if header is None:continue
                   h=' '.join(trs[header].stripped_strings).lower()
                   if not all(x in h for x in ('equipo local','equipo visitante','resultado','fecha/hora')):continue
+                  headers=[' '.join(c.stripped_strings).lower() for c in trs[header].find_all(['td','th'],recursive=False)]
+                  idx=[next(i for i,h in enumerate(headers) if label in h) for label in ('equipo local','equipo visitante','resultado','fecha/hora')]
                   for tr in trs[header+1:]:
                       cells=tr.find_all(['td','th'],recursive=False)
                       if len(cells)<4:continue
+                      if len(cells)<=max(idx):
+                          skipped+=1
+                          continue
+                      home,away,score,date=[' '.join(cells[i].stripped_strings).strip() for i in idx]
+                      if not home or not away or home.lower()=='equipo local' or away.lower()=='equipo visitante' or tr.find('th'):
+                          skipped+=1
+                          print('FILA 67 descartada',cid,'celdas',len(cells),'cabecera',bool(tr.find('th')),'equipos_presentes',bool(home and away))
+                          continue
                       rows+=1
+                      score_counts['con_marcador' if re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score) else 'sin_marcador']+=1
+                      for a in tr.select('a[href]'):
+                          u=urllib.parse.urlparse(urllib.parse.urljoin(host,a['href']))
+                          if u.netloc=='farugby.matchready.es':link_patterns[re.sub(r'\d+','{id}',u.path)]+=1
                       ids={actid(a.get('href')) for a in tr.select('a[href]')}-{None}
                       if len(ids)>1:ambiguous+=1
                       elif ids:found.update(ids)
+              print('DIAGNOSTICO 67',cid,'descartadas',skipped,'marcadores',dict(score_counts),'rutas',dict(link_patterns))
               c=dict(partidos_db=len(db),filas_web=rows,actas_db=len(known),actas_web=len(found),coincidentes=len(known&found),nuevas_candidatas=len(found-known),no_localizadas=len(known-found),ambiguas=ambiguous)
               print('DESCUBRIMIENTO 66',cid,json.dumps(c,sort_keys=True))
               totals.update(c)
