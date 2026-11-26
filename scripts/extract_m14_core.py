@@ -271,3 +271,108 @@ def extract_events(raw,m,core):
     equal=sum(d==0 for d in differences); superior=sum(d>0 for d in differences); inferior=sum(d<0 for d in differences)
     print('Balance numérico',m['id'],'igualdad',equal,'superior local',superior,'superior visitante',inferior,'minutos diferencia local',sum(max(0,d) for d in differences),'minutos diferencia visitante',sum(max(0,-d) for d in differences),'coincide',equal+superior+inferior==36)
     return dict(timeline=timeline,participation=participation,occupancy=occupancy,equal=equal,superior=superior,inferior=inferior)
+
+
+def extract_staff(raw,m,core):
+    import json
+    identities=core['identities']
+    staff58=[]
+    staff_slots58=Counter()
+    staff_ids=set()
+    with pdfplumber.open(io.BytesIO(raw)) as doc:
+        page=doc.pages[0]
+        for side in (0,1):
+            region=page.crop((side*page.width/2,0,(side+1)*page.width/2,page.height))
+            lines=(region.extract_text(x_tolerance=3,y_tolerance=2) or '').splitlines()
+            for role in ('Entrenador','Delegado','Juez línea'):
+                hits=[]
+                for i,line in enumerate(lines):
+                    match=re.match(r'^\s*'+re.escape(role)+r'\s*:\s*(.*)$',line,re.I)
+                    if not match: continue
+                    name=match.group(1).strip()
+                    licence=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*('+ (r'\d{6,7}' if role=='Juez línea' else r'\d{7}') +r')\b',' '.join(lines[i+1:i+4]).split('Entrenador:')[0].split('Delegado:')[0].split('Juez línea:')[0])
+                    if name and licence and any(c.isalpha() for c in name):
+                        hits.append((licence.group(1),name))
+                if role=='Juez línea' and not hits:
+                    for i,line in enumerate(lines):
+                        short=re.fullmatch(r'\s*Juez\s+l[ií]nea\s*:\s*(\d{6})\s*',line,re.I)
+                        if not short: continue
+                        lic=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{6})\b',' '.join(lines[i+1:i+4]))
+                        if lic and lic.group(1)==short.group(1):
+                            side61='local' if side==0 else 'visitante'
+                            staff58.append(dict(partido_id=m['id'],equipo_id=m['equipo_'+side61+'_id'],funcion=role,licencia=lic.group(1),nombre_completo=None,en_alineacion=False))
+                            print('JUEZ 61 identificador repetido sin nombre',m['id'],side61,'coincide_alineacion',lic.group(1) in identities[side61].values())
+                staff_slots58[(role,'completo' if len(hits)==1 else 'ausente_o_ambiguo')]+=1
+                if len(hits)==1:
+                    ident58,name58=hits[0]
+                    staff_ids.add(ident58)
+                    side58='local' if side==0 else 'visitante'
+                    staff58.append(dict(partido_id=m['id'],equipo_id=m['equipo_'+side58+'_id'],funcion=role,licencia=ident58,nombre_completo=name58,en_alineacion=ident58 in identities[side58].values()))
+                if role=='Juez línea' and not hits:
+                    labels=[i for i,line in enumerate(lines) if re.search(r'(?i)juez\s+l[ií]nea',line)]
+                    for idx in labels:
+                        segment=' '.join(lines[idx:idx+3])
+                        # Inspect geometry only; never print names or identifiers.
+                        halfwords=region.extract_words(x_tolerance=2,y_tolerance=2)
+                        labels60=[w for w in halfwords if w['text'].casefold().strip(':')=='juez']
+                        for label60 in labels60:
+                            y60=label60['top']
+                            band60=[w for w in halfwords if y60-2<=w['top']<=y60+24]
+                            shape60=[]
+                            for w in sorted(band60,key=lambda w:(round(w['top']/2),w['x0'])):
+                                t=w['text'].casefold().strip(':')
+                                kind=t if t in ('juez','línea','linea','nº','no','licencia','delegado','entrenador') else 'NUM'+str(len(t)) if t.isdigit() else 'VACIO' if not any(c.isalnum() for c in t) else 'TEXTO'
+                                shape60.append([round(w['top']-y60,1),round((w['x0']-side*page.width/2)/page.width,3),kind])
+                            print('JUEZ 60 geometría',m['id'],'lado',side,json.dumps(shape60,ensure_ascii=False))
+
+                        print('REVISION JUEZ 59',m['id'],'lado',side,'campo_vacio',not bool(re.sub(r'(?i)juez\\s+l[ií]nea\\s*:?|n[ºo]\\s*licencia\\s*:?|[\\s:–—-]','',segment)),'lineas',len(lines[idx:idx+3]))
+                        print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',True,'licencia presente',bool(re.search(r'\b\d{7}\b',segment)),'nombre presente',bool(re.search(r'(?i)juez\s+l[ií]nea\s*:\s*[A-Za-zÁÉÍÓÚÑáéíóúñ]',lines[idx])))
+                    if not labels: print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',False)
+                print('Personal',role,'local' if side==0 else 'visitante','registros completos',len(hits))
+        words=page.extract_words(x_tolerance=2,y_tolerance=2)
+        referee_id=None
+        officials={}
+        for h in words:
+            if h['text'].casefold()!='árbitro' or h['top']<page.height*.7: continue
+            header=page.crop((0,max(0,h['top']-4),page.width,min(page.height,h['bottom']+4))).extract_text() or ''
+            if not all(t in header.casefold() for t in ('delegado','médico','licencia')): continue
+            headerwords=[w for w in words if abs(w['top']-h['top'])<4]
+            headerwords.sort(key=lambda w:w['x0'])
+            groups=[]
+            for w in headerwords:
+                if not groups or w['x0']-groups[-1][-1]['x1']>12: groups.append([w])
+                else: groups[-1].append(w)
+            labels=[' '.join(w['text'] for w in g).casefold() for g in groups]
+            centers=[(g[0]['x0']+g[-1]['x1'])/2 for g in groups]
+            print('Encabezados personal','seis' if len(groups)==6 else 'variante','cantidad',len(groups))
+            edges=[0]+[(x+y)/2 for x,y in zip(centers,centers[1:])]+[page.width] if len(groups)==6 else [page.width*i/6 for i in range(7)]
+            for i,role in enumerate(('Árbitro principal','Delegado de campo','Médico')):
+                namebox=page.crop((edges[2*i],h['bottom']+1,edges[2*i+1],min(page.height,h['bottom']+40)))
+                idbox=page.crop((edges[2*i+1],h['bottom']+1,edges[2*i+2],min(page.height,h['bottom']+40)))
+                name=' '.join((namebox.extract_text() or '').split())
+                ident=' '.join((idbox.extract_text() or '').split())
+                ids=re.findall(r'\b\d{3,10}\b',ident)
+                has_name=any(c.isalpha() for c in name) and name.casefold() not in ('no','ninguno','sin médico','no consta')
+                # Preserve the entire printed identifier, including prefixes.
+                if i==2:
+                    if not has_name and not ident.strip(' -–—'):
+                        print('Estado médico ausente en origen')
+                    elif has_name and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ./-]{0,30}',ident) and any(c.isdigit() for c in ident):
+                        officials[role]=ident
+                        staff58.append(dict(partido_id=m['id'],equipo_id=None,funcion=role,licencia=ident,nombre_completo=name,en_alineacion=False))
+                        staff_ids.update(ids)
+                        print('Estado médico identificación conservada')
+                    else:
+                        print('Estado médico revisión manual')
+                if i!=2 and len(ids)==1 and has_name and len(ids[0])==7:
+                    officials[role]=ids[0]
+                    staff58.append(dict(partido_id=m['id'],equipo_id=None,funcion=role,licencia=ids[0],nombre_completo=name,en_alineacion=False))
+                    staff_ids.add(ids[0])
+                if i==2:
+                    print('Diagnóstico médico','nombre presente',has_name,'campo identificación vacío',not ident or not ident.strip('-–—'),'cantidad números',len(ids),'longitudes',','.join(str(len(x)) for x in ids),'texto no numérico',any(c.isalpha() for c in ident))
+            break
+        print('Formato seis columnas reconocido',len(officials)==3)
+        referee_id=officials.get('Árbitro principal')
+        for role in ('Delegado de campo','Médico'):
+            print(role,'registro completo',role in officials)
+    return staff58
