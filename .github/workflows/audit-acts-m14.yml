@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_personal:
+        description: Importar personal M14 validado (472 registros)
+        type: boolean
+        default: false
       guardar_minutos_sancion:
         description: 'Guardar minutos sancionados M14 (versión 57)'
         type: boolean
@@ -57,6 +61,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_PERSONAL: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_personal || false }}
           GUARDAR_MINUTOS_SANCION: ${{ github.event_name == 'workflow_dispatch' && inputs.guardar_minutos_sancion || false }}
           IMPORTAR_ESTADISTICAS_EQUIPOS: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_estadisticas_equipos || false }}
           IMPORTAR_ESTADISTICAS_JUGADORES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_estadisticas_jugadores || false }}
@@ -85,7 +90,7 @@ jobs:
           from collections import Counter
           staff58=[]
           staff_slots58=Counter()
-          if sum(os.environ.get(k)=='true' for k in ('GUARDAR_MINUTOS_SANCION','IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
+          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_PERSONAL','GUARDAR_MINUTOS_SANCION','IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
           # Verify the installed diagnostic RPC using only synthetic temporary rows.
           req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with opener.open(req,timeout=30) as response: probe=json.load(response)
@@ -1031,6 +1036,20 @@ jobs:
                   raise SystemExit('Simulación personal HTTP '+str(exc.code)) from None
               if result62!=dict(candidatos=472,parciales=3,insertados=0,simulacion=True): raise SystemExit('Simulación personal discrepante')
               print('PERSONAL 62 simulación',json.dumps(result62,sort_keys=True))
+              if os.environ.get('IMPORTAR_PERSONAL')=='true':
+                  for attempt63 in (1,2):
+                      req63=urllib.request.Request(base+'/rest/v1/rpc/importar_personal_m14',data=json.dumps(dict(p_filas=payload62,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                      try:
+                          with opener.open(req63,timeout=90) as response: result63=json.load(response)
+                      except urllib.error.HTTPError as exc:
+                          raise SystemExit('Importación personal HTTP '+str(exc.code)) from None
+                      if result63.get('candidatos')!=472 or result63.get('parciales')!=3 or result63.get('simulacion') is not False or result63.get('insertados') not in ((0,472) if attempt63==1 else (0,)): raise SystemExit('Importación personal discrepante')
+                      print('PERSONAL 63 intento',attempt63,json.dumps(result63,sort_keys=True))
+                  saved63=[x for x in all_rows('personal_partidos','id,partido_id,equipo_id,funcion,licencia,nombre_completo') if x['partido_id'] in match_ids]
+                  def key63(x): return (x['partido_id'],x['equipo_id'],x['funcion'])
+                  if len(saved63)!=472 or {key63(x):(x['licencia'],x['nombre_completo']) for x in saved63}!={key63(x):(x['licencia'],x['nombre_completo']) for x in payload62}: raise SystemExit('Persistencia personal discrepante')
+                  print('PERSONAL 63 persistencia 472 registros, 3 parciales, cero discrepancias')
+
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
