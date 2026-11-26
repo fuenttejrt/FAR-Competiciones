@@ -32,7 +32,7 @@ jobs:
       - name: Comparar calendarios y actualizar en ejecución autorizada
         env:
           ACTUALIZAR: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario) }}
-          GUARDAR_RESULTADOS: ${{ github.event_name == 'workflow_dispatch' && inputs.actualizar_resultados }}
+          GUARDAR_RESULTADOS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_resultados) }}
           PROBAR_AUTORIZACION: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.probar_modo_autorizado) }}
           EVENTO: ${{ github.event_name }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -353,6 +353,7 @@ jobs:
           if os.environ.get('PROBAR_AUTORIZACION')=='true':
               if not authorized(score_proposals,result_scores,bool(proposed or proposed_rounds)):raise SystemExit('Datos actuales no autorizables')
               print('PREVUELO 85',json.dumps(dict(candidatos=len(score_proposals),autorizado=True,escritura=False),sort_keys=True))
+          print('MODO 86', 'automatico programado' if os.environ.get('EVENTO')=='schedule' else 'manual autorizado' if os.environ.get('GUARDAR_RESULTADOS')=='true' else 'simulacion')
           if os.environ.get('GUARDAR_RESULTADOS')=='true':
               if not authorized(score_proposals,result_scores,bool(proposed or proposed_rounds)):raise SystemExit('Resultados no autorizables o calendario pendiente')
               if score_proposals:
