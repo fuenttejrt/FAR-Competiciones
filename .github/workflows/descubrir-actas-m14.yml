@@ -210,10 +210,9 @@ jobs:
           print('TOTAL 69',json.dumps(dict(reconciliation),sort_keys=True))
           print('TOTAL 66',json.dumps(dict(totals),sort_keys=True))
           if totals['no_localizadas'] or totals['ambiguas'] or not totals['filas_web']:raise SystemExit('Calendario no reconciliado')
-          PY
-
           payload=dict(p_partidos=proposed,p_jornadas=proposed_rounds,p_simular=True)
           req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_calendario_m14',data=json.dumps(payload).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
           print('SIMULACION 73',json.dumps(result,sort_keys=True))
           if result!={'partidos':len(proposed),'jornadas':len(proposed_rounds),'simulacion':True}:raise SystemExit('Resultado RPC discrepante')
+          PY
