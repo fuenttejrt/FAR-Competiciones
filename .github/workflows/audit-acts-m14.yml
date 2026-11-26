@@ -95,6 +95,7 @@ jobs:
           team_competition={}
           version_plan=[]
           roster_audit=Counter()
+          lineup_payload=[]
           name_variants=defaultdict(set)
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
@@ -500,6 +501,7 @@ jobs:
                           reliable=ok and not duration_warning
                           tc['actas_participacion']+=int(reliable)
                           for d,ident in identities[side].items():
+                              lineup_payload.append(dict(partido_id=m['id'],equipo_id=team_id,licencia=str(ident),dorsal=d,titular=d in starting[side]))
                               pc=players[(team_id,ident)]
                               pc['convocatorias']+=1
                               pc['titularidades']+=int(d in starting[side])
@@ -638,6 +640,16 @@ jobs:
           with opener.open(req,timeout=60) as response: repeat_probe=json.load(response)
           if repeat_probe!=expected_probe: raise SystemExit('Repetición SQL no coincide')
           print('IMPORTADOR 37 simulación repetida correcta; escritura real no ejecutada')
+          if os.environ.get('IMPORTAR_JUGADORES')!='true':
+              if len(lineup_payload)!=sum(c['convocatorias'] for c in players.values()): raise SystemExit('Total alineaciones incoherente')
+              expected_lineup=dict(alineaciones=len(lineup_payload),titulares=sum(x['titular'] for x in lineup_payload),suplentes=sum(not x['titular'] for x in lineup_payload),partidos=accepted,simulacion=True)
+              lineup_req=urllib.request.Request(base+'/rest/v1/rpc/importar_alineaciones_m14',data=json.dumps(dict(p_filas=lineup_payload)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with opener.open(lineup_req,timeout=90) as response: lineup_probe=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit('Validación alineaciones HTTP '+str(exc.code)) from None
+              if lineup_probe!=expected_lineup: raise SystemExit('Validación SQL alineaciones no coincide')
+              print('ALINEACIONES 39',json.dumps(lineup_probe,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
