@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_alineaciones:
+        description: Importar realmente las alineaciones M14 validadas
+        type: boolean
+        default: false
       importar_jugadores:
         description: Importar realmente jugadores M14 y sus relaciones (autorización explícita)
         type: boolean
@@ -25,6 +29,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_ALINEACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_alineaciones || false }}
           IMPORTAR_JUGADORES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_jugadores || false }}
           GUARDAR_ACTAS: ${{ github.event_name == 'workflow_dispatch' && inputs.guardar_actas || false }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -671,6 +676,24 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          if os.environ.get('IMPORTAR_ALINEACIONES')=='true':
+              if os.environ.get('IMPORTAR_JUGADORES')=='true' or os.environ.get('GUARDAR_ACTAS')=='true': raise SystemExit('Ejecutar alineaciones por separado')
+              if expected_lineup!=dict(alineaciones=2124,titulares=1584,suplentes=540,partidos=53,simulacion=True): raise SystemExit('Alcance de alineaciones distinto del validado')
+              if changes['estado_correcto']!=accepted or changes['modificada'] or changes['nueva']: raise SystemExit('Actas cambiadas; revisar antes de importar')
+              def write_lineups():
+                  request=urllib.request.Request(base+'/rest/v1/rpc/importar_alineaciones_m14',data=json.dumps(dict(p_filas=lineup_payload,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  try:
+                      with opener.open(request,timeout=90) as response: return json.load(response)
+                  except urllib.error.HTTPError as exc:
+                      raise SystemExit('Importación alineaciones HTTP '+str(exc.code)) from None
+              first_lineups=write_lineups()
+              expected_written=dict(expected_lineup,simulacion=False)
+              if {k:v for k,v in first_lineups.items() if k!='insertadas'}!=expected_written: raise SystemExit('Resultado alineaciones inesperado')
+              print('ALINEACIONES 40 insertadas',first_lineups['insertadas'])
+              if write_lineups()!=dict(expected_written,insertadas=0): raise SystemExit('Repetición alineaciones incorrecta')
+              print('ALINEACIONES 40 repetición sin duplicados correcta')
+          else:
+              print('ALINEACIONES 40 escritura no autorizada; solo simulación')
           if os.environ.get('IMPORTAR_JUGADORES')=='true':
               if os.environ.get('GUARDAR_ACTAS')=='true': raise SystemExit('Ejecutar importación de jugadores por separado')
               if accepted!=53 or len(identities_expected)!=432 or len(links)!=436 or len(confirmed_teams)!=18: raise SystemExit('Alcance distinto del validado; revisar antes de importar')
