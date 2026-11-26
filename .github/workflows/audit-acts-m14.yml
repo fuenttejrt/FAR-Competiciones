@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_estadisticas_equipos:
+        description: Importar estadísticas de equipos M14 validadas
+        type: boolean
+        default: false
       importar_estadisticas_jugadores:
         description: Importar estadísticas individuales M14 validadas
         type: boolean
@@ -49,6 +53,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_ESTADISTICAS_EQUIPOS: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_estadisticas_equipos || false }}
           IMPORTAR_ESTADISTICAS_JUGADORES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_estadisticas_jugadores || false }}
           IMPORTAR_PARTICIPACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_participaciones || false }}
           IMPORTAR_SANCIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_sanciones || false }}
@@ -72,7 +77,7 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
-          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
+          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
           # Verify the installed diagnostic RPC using only synthetic temporary rows.
           req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with opener.open(req,timeout=30) as response: probe=json.load(response)
@@ -812,7 +817,7 @@ jobs:
               probe=stats_rpc(True)
               if probe.get('insertadas')!=0: raise SystemExit('Simulación estadísticas incorrecta')
               print('ESTADISTICAS 52 simulación',json.dumps(probe,sort_keys=True))
-          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
               actual_teams=defaultdict(Counter)
               match_ids={x['partido_id'] for x in lineup_payload}
               match_map={m['id']:m for m in all_matches if m['id'] in match_ids}
@@ -849,6 +854,19 @@ jobs:
               if any(discrepancies.values()): raise SystemExit('Estadísticas equipos discrepantes')
               print('EQUIPOS 53',json.dumps(dict(equipos=len(actual_teams),partidos=len(match_map),totales={f:sum(c[f] for c in actual_teams.values()) for f in fields_team},simulacion=True),sort_keys=True))
               print('EQUIPOS 53 balance reglamentario actas',json.dumps({f:sum(c[f] for c in team_totals.values()) for f in ('igualdad','superioridad','inferioridad','minutos_balance')},sort_keys=True))
+          def team_stats_rpc(simulate):
+              request=urllib.request.Request(base+'/rest/v1/rpc/importar_estadisticas_equipos_m14',data=json.dumps(dict(p_filas=simulated_teams,p_simular=simulate)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with opener.open(request,timeout=90) as response: result=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit('Importación estadísticas equipos HTTP '+str(exc.code)) from None
+              expected=dict(equipos=18,partidos_jugados=106,victorias=51,empates=4,derrotas=51,puntos_favor=1850,puntos_contra=1850,ensayos_favor=295,ensayos_contra=295,transformaciones=177,ensayos_castigo_favor=3,amarillas=23,rojas=4,minutos_superioridad=315,minutos_inferioridad=315,actas_comprobadas=106,simulacion=simulate)
+              if any(result.get(k)!=v for k,v in expected.items()): raise SystemExit('Resultado estadísticas equipos discrepante')
+              return result
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              probe=team_stats_rpc(True)
+              if probe.get('insertadas')!=0: raise SystemExit('Simulación equipos incorrecta')
+              print('EQUIPOS 54 simulación',json.dumps(probe,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
@@ -870,6 +888,11 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          if os.environ.get('IMPORTAR_ESTADISTICAS_EQUIPOS')=='true':
+              first=team_stats_rpc(False)
+              second=team_stats_rpc(False)
+              if first.get('insertadas') not in (0,18) or second.get('insertadas')!=0: raise SystemExit('Idempotencia equipos incorrecta')
+              print('EQUIPOS 54',json.dumps(first,sort_keys=True),'repetición',second['insertadas'])
           if os.environ.get('IMPORTAR_ESTADISTICAS_JUGADORES')=='true':
               first=stats_rpc(False)
               second=stats_rpc(False)
