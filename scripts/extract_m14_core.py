@@ -233,15 +233,20 @@ def extract_events(raw,m,core):
             if found!={'local','visitante'}: print(heading,'bloques incompletos',len(found))
     # Compare simultaneous events by shared dorsals; independent events commute.
     occupancy={}
+    sanction_minutes={}
+    returns=0
     for side in ('local','visitante'):
         active=set(starting[side]); banned=set(); suspended={}; minutes={d:0 for d in roster[side]}
+        sanctioned=Counter()
         issues=[]; compatible=0; ambiguous=0; counts=[]
         events=sorted(timeline[side],key=lambda e:e[0])
         for t in range(37):
             returning={d for d,end in suspended.items() if end==t}
             for d in returning:
                 del suspended[d]
-                if d not in banned: active.add(d)
+                if d not in banned:
+                    active.add(d)
+                    returns+=int(t<36)
             current=[e for e in events if e[0]==t]
             touched=[d for e in current for d in e[2]]
             if len(touched)!=len(set(touched)) or returning.intersection(touched):
@@ -262,15 +267,18 @@ def extract_events(raw,m,core):
             if t<36:
                 counts.append(len(active))
                 for d in active: minutes[d]+=1
+                sanctioned.update(set(suspended)|banned)
         if any(e[0]<0 or e[0]>36 for e in events): issues.append('minuto fuera duración')
         if sum(minutes.values())!=sum(counts) or any(v<0 or v>36 for v in minutes.values()): issues.append('balance minutos')
         participation[side]=(minutes,not issues)
         occupancy[side]=counts
+        sanction_minutes[side]={d:sanctioned[d] for d in roster[side]}
+        if any(minutes[d]+sanctioned[d]>36 for d in roster[side]):raise ValueError('Balance individual de sanción')
         print('Simulación participación',m['id'],side,'titulares',len(starting[side]),'jugadores con minutos',sum(v>0 for v in minutes.values()),'minutos acumulados',sum(minutes.values()),'simultáneos compatibles',compatible,'ambiguos',ambiguous,'incidencias',len(issues),'tipos',','.join(sorted(set(issues))) or 'ninguna')
     differences=[a-b for a,b in zip(occupancy['local'],occupancy['visitante'])]
     equal=sum(d==0 for d in differences); superior=sum(d>0 for d in differences); inferior=sum(d<0 for d in differences)
     print('Balance numérico',m['id'],'igualdad',equal,'superior local',superior,'superior visitante',inferior,'minutos diferencia local',sum(max(0,d) for d in differences),'minutos diferencia visitante',sum(max(0,-d) for d in differences),'coincide',equal+superior+inferior==36)
-    return dict(timeline=timeline,participation=participation,occupancy=occupancy,equal=equal,superior=superior,inferior=inferior)
+    return dict(timeline=timeline,participation=participation,occupancy=occupancy,equal=equal,superior=superior,inferior=inferior,sanction_minutes=sanction_minutes,returns=returns)
 
 
 def extract_staff(raw,m,core):
