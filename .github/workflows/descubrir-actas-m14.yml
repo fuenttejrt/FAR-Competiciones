@@ -54,8 +54,11 @@ jobs:
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1:raise SystemExit('Competición ambigua')
               db=[]
-              for j in get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'}):
-                  db.extend(get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'id,url_acta,id_oficial,equipo_local_id,equipo_visitante_id,fecha_hora,puntos_local,puntos_visitante'}))
+              jornadas=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'*'})
+              print('JORNADAS 70 esquema',sorted(jornadas[0]) if jornadas else [])
+              jmap={j['id']:j for j in jornadas}
+              for j in jornadas:
+                  db.extend(get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'id,jornada_id,url_acta,id_oficial,equipo_local_id,equipo_visitante_id,fecha_hora,puntos_local,puntos_visitante'}))
               sample=get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'*'})
               print('ESQUEMA 68',sorted(sample[0]) if sample else [])
               known={actid(m['url_acta']) for m in db if m['url_acta']}
@@ -120,6 +123,9 @@ jobs:
                   if len(candidates)!=1:
                       counts['sin_asociar' if not candidates else 'ambiguos']+=1
                       print('DIFERENCIA 69',cid,home,away,day,'candidatos',len(candidates))
+                      pairs=[m for m in db if norm(names.get(m['equipo_local_id'],''))==norm(home) and norm(names.get(m['equipo_visitante_id'],''))==norm(away)]
+                      print('FECHAS 70',cid,home,away,day,json.dumps([dict(id=m['id'],fecha=m['fecha_hora'],jornada=m['jornada_id'],oficial=m['id_oficial'],marcador=[m['puntos_local'],m['puntos_visitante']]) for m in pairs],ensure_ascii=False))
+                      counts['pareja_unica' if len(pairs)==1 else 'pareja_multiple' if pairs else 'pareja_ausente']+=1
                       continue
                   m=candidates[0]
                   if m['id'] in matched:
@@ -131,6 +137,10 @@ jobs:
                   if sc and (m['puntos_local'],m['puntos_visitante'])!=tuple(map(int,sc.groups())):counts['marcador_distinto']+=1
                   if not sc and (m['puntos_local'] is not None or m['puntos_visitante'] is not None):counts['marcador_pendiente_db']+=1
               counts['db_sin_asociar']=len(db)-len(matched)
+              for m in db:
+                  if m['id'] not in matched:
+                      j=jmap[m['jornada_id']]
+                      print('PENDIENTE DB 70',cid,m['id'],names.get(m['equipo_local_id']),names.get(m['equipo_visitante_id']),m['fecha_hora'],json.dumps({k:v for k,v in j.items() if k in ('id','nombre','numero','fecha','fecha_inicio','id_oficial','titulo')},ensure_ascii=False))
               reconciliation.update(counts)
               print('ASOCIACION 69',cid,json.dumps(dict(counts),sort_keys=True))
               print('REPETIDOS 68',cid,[(list(k),v) for k,v in Counter(fixtures).items() if v>1])
