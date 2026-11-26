@@ -132,12 +132,14 @@ jobs:
           changes_payload=[]
           sanctions_payload=[]
           name_variants=defaultdict(set)
+          all_matches=[]
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1: raise SystemExit('Competición ambigua')
               rounds=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'})
               matches=get('partidos',{'jornada_id':'in.('+','.join(str(x['id']) for x in rounds)+')','url_acta':'not.is.null','select':'id,url_acta,puntos_local,puntos_visitante,equipo_local_id,equipo_visitante_id,jornada_id','order':'id.asc'})
               if not matches: raise SystemExit('Sin actas: '+cid)
+              all_matches.extend(matches)
               expected_acts+=len(matches)
               print('Actas a revisar',cid,len(matches))
               for m in matches:
@@ -813,7 +815,8 @@ jobs:
           if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
               actual_teams=defaultdict(Counter)
               match_ids={x['partido_id'] for x in lineup_payload}
-              match_map={m['id']:m for m in matches if m['id'] in match_ids}
+              match_map={m['id']:m for m in all_matches if m['id'] in match_ids}
+              print('EQUIPOS 53 alcance',len(all_matches),'partidos únicos',len(match_map),'alineaciones partidos',len(match_ids))
               events_by_team=defaultdict(Counter)
               for e in all_rows('anotaciones','id,partido_id,equipo_id,tipo,puntos'):
                   if e['partido_id'] not in match_ids: continue
