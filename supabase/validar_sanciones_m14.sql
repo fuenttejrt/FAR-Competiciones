@@ -1,7 +1,8 @@
 begin;
-create or replace function public.validar_sanciones_m14(p_filas jsonb)
+drop function if exists public.validar_sanciones_m14(jsonb);
+create or replace function public.validar_sanciones_m14(p_filas jsonb,p_simular boolean default true)
 returns jsonb language plpgsql security invoker set search_path=pg_catalog as $$
-declare resultado jsonb; restricciones jsonb;
+declare resultado jsonb; restricciones jsonb; inserted integer:=0;
 begin
  if jsonb_typeof(p_filas) is distinct from 'array' then raise exception 'Formato inválido'; end if;
  create temporary table far_sanciones_stage(partido_id bigint not null,equipo_id bigint not null,orden_evento integer not null,minuto integer not null,dorsal integer not null,tipo text not null,primary key(partido_id,orden_evento)) on commit drop;
@@ -13,9 +14,19 @@ begin
  select jsonb_build_object('total',count(*),'partidos',count(distinct partido_id),'amarillas',count(*) filter(where tipo='Expulsiones temporales'),'rojas',count(*) filter(where tipo='Expulsiones definitivas'),'simulacion',true) into resultado from pg_temp.far_sanciones_stage;
  if resultado<> '{"total":27,"partidos":16,"amarillas":23,"rojas":4,"simulacion":true}'::jsonb then raise exception 'Alcance inesperado'; end if;
  select coalesce(jsonb_agg(jsonb_build_object('nombre',conname,'definicion',pg_get_constraintdef(oid)) order by conname),'[]'::jsonb) into restricciones from pg_constraint where conrelid='public.sanciones'::regclass;
+ if p_simular is null then raise exception 'Modo inválido'; end if;
+ if not p_simular then
+   lock table public.sanciones in share row exclusive mode;
+   if exists(select 1 from public.sanciones a join (select distinct partido_id from pg_temp.far_sanciones_stage) p on p.partido_id=a.partido_id left join pg_temp.far_sanciones_stage s on s.partido_id=a.partido_id and s.orden_evento=a.orden_evento left join public.alineaciones al on al.partido_id=s.partido_id and al.equipo_id=s.equipo_id and al.dorsal=s.dorsal where s.partido_id is null or (a.equipo_id,a.minuto,a.dorsal,a.jugador_id,a.tipo,a.verificada) is distinct from (s.equipo_id,s.minuto,s.dorsal,al.jugador_id,case when s.tipo='Expulsiones temporales' then 'temporal' else 'definitiva' end,true)) then raise exception 'Sanciones existentes discrepantes'; end if;
+   insert into public.sanciones(partido_id,equipo_id,orden_evento,minuto,dorsal,jugador_id,tipo,verificada)
+   select s.partido_id,s.equipo_id,s.orden_evento,s.minuto,s.dorsal,al.jugador_id,case when s.tipo='Expulsiones temporales' then 'temporal' else 'definitiva' end,true from pg_temp.far_sanciones_stage s join public.alineaciones al on al.partido_id=s.partido_id and al.equipo_id=s.equipo_id and al.dorsal=s.dorsal where not exists(select 1 from public.sanciones a where a.partido_id=s.partido_id and a.orden_evento=s.orden_evento);
+   get diagnostics inserted=row_count;
+   if (select count(*) from public.sanciones a join (select distinct partido_id from pg_temp.far_sanciones_stage) p on p.partido_id=a.partido_id)<>27 then raise exception 'Total almacenado incorrecto'; end if;
+   resultado:=resultado||jsonb_build_object('simulacion',false,'insertadas',inserted);
+ end if;
  drop table pg_temp.far_sanciones_stage;
  return resultado||jsonb_build_object('restricciones',restricciones);
 end; $$;
-revoke all on function public.validar_sanciones_m14(jsonb) from public,anon,authenticated;
-grant execute on function public.validar_sanciones_m14(jsonb) to service_role;
+revoke all on function public.validar_sanciones_m14(jsonb,boolean) from public,anon,authenticated;
+grant execute on function public.validar_sanciones_m14(jsonb,boolean) to service_role;
 commit;
