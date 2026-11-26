@@ -6,9 +6,14 @@ on:
         description: 'Guardar los cambios de calendario validados'
         type: boolean
         default: false
+  schedule:
+    - cron: '47 7,19 * * *'
   push:
     paths:
       - '.github/workflows/descubrir-actas-m14.yml'
+concurrency:
+  group: calendario-m14
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
@@ -16,9 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: pip install beautifulsoup4
-      - name: Comparar calendarios y actualizar solo con autorización manual
+      - name: Comparar calendarios y actualizar en ejecución autorizada
         env:
-          ACTUALIZAR: ${{ github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario }}
+          ACTUALIZAR: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario) }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
@@ -234,7 +239,8 @@ jobs:
           with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
           print('SIMULACION 73',json.dumps(result,sort_keys=True))
           if result!={'partidos':len(proposed),'jornadas':len(proposed_rounds),'simulacion':True}:raise SystemExit('Resultado RPC discrepante')
-          if os.environ.get('ACTUALIZAR')=='true':
+          print('MODO 76', 'actualizacion autorizada' if os.environ.get('ACTUALIZAR')=='true' else 'solo simulacion')
+          if os.environ.get('ACTUALIZAR')=='true' and (proposed or proposed_rounds):
               if reconciliation['marcador_distinto'] or reconciliation['marcador_pendiente_db']:raise SystemExit('Marcadores discrepantes')
               before=get('historial_calendario_m14',{'select':'id'})
               def rpc():
