@@ -702,6 +702,16 @@ jobs:
                   try:
                       with opener.open(request,timeout=90) as response: return json.load(response)
                   except urllib.error.HTTPError as exc:
+                      try:
+                          error=json.loads(exc.read())
+                          code=str(error.get('code',''))
+                          if not re.fullmatch(r'[A-Z0-9]{5,12}',code): code='desconocido'
+                          msg=str(error.get('message',''))
+                          category=next((x for x in ('check constraint','not-null constraint','foreign key constraint','unique constraint','invalid input syntax','does not exist','permission denied','Anotaciones existentes discrepantes','Total almacenado incorrecto o duplicados','Importación no autorizada o totales inesperados') if x.lower() in msg.lower()),'otro')
+                          constraint=re.search(r'constraint "([a-zA-Z0-9_]+)"',msg)
+                          print('ANOTACIONES 42 diagnóstico SQL',code,category,'restricción',constraint.group(1) if constraint else 'no identificada')
+                      except Exception:
+                          print('ANOTACIONES 42 diagnóstico SQL no disponible')
                       raise SystemExit('Importación anotaciones HTTP '+str(exc.code)) from None
               expected_real=dict(expected_scoring,simulacion=False)
               first=write_scoring()
