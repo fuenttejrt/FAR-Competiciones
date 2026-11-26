@@ -197,9 +197,9 @@ jobs:
                       pdf_id=next(iter(pdf_ids))
                       if m['url_acta'] and actid(m['url_acta'])!=pdf_id:raise SystemExit('Acta distinta para partido asociado')
                       if m['url_acta']:
-                          existing_actas.append(dict(partido=m['id'],acta=pdf_id,url=m['url_acta'],local=home,visitante=away))
+                          existing_actas.append(dict(partido=m['id'],acta=pdf_id,url=m['url_acta'],local=home,visitante=away,marcador_web=score,marcador_db=[m['puntos_local'],m['puntos_visitante']]))
                       if not m['url_acta']:
-                          new_actas.append(dict(partido=m['id'],jornada=m['jornada_id'],acta=pdf_id,url=host+'/es/public/competition/match_pdf/'+pdf_id+'/act/',marcador_web=score,local=home,visitante=away))
+                          new_actas.append(dict(partido=m['id'],jornada=m['jornada_id'],acta=pdf_id,url=host+'/es/public/competition/match_pdf/'+pdf_id+'/act/',marcador_web=score,local=home,visitante=away,marcador_db=[m['puntos_local'],m['puntos_visitante']]))
                   j=jmap[m['jornada_id']]
                   if norm(context)!=norm(j['nombre']):
                       counts['contexto_distinto']+=1
@@ -287,6 +287,18 @@ jobs:
                   if reader.is_encrypted or not 1<=len(reader.pages)<=50:raise ValueError('Páginas o cifrado')
                   content='\n'.join(p.extract_text() or '' for p in reader.pages)
                   if not content.strip():raise ValueError('Texto vacío')
+                  normalized=norm(content)
+                  local_ok=norm(a['local']) in normalized
+                  away_ok=norm(a['visitante']) in normalized
+                  sc=re.fullmatch(r'\s*(\d+)\s*[-:]\s*(\d+)\s*',a['marcador_web'])
+                  score_ok=False
+                  if sc:
+                      x,y=map(int,sc.groups())
+                      score_ok=bool(re.search(r'(?<!\d)'+str(x)+r'\s*[-:–]\s*'+str(y)+r'(?!\d)',content))
+                  db_ok=bool(sc and (a['marcador_db']==[None,None] or a['marcador_db']==[x,y]))
+                  for label,ok in [('equipos_local',local_ok),('equipos_visitante',away_ok),('marcador_textual',score_ok),('marcador_db',db_ok)]:
+                      pdf_counts['89_'+label+('_ok' if ok else '_revisar')]+=1
+                  if not all((local_ok,away_ok,score_ok,db_ok)):print('REVISION CONTENIDO 89',a['partido'],dict(local=local_ok,visitante=away_ok,marcador=score_ok,db=db_ok))
                   digest=hashlib.sha256(' '.join(content.split()).encode()).hexdigest()
                   old=get('actas',{'partido_id':'eq.'+str(a['partido']),'select':'id,hash_contenido'})
                   if len(old)>1:raise ValueError('Acta duplicada')
