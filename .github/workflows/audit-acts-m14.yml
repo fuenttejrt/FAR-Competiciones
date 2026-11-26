@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      guardar_minutos_sancion:
+        description: 'Guardar minutos sancionados M14 (versión 57)'
+        type: boolean
+        default: false
       importar_estadisticas_equipos:
         description: Importar estadísticas de equipos M14 validadas
         type: boolean
@@ -53,6 +57,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          GUARDAR_MINUTOS_SANCION: ${{ github.event_name == 'workflow_dispatch' && inputs.guardar_minutos_sancion || false }}
           IMPORTAR_ESTADISTICAS_EQUIPOS: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_estadisticas_equipos || false }}
           IMPORTAR_ESTADISTICAS_JUGADORES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_estadisticas_jugadores || false }}
           IMPORTAR_PARTICIPACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_participaciones || false }}
@@ -77,7 +82,7 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
-          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
+          if sum(os.environ.get(k)=='true' for k in ('GUARDAR_MINUTOS_SANCION','IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
           # Verify the installed diagnostic RPC using only synthetic temporary rows.
           req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with opener.open(req,timeout=30) as response: probe=json.load(response)
@@ -959,6 +964,20 @@ jobs:
               for k,c in balances.items():
                   if c['superioridad']!=stored_teams[k]['minutos_superioridad'] or c['inferioridad']!=stored_teams[k]['minutos_inferioridad']: raise SystemExit('Balance numérico reconstruido discrepante')
               print('TIEMPOS 56',json.dumps(dict(partidos=len(match_map),sustituciones=len(changes_db),sanciones=len(sanctions_db),minutos_jugados=total_minutes,minutos_sancionados=sum(sanction_minutes.values()),reincorporaciones=returns,igualdad=sum(c['igualdad'] for c in balances.values()),superioridad=sum(c['superioridad'] for c in balances.values()),inferioridad=sum(c['inferioridad'] for c in balances.values()),discrepancias=0,solo_lectura=True),sort_keys=True))
+              sanction_payload=[dict(alineacion_id=a['id'],minutos_sancionado=sanction_minutes[(k,d)]) for k,roster in rosters.items() for d,a in roster.items()]
+              def sanction_minutes_rpc(simulate):
+                  req=urllib.request.Request(base+'/rest/v1/rpc/guardar_minutos_sancion_m14',data=json.dumps(dict(p_filas=sanction_payload,p_simular=simulate)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  with opener.open(req,timeout=90) as response: result=json.load(response)
+                  if result.get('participaciones')!=2124 or result.get('minutos_sancionados')!=130 or result.get('simulacion')!=simulate: raise SystemExit('Resultado minutos sanción discrepante')
+                  return result
+              probe57=sanction_minutes_rpc(True)
+              if probe57.get('actualizadas')!=0: raise SystemExit('Simulación modificó datos')
+              print('SANCION 57 simulación',json.dumps(probe57,sort_keys=True))
+              if os.environ.get('GUARDAR_MINUTOS_SANCION')=='true':
+                  result57=sanction_minutes_rpc(False)
+                  repeat57=sanction_minutes_rpc(False)
+                  if result57.get('actualizadas') not in (0,2124) or repeat57.get('actualizadas')!=0: raise SystemExit('Repetición minutos sanción discrepante')
+                  print('SANCION 57',json.dumps(result57,sort_keys=True),'repetición',repeat57['actualizadas'])
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
