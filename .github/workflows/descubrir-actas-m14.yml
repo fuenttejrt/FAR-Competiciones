@@ -28,7 +28,8 @@ jobs:
   descubrir:
     runs-on: ubuntu-latest
     steps:
-      - run: pip install beautifulsoup4 pypdf
+      - uses: actions/checkout@v4
+      - run: pip install beautifulsoup4 pypdf pdfplumber
       - name: Comparar calendarios y actualizar en ejecución autorizada
         env:
           ACTUALIZAR: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario) }}
@@ -41,6 +42,8 @@ jobs:
           python - <<'PY'
           import os,json,re,urllib.request,urllib.parse,unicodedata,io,hashlib
           from pypdf import PdfReader
+          from scripts.extract_m14_core import extract_roster_scoring
+          import contextlib
           from datetime import datetime
           from zoneinfo import ZoneInfo
           from bs4 import BeautifulSoup
@@ -308,6 +311,14 @@ jobs:
                   else:
                       if a in audit_pdfs:raise ValueError('Acta histórica ausente')
                       pdf_counts['nueva_legible']+=1
+                  if sc:
+                      with contextlib.redirect_stdout(io.StringIO()):
+                          core=extract_roster_scoring(raw,content,dict(id=a['partido'],puntos_local=x,puntos_visitante=y))
+                      if not all(core['score_ok'].get(side,False) for side in ('local','visitante')):raise ValueError('Marcador estructurado')
+                      pdf_counts['90_actas']+=1
+                      pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
+                      pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
+                      pdf_counts['90_anotaciones']+=sum(len(v) for v in core['scores'].values())
                   pdf_counts['legibles']+=1
                   print('PDF 88',a['partido'],'paginas',len(reader.pages),'sha256',digest)
               except Exception as exc:
