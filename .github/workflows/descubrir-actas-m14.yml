@@ -62,6 +62,8 @@ jobs:
           totals=Counter()
           reconciliation=Counter()
           proposed=[]
+          score_audit=Counter()
+          score_proposals=[]
           verified_links=0
           verified_times=0
           proposed_rounds=[]
@@ -195,7 +197,21 @@ jobs:
                   if not m['fecha_hora'] and len(date.split())>1 and date.split()[1]!='00:00':counts['hora_nueva']+=1
                   counts['asociados']+=1
                   sc=re.fullmatch(r'\s*(\d+)\s*[-:]\s*(\d+)\s*',score)
-                  if sc and (m['puntos_local'],m['puntos_visitante'])!=tuple(map(int,sc.groups())):counts['marcador_distinto']+=1
+                  previous=(m['puntos_local'],m['puntos_visitante'])
+                  if sc:
+                      official=tuple(map(int,sc.groups()))
+                      score_audit['publicados']+=1
+                      score_audit['con_pdf_db' if m['url_acta'] else 'sin_pdf_db']+=1
+                      if previous==official:score_audit['coincidentes']+=1
+                      else:
+                          counts['marcador_distinto']+=1
+                          kind='nuevo' if previous==(None,None) else 'correccion'
+                          score_audit[kind]+=1
+                          score_proposals.append(dict(id=m['id'],jornada=jid,anterior=previous,nuevo=official,tipo=kind,acta_db=bool(m['url_acta'])))
+                  elif previous==(None,None):score_audit['pendientes']+=1
+                  else:
+                      score_audit['resultado_retirado']+=1
+                      score_proposals.append(dict(id=m['id'],jornada=jid,anterior=previous,nuevo=None,tipo='retirado',acta_db=bool(m['url_acta'])))
                   if not sc and (m['puntos_local'] is not None or m['puntos_visitante'] is not None):counts['marcador_pendiente_db']+=1
               counts['db_sin_asociar']=len(db)-len(matched)
               for m in db:
@@ -234,6 +250,10 @@ jobs:
               rows=get('partidos',{'id':'eq.'+str(h['entidad_id']),'select':'id,fecha_hora'})
               if len(rows)!=1 or not rows[0]['fecha_hora']:raise SystemExit('Horario inicial ausente')
           print('AUDITORIA 75',json.dumps(dict(historial=len(history),horarios_iniciales=len(initial),jornada_inicial=len(moved),actas_asociadas=verified_links,horarios_coincidentes=verified_times,propuestas=len(proposed),jornadas_propuestas=len(proposed_rounds)),sort_keys=True))
+          if score_audit['publicados']+score_audit['pendientes']+score_audit['resultado_retirado']!=reconciliation['asociados']:raise SystemExit('Cobertura de resultados incompleta')
+          if len({p['id'] for p in score_proposals})!=len(score_proposals):raise SystemExit('Propuestas de marcador duplicadas')
+          for p in score_proposals:print('PROPUESTA RESULTADO 77',json.dumps(p,sort_keys=True))
+          print('AUDITORIA RESULTADOS 77',json.dumps(dict(score_audit),sort_keys=True))
           payload=dict(p_partidos=proposed,p_jornadas=proposed_rounds,p_simular=True)
           req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_calendario_m14',data=json.dumps(payload).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
