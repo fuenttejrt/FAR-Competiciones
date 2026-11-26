@@ -114,6 +114,7 @@ jobs:
           lineup_payload=[]
           scoring_payload=[]
           changes_payload=[]
+          sanctions_payload=[]
           name_variants=defaultdict(set)
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
@@ -539,6 +540,7 @@ jobs:
                               if kind=='Cambios':
                                   changes_payload.append(dict(partido_id=m['id'],equipo_id=team_id,minuto=minute,dorsal_entra=ds[0],dorsal_sale=ds[1]))
                               else:
+                                  sanctions_payload.append(dict(partido_id=m['id'],equipo_id=team_id,minuto=minute,dorsal=ds[0],tipo=kind))
                                   tc[kind]+=1
                                   players[(team_id,identities[side][ds[0]])][kind]+=1
                       print('Auditoría duración',m['id'],'máximo anotación',max((t for events in scores.values() for k,t,d in events if t is not None),default=None),'máximo cambios y sanciones',max((e[0] for events in timeline.values() for e in events),default=None),'referencia',36)
@@ -695,6 +697,19 @@ jobs:
                   raise SystemExit('Validación sustituciones HTTP '+str(exc.code)) from None
               if changes_probe!=expected_changes: raise SystemExit('Validación SQL sustituciones no coincide')
               print('SUSTITUCIONES 43',json.dumps(changes_probe,sort_keys=True))
+          sanction_counts=Counter()
+          sanction_types=Counter()
+          roster_keys=Counter((x['partido_id'],x['equipo_id'],x['dorsal']) for x in lineup_payload)
+          sanctions_payload.sort(key=lambda x:(x['partido_id'],x['minuto'],x['equipo_id']))
+          for event in sanctions_payload:
+              if event['tipo'] not in ('Expulsiones temporales','Expulsiones definitivas') or not 0<=event['minuto']<=36 or roster_keys[(event['partido_id'],event['equipo_id'],event['dorsal'])]!=1:
+                  raise SystemExit('Sanción no válida o alineación ambigua')
+              sanction_counts[event['partido_id']]+=1
+              event['orden_evento']=sanction_counts[event['partido_id']]
+              sanction_types[event['tipo']]+=1
+          if sanction_types['Expulsiones temporales']!=sum(x['amarillas'] for x in simulated_players) or sanction_types['Expulsiones definitivas']!=sum(x['rojas'] for x in simulated_players) or sanction_types['Expulsiones temporales']!=sum(x['amarillas'] for x in simulated_teams) or sanction_types['Expulsiones definitivas']!=sum(x['rojas'] for x in simulated_teams):
+              raise SystemExit('Totales de sanciones discrepantes')
+          print('SANCIONES 45',json.dumps(dict(total=len(sanctions_payload),partidos=len(sanction_counts),amarillas=sanction_types['Expulsiones temporales'],rojas=sanction_types['Expulsiones definitivas'],simulacion=True),sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
