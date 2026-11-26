@@ -350,6 +350,9 @@ jobs:
                   if authorized(rows,rs,cal)!=expected:raise SystemExit('Prueba autorización fallida '+label)
                   print('AUTORIZACION 84',label,'correcta')
               print('TOTAL AUTORIZACION 84',len(cases),'sin escrituras')
+          if os.environ.get('PROBAR_AUTORIZACION')=='true':
+              if not authorized(score_proposals,result_scores,bool(proposed or proposed_rounds)):raise SystemExit('Datos actuales no autorizables')
+              print('PREVUELO 85',json.dumps(dict(candidatos=len(score_proposals),autorizado=True,escritura=False),sort_keys=True))
           if os.environ.get('GUARDAR_RESULTADOS')=='true':
               if not authorized(score_proposals,result_scores,bool(proposed or proposed_rounds)):raise SystemExit('Resultados no autorizables o calendario pendiente')
               if score_proposals:
