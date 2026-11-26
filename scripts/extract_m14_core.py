@@ -175,3 +175,99 @@ def extract_roster_scoring(raw,content,m):
         print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
     if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
     return dict(roster=roster,identities=identities,starting=starting,scores=scores,score_ok=score_ok,content_hash=content_hash)
+
+
+def extract_events(raw,m,core):
+    roster=core['roster']
+    starting=core['starting']
+    timeline={'local':[],'visitante':[]}
+    participation={}
+    with pdfplumber.open(io.BytesIO(raw)) as doc:
+        for heading,allowed,fields in [('Cambios',{'CT','CL','CS','CC','C1','CJ','C20'},['dorsal entra','dorsal sale']),('Expulsiones temporales',set('ABCDE'),['dorsal']),('Expulsiones definitivas',set('ABCDE'),['dorsal'])]:
+            found=set()
+            for page in doc.pages:
+                region=page
+                if heading!='Cambios':
+                    region=page.crop((0 if heading.endswith('temporales') else page.width/2,0,page.width/2 if heading.endswith('temporales') else page.width,page.height))
+                words=region.extract_words(x_tolerance=2,y_tolerance=2)
+                rows=[]
+                for w in sorted(words,key=lambda w:(w['top'],w['x0'])):
+                    if not rows or abs(rows[-1][0]['top']-w['top'])>=2: rows.append([w])
+                    else: rows[-1].append(w)
+                rows=[sorted(row,key=lambda w:w['x0']) for row in rows]
+                lines=[' '.join(w['text'] for w in row).strip() for row in rows]
+                starts=[i for i,line in enumerate(lines) if line.casefold()==heading.casefold()]
+                for start in starts:
+                    end=next((i for i in range(start+1,len(lines)) if re.fullmatch(r'Cambios|Expulsiones temporales|Expulsiones definitivas|Árbitro',lines[i],re.I)),len(lines))
+                    teams=[i for i in range(start+1,end) if re.match(r'Equipo\s+(local|visitante):',lines[i],re.I)]
+                    for k,idx in enumerate(teams):
+                        side=re.match(r'Equipo\s+(local|visitante):',lines[idx],re.I).group(1).lower()
+                        if side in found: continue
+                        stop=teams[k+1] if k+1<len(teams) else end
+                        labels={}
+                        for i in range(idx+1,stop):
+                            match=re.match(r'^(Dorsal entra|Dorsal sale|Dorsal|Minuto|Tipo)\b',lines[i],re.I)
+                            if match: labels[match.group(1).lower()]=rows[i]
+                        if not all(x in labels for x in ['tipo','minuto']+fields): continue
+                        found.add(side)
+                        def center(w): return (w['x0']+w['x1'])/2
+                        def cell(label,x):
+                            candidates=[w for w in labels[label] if w['text'].isdigit() and abs(center(w)-x)<12.5]
+                            return int(min(candidates,key=lambda w:abs(center(w)-x))['text']) if candidates else None
+                        events=[w for w in labels['tipo'] if w['text'].upper() in allowed]
+                        unknown=[w for w in labels['tipo'] if w['text'].upper() not in allowed and w['text'].lower() not in ('tipo','*','tipo*')]
+                        invalid=0
+                        missing_minute=0; unknown_dorsal=0; same_dorsal=0
+                        for event in events:
+                            x=center(event)
+                            minute=cell('minuto',x)
+                            dorsals=[cell(label,x) for label in fields]
+                            bad_minute=minute is None
+                            bad_dorsal=any(d is None or d not in roster.get(side,set()) for d in dorsals)
+                            bad_same=len(dorsals)==2 and dorsals[0]==dorsals[1]
+                            missing_minute+=bad_minute; unknown_dorsal+=bad_dorsal; same_dorsal+=bad_same
+                            if bad_minute or bad_dorsal or bad_same: invalid+=1
+                            else: timeline[side].append((minute,heading,dorsals,event['text'].upper()))
+                        print('Validación eventos',m['id'],heading,side,'minutos ausentes',missing_minute,'dorsales inválidos',unknown_dorsal,'entra igual sale',same_dorsal)
+                        print(heading,side,'eventos',len(events),'incompletos',invalid,'tokens desconocidos',len(unknown))
+            if found!={'local','visitante'}: print(heading,'bloques incompletos',len(found))
+    # Compare simultaneous events by shared dorsals; independent events commute.
+    occupancy={}
+    for side in ('local','visitante'):
+        active=set(starting[side]); banned=set(); suspended={}; minutes={d:0 for d in roster[side]}
+        issues=[]; compatible=0; ambiguous=0; counts=[]
+        events=sorted(timeline[side],key=lambda e:e[0])
+        for t in range(37):
+            returning={d for d,end in suspended.items() if end==t}
+            for d in returning:
+                del suspended[d]
+                if d not in banned: active.add(d)
+            current=[e for e in events if e[0]==t]
+            touched=[d for e in current for d in e[2]]
+            if len(touched)!=len(set(touched)) or returning.intersection(touched):
+                ambiguous+=1; issues.append('orden ambiguo')
+            elif len(current)>1: compatible+=1
+            for _,kind,ds,code in current:
+                if kind=='Cambios':
+                    enter,leave=ds
+                    if leave not in active or enter in active or enter in banned or enter in suspended: issues.append('cambio incompatible')
+                    else: active.remove(leave); active.add(enter)
+                else:
+                    d=ds[0]
+                    if d not in active: issues.append('sanción fuera de campo')
+                    active.discard(d)
+                    if kind=='Expulsiones definitivas': banned.add(d); suspended.pop(d,None)
+                    else: suspended[d]=t+5
+            if len(active)>15: issues.append('exceso jugadores')
+            if t<36:
+                counts.append(len(active))
+                for d in active: minutes[d]+=1
+        if any(e[0]<0 or e[0]>36 for e in events): issues.append('minuto fuera duración')
+        if sum(minutes.values())!=sum(counts) or any(v<0 or v>36 for v in minutes.values()): issues.append('balance minutos')
+        participation[side]=(minutes,not issues)
+        occupancy[side]=counts
+        print('Simulación participación',m['id'],side,'titulares',len(starting[side]),'jugadores con minutos',sum(v>0 for v in minutes.values()),'minutos acumulados',sum(minutes.values()),'simultáneos compatibles',compatible,'ambiguos',ambiguous,'incidencias',len(issues),'tipos',','.join(sorted(set(issues))) or 'ninguna')
+    differences=[a-b for a,b in zip(occupancy['local'],occupancy['visitante'])]
+    equal=sum(d==0 for d in differences); superior=sum(d>0 for d in differences); inferior=sum(d<0 for d in differences)
+    print('Balance numérico',m['id'],'igualdad',equal,'superior local',superior,'superior visitante',inferior,'minutos diferencia local',sum(max(0,d) for d in differences),'minutos diferencia visitante',sum(max(0,-d) for d in differences),'coincide',equal+superior+inferior==36)
+    return dict(timeline=timeline,participation=participation,occupancy=occupancy,equal=equal,superior=superior,inferior=inferior)
