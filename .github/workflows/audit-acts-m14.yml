@@ -748,6 +748,50 @@ jobs:
               if participation_probe!=dict(total=2124,partidos=53,minutos=56894,titulares=1584,suplentes_con_minutos=256,suplentes_sin_minutos=284,jugadores_con_minutos=1840,simulacion=True) or not isinstance(constraints,list) or not constraints: raise SystemExit('Validación SQL participaciones no coincide')
               print('PARTICIPACIONES 49',json.dumps(participation_probe,sort_keys=True))
               print('PARTICIPACIONES 49 restricciones',json.dumps(constraints,sort_keys=True))
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              def all_rows(table,fields):
+                  rows=[]
+                  while True:
+                      batch=get(table,dict(select=fields,order='id.asc',limit='500',offset=str(len(rows))))
+                      rows.extend(batch)
+                      if len(batch)<500: return rows
+              scope={x['partido_id'] for x in lineup_payload}
+              al=[x for x in all_rows('alineaciones','id,partido_id,equipo_id,jugador_id,titular') if x['partido_id'] in scope]
+              by_id={x['id']:x for x in al}
+              identities_db={x['id']:str(x['licencia']) for x in all_rows('jugadores','id,licencia')}
+              actual=defaultdict(Counter)
+              for a in al:
+                  c=actual[(a['equipo_id'],identities_db[a['jugador_id']])]
+                  c['convocatorias']+=1
+                  c['titularidades']+=int(a['titular'])
+              seen=set()
+              for p in all_rows('participaciones','id,alineacion_id,minutos_jugados,jugado'):
+                  a=by_id.get(p['alineacion_id'])
+                  if a is None: continue
+                  if a['id'] in seen or p['jugado']!=(p['minutos_jugados']>0): raise SystemExit('Participación almacenada discrepante')
+                  seen.add(a['id'])
+                  c=actual[(a['equipo_id'],identities_db[a['jugador_id']])]
+                  c['minutos_jugados']+=p['minutos_jugados']
+                  c['partidos_jugados']+=int(p['jugado'])
+                  c['minutos_posibles']+=36
+                  c['actas_participacion_verificada']+=1
+              if seen!=set(by_id): raise SystemExit('Participaciones almacenadas incompletas')
+              for e in all_rows('anotaciones','id,partido_id,equipo_id,jugador_id,tipo,puntos'):
+                  if e['partido_id'] not in scope or e['tipo']=='ensayo_castigo': continue
+                  c=actual[(e['equipo_id'],identities_db[e['jugador_id']])]
+                  c['ensayos']+=int(e['tipo']=='ensayo')
+                  c['transformaciones']+=int(e['tipo']=='transformacion')
+                  c['puntos']+=e['puntos']
+              for e in all_rows('sanciones','id,partido_id,equipo_id,jugador_id,tipo'):
+                  if e['partido_id'] not in scope: continue
+                  actual[(e['equipo_id'],identities_db[e['jugador_id']])]['amarillas' if e['tipo']=='temporal' else 'rojas']+=1
+              fields=('convocatorias','titularidades','partidos_jugados','minutos_jugados','minutos_posibles','ensayos','transformaciones','puntos','amarillas','rojas','actas_participacion_verificada')
+              expected={(x['equipo_id'],str(x['identity'])):x for x in simulated_players}
+              if set(actual)!=set(expected) or len(actual)!=436: raise SystemExit('Identidades estadísticas discrepantes')
+              mismatches={f:sum(actual[k][f]!=v[f] for k,v in expected.items()) for f in fields}
+              print('ESTADISTICAS 51 discrepancias',json.dumps(mismatches,sort_keys=True))
+              if any(mismatches.values()): raise SystemExit('Estadísticas almacenadas discrepantes')
+              print('ESTADISTICAS 51',json.dumps(dict(registros=len(actual),identidades=len({k[1] for k in actual}),equipos=len({k[0] for k in actual}),totales={f:sum(c[f] for c in actual.values()) for f in fields},simulacion=True),sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
