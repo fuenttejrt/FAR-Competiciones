@@ -2,6 +2,10 @@ name: Descubrir actas MatchReady M14
 on:
   workflow_dispatch:
     inputs:
+      actualizar_resultados:
+        description: 'Guardar nuevos resultados oficiales validados'
+        type: boolean
+        default: false
       actualizar_calendario:
         description: 'Guardar los cambios de calendario validados'
         type: boolean
@@ -24,6 +28,8 @@ jobs:
       - name: Comparar calendarios y actualizar en ejecución autorizada
         env:
           ACTUALIZAR: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario) }}
+          GUARDAR_RESULTADOS: ${{ github.event_name == 'workflow_dispatch' && inputs.actualizar_resultados }}
+          EVENTO: ${{ github.event_name }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
@@ -201,7 +207,7 @@ jobs:
                   sc=re.fullmatch(r'\s*(\d+)\s*[-:]\s*(\d+)\s*',score)
                   previous=(m['puntos_local'],m['puntos_visitante'])
                   if sc:
-                      test_played.append(dict(id=m['id'],jornada=jid,anterior=previous,nuevo=previous,tipo='nuevo'))
+                      if previous[0] is not None and previous[1] is not None:test_played.append(dict(id=m['id'],jornada=jid,anterior=previous,nuevo=previous,tipo='nuevo'))
                       official=tuple(map(int,sc.groups()))
                       score_audit['publicados']+=1
                       score_audit['con_pdf_db' if m['url_acta'] else 'sin_pdf_db']+=1
@@ -269,7 +275,7 @@ jobs:
           def test_rpc(rows):
               req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_resultados_m14',data=json.dumps(dict(p_filas=rows,p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
               with urllib.request.urlopen(req,timeout=60) as resp:return json.load(resp)
-          if test_pending and test_played:
+          if os.environ.get('EVENTO')!='schedule' and os.environ.get('GUARDAR_RESULTADOS')!='true' and test_pending and test_played:
               a=test_pending[0]
               b=test_played[0]
               cases=[('nuevo',a,'candidatos'),('repetido',dict(b,anterior=[None,None]),'iguales'),('correccion',dict(b,tipo='correccion',nuevo=[99,0]),'bloqueados'),('retirado',dict(b,tipo='retirado',nuevo=None),'bloqueados')]
@@ -286,7 +292,7 @@ jobs:
               if history_results_before!=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'}):raise SystemExit('Historial alterado')
               print('TOTAL PRUEBAS 79',6,'sin escrituras')
           else:print('PRUEBAS 79 omitidas: no hay candidatos adecuados')
-          if test_pending and test_played:
+          if os.environ.get('EVENTO')!='schedule' and os.environ.get('GUARDAR_RESULTADOS')!='true' and test_pending and test_played:
               req80=urllib.request.Request(base+'/rest/v1/rpc/probar_resultados_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
               with urllib.request.urlopen(req80,timeout=60) as resp: prueba80=json.load(resp)
               if not all(prueba80.get(k) is True for k in ('escritura','repeticion','historial','reversion','estado_verificado')):raise SystemExit('Prueba transaccional 80 fallida')
@@ -295,11 +301,12 @@ jobs:
               states=prueba80.get('estados',{})
               if sum(states.values())!=reconciliation['asociados']:raise SystemExit('Inventario de estados incompleto')
               print('ESTADOS 81',json.dumps(states,sort_keys=True))
-          req82=urllib.request.Request(base+'/rest/v1/rpc/probar_proteccion_resultados_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
-          with urllib.request.urlopen(req82,timeout=60) as resp: prueba82=json.load(resp)
-          if not all(prueba82.get(k) is True for k in ('bloqueado','reversion','historial_intacto')) or set(prueba82.get('cobertura',[]))!={'actas','alineaciones','anotaciones','sustituciones','sanciones'}:raise SystemExit('Protección 82 no confirmada')
-          if history_results_before!=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'}):raise SystemExit('Historial alterado tras prueba 82')
-          print('PROTECCION 82',json.dumps(prueba82,sort_keys=True))
+          if os.environ.get('EVENTO')!='schedule' and os.environ.get('GUARDAR_RESULTADOS')!='true':
+              req82=urllib.request.Request(base+'/rest/v1/rpc/probar_proteccion_resultados_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(req82,timeout=60) as resp: prueba82=json.load(resp)
+              if not all(prueba82.get(k) is True for k in ('bloqueado','reversion','historial_intacto')) or set(prueba82.get('cobertura',[]))!={'actas','alineaciones','anotaciones','sustituciones','sanciones'}:raise SystemExit('Protección 82 no confirmada')
+              if history_results_before!=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'}):raise SystemExit('Historial alterado tras prueba 82')
+              print('PROTECCION 82',json.dumps(prueba82,sort_keys=True))
           payload=dict(p_partidos=proposed,p_jornadas=proposed_rounds,p_simular=True)
           req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_calendario_m14',data=json.dumps(payload).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
@@ -328,4 +335,25 @@ jobs:
               after=get('historial_calendario_m14',{'select':'id'})
               if len(after)-len(before)!=len(proposed)+len(proposed_rounds):raise SystemExit('Historial discrepante')
               print('PERSISTENCIA 74',len(proposed),len(proposed_rounds),'historial nuevo',len(after)-len(before))
+          if os.environ.get('GUARDAR_RESULTADOS')=='true':
+              if any(p['tipo']!='nuevo' or p['acta_db'] for p in score_proposals) or result_scores['bloqueados'] or result_scores['candidatos']!=len(score_proposals):raise SystemExit('Resultados no autorizables')
+              if proposed or proposed_rounds:raise SystemExit('Resolver primero cambios de calendario')
+              if score_proposals:
+                  def write_scores():
+                      req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_resultados_m14',data=json.dumps(dict(p_filas=score_proposals,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                      with urllib.request.urlopen(req,timeout=60) as resp:return json.load(resp)
+                  first=write_scores()
+                  if first!={'candidatos':len(score_proposals),'iguales':0,'bloqueados':0,'simulacion':False}:raise SystemExit('Escritura resultados discrepante')
+                  second=write_scores()
+                  if second!={'candidatos':0,'iguales':len(score_proposals),'bloqueados':0,'simulacion':False}:raise SystemExit('Repetición resultados discrepante')
+                  after=get('historial_resultados_m14',{'select':'id,partido_id,anterior,nuevo'})
+                  added=[h for h in after if h['id'] not in {x['id'] for x in history_results_before}]
+                  if len(added)!=len(score_proposals):raise SystemExit('Historial resultados discrepante')
+                  for p in score_proposals:
+                      rows=get('partidos',{'id':'eq.'+str(p['id']),'select':'id,puntos_local,puntos_visitante,estado'})
+                      if len(rows)!=1 or [rows[0]['puntos_local'],rows[0]['puntos_visitante']]!=list(p['nuevo']) or rows[0]['estado']!='finalizado':raise SystemExit('Persistencia resultado discrepante')
+                      if not any(h['partido_id']==p['id'] and h['anterior']==dict(marcador=[None,None],estado='pendiente') and h['nuevo']==dict(marcador=list(p['nuevo']),estado='finalizado') for h in added):raise SystemExit('Contenido historial discrepante')
+                  print('IMPORTACION 83',len(score_proposals),'verificados sin duplicados')
+              else:print('IMPORTACION 83 sin resultados nuevos')
+          else:print('MODO RESULTADOS 83 solo simulacion')
           PY
