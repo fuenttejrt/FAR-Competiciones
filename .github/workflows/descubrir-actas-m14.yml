@@ -51,6 +51,7 @@ jobs:
           totals=Counter()
           reconciliation=Counter()
           proposed=[]
+          proposed_rounds=[]
           round_dates={}
           round_meta={}
           round_sizes=Counter()
@@ -202,6 +203,7 @@ jobs:
                   print('JORNADA 72 parcial',jid,j['nombre'],sorted(days),'conservar fecha base')
               elif next(iter(days))!=j['fecha_inicio']:
                   print('JORNADA 72 cambio completo',jid,j['nombre'],j['fecha_inicio'],next(iter(days)))
+                  proposed_rounds.append(dict(id=jid,anterior=j['fecha_inicio'],nueva=next(iter(days))))
           for p in proposed:print('PROPUESTA 72',json.dumps(p,sort_keys=True))
           print('TOTAL 72',json.dumps(dict(Counter(p['tipo'] for p in proposed)),sort_keys=True))
           if reconciliation['asociados']!=totals['partidos_db'] or reconciliation['asociados']!=totals['filas_web'] or reconciliation['contexto_distinto'] or reconciliation['jornada_web_no_detectada']:raise SystemExit('Simulación no autorizable: asociación o contexto incompleto')
@@ -209,3 +211,9 @@ jobs:
           print('TOTAL 66',json.dumps(dict(totals),sort_keys=True))
           if totals['no_localizadas'] or totals['ambiguas'] or not totals['filas_web']:raise SystemExit('Calendario no reconciliado')
           PY
+
+          payload=dict(p_partidos=proposed,p_jornadas=proposed_rounds,p_simular=True)
+          req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_calendario_m14',data=json.dumps(payload).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+          with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
+          print('SIMULACION 73',json.dumps(result,sort_keys=True))
+          if result!={'partidos':len(proposed),'jornadas':len(proposed_rounds),'simulacion':True}:raise SystemExit('Resultado RPC discrepante')
