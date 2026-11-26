@@ -2,6 +2,10 @@ name: Descubrir actas MatchReady M14
 on:
   workflow_dispatch:
     inputs:
+      probar_modo_autorizado:
+        description: 'Probar autorización sin guardar resultados oficiales'
+        type: boolean
+        default: false
       actualizar_resultados:
         description: 'Guardar nuevos resultados oficiales validados'
         type: boolean
@@ -29,6 +33,7 @@ jobs:
         env:
           ACTUALIZAR: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario) }}
           GUARDAR_RESULTADOS: ${{ github.event_name == 'workflow_dispatch' && inputs.actualizar_resultados }}
+          PROBAR_AUTORIZACION: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.probar_modo_autorizado) }}
           EVENTO: ${{ github.event_name }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -335,9 +340,18 @@ jobs:
               after=get('historial_calendario_m14',{'select':'id'})
               if len(after)-len(before)!=len(proposed)+len(proposed_rounds):raise SystemExit('Historial discrepante')
               print('PERSISTENCIA 74',len(proposed),len(proposed_rounds),'historial nuevo',len(after)-len(before))
+          def authorized(rows,sim,calendar_pending):
+              return not calendar_pending and not any(p['tipo']!='nuevo' or p['acta_db'] for p in rows) and sim.get('simulacion') is True and sim.get('bloqueados')==0 and sim.get('candidatos')==len(rows) and sim.get('iguales')==0
+          if os.environ.get('PROBAR_AUTORIZACION')=='true':
+              sample=dict(tipo='nuevo',acta_db=False)
+              sim=dict(simulacion=True,bloqueados=0,candidatos=1,iguales=0)
+              cases=[('nuevo',[sample],sim,False,True),('correccion',[dict(sample,tipo='correccion')],sim,False,False),('retirado',[dict(sample,tipo='retirado')],sim,False,False),('acta',[dict(sample,acta_db=True)],sim,False,False),('bloqueado',[sample],dict(sim,bloqueados=1),False,False),('calendario',[sample],sim,True,False),('recuento',[sample],dict(sim,candidatos=0),False,False),('vacio',[],dict(sim,candidatos=0),False,True),('no_simulado',[sample],dict(sim,simulacion=False),False,False)]
+              for label,rows,rs,cal,expected in cases:
+                  if authorized(rows,rs,cal)!=expected:raise SystemExit('Prueba autorización fallida '+label)
+                  print('AUTORIZACION 84',label,'correcta')
+              print('TOTAL AUTORIZACION 84',len(cases),'sin escrituras')
           if os.environ.get('GUARDAR_RESULTADOS')=='true':
-              if any(p['tipo']!='nuevo' or p['acta_db'] for p in score_proposals) or result_scores['bloqueados'] or result_scores['candidatos']!=len(score_proposals):raise SystemExit('Resultados no autorizables')
-              if proposed or proposed_rounds:raise SystemExit('Resolver primero cambios de calendario')
+              if not authorized(score_proposals,result_scores,bool(proposed or proposed_rounds)):raise SystemExit('Resultados no autorizables o calendario pendiente')
               if score_proposals:
                   def write_scores():
                       req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_resultados_m14',data=json.dumps(dict(p_filas=score_proposals,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
