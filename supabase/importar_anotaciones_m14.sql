@@ -12,6 +12,12 @@ begin
  if exists(select 1 from pg_temp.far_anotacion_stage s where s.tipo<>'EC' and (select count(*) from public.alineaciones a where a.partido_id=s.partido_id and a.equipo_id=s.equipo_id and a.dorsal=s.dorsal)<>1) then raise exception 'Anotador sin alineación única'; end if;
  if exists(select 1 from pg_temp.far_anotacion_stage s join public.partidos p on p.id=s.partido_id group by s.partido_id,s.equipo_id,p.equipo_local_id,p.puntos_local,p.puntos_visitante having sum(s.puntos) is distinct from case when s.equipo_id=p.equipo_local_id then p.puntos_local else p.puntos_visitante end) then raise exception 'Marcador discrepante'; end if;
  select count(*),count(distinct partido_id),count(*) filter(where tipo='E'),count(*) filter(where tipo='T'),count(*) filter(where tipo='EC'),coalesce(sum(puntos),0) into n,np,ne,nt,nec,pts from pg_temp.far_anotacion_stage;
+ -- Global event order per match; equal minutes use deterministic team and original order.
+ create temporary table far_anotacion_ordered on commit drop as
+ select partido_id,equipo_id,row_number() over(partition by partido_id order by minuto,equipo_id,orden_evento)::integer as orden_evento,tipo,minuto,dorsal,puntos from pg_temp.far_anotacion_stage;
+ truncate pg_temp.far_anotacion_stage;
+ insert into pg_temp.far_anotacion_stage select * from pg_temp.far_anotacion_ordered;
+ drop table pg_temp.far_anotacion_ordered;
  if p_simular is distinct from true then
    if p_simular is null or n<>475 or np<>53 or ne<>295 or nt<>177 or nec<>3 or pts<>1850 then raise exception 'Importación no autorizada o totales inesperados'; end if;
    lock table public.anotaciones in share row exclusive mode;
