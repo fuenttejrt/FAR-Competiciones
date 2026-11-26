@@ -101,6 +101,7 @@ jobs:
           version_plan=[]
           roster_audit=Counter()
           lineup_payload=[]
+          scoring_payload=[]
           name_variants=defaultdict(set)
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
@@ -515,7 +516,8 @@ jobs:
                                   pc['minutos_posibles']+=36
                                   pc['jugados']+=int(mins[d]>0)
                                   pc['actas_participacion']+=1
-                          for k,t,d in scores[side]:
+                          for order,(k,t,d) in enumerate(scores[side],1):
+                              scoring_payload.append(dict(partido_id=m['id'],equipo_id=team_id,orden_evento=order,tipo=k,minuto=t,dorsal=d,puntos=weights[k]))
                               tc[k]+=1
                               if k!='EC':
                                   pc=players[(team_id,identities[side][d])]
@@ -655,6 +657,16 @@ jobs:
                   raise SystemExit('Validación alineaciones HTTP '+str(exc.code)) from None
               if lineup_probe!=expected_lineup: raise SystemExit('Validación SQL alineaciones no coincide')
               print('ALINEACIONES 39',json.dumps(lineup_probe,sort_keys=True))
+          if os.environ.get('IMPORTAR_JUGADORES')!='true' and os.environ.get('IMPORTAR_ALINEACIONES')!='true':
+              expected_scoring=dict(anotaciones=len(scoring_payload),partidos_con_anotaciones=len({x['partido_id'] for x in scoring_payload}),ensayos=sum(x['tipo']=='E' for x in scoring_payload),transformaciones=sum(x['tipo']=='T' for x in scoring_payload),ensayos_castigo=sum(x['tipo']=='EC' for x in scoring_payload),puntos=sum(x['puntos'] for x in scoring_payload),simulacion=True)
+              if sum(x['puntos'] for x in scoring_payload if x['tipo']!='EC')!=sum(r['puntos'] for r in simulated_players): raise SystemExit('Puntos individuales incoherentes')
+              scoring_req=urllib.request.Request(base+'/rest/v1/rpc/importar_anotaciones_m14',data=json.dumps(dict(p_filas=scoring_payload)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with opener.open(scoring_req,timeout=90) as response: scoring_probe=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit('Validación anotaciones HTTP '+str(exc.code)) from None
+              if scoring_probe!=expected_scoring: raise SystemExit('Validación SQL anotaciones no coincide')
+              print('ANOTACIONES 41',json.dumps(scoring_probe,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
