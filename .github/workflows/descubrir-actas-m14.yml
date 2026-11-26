@@ -281,6 +281,7 @@ jobs:
           pdf_opener=urllib.request.build_opener(NoRedirect())
           pdf_counts=Counter()
           audit_pdfs=existing_actas if os.environ.get('EVENTO')!='schedule' else []
+          identities94={v['id']:str(v['licencia']) for v in get('jugadores',{'select':'id,licencia'})} if audit_pdfs else {}
           for a in audit_pdfs+new_actas:
               try:
                   if actid(a['url'])!=a['acta']:raise ValueError('URL')
@@ -334,6 +335,25 @@ jobs:
                       pdf_counts['93_minutos_sancion']+=sum(sum(v.values()) for v in events['sanction_minutes'].values())
                       pdf_counts['93_reincorporaciones']+=events['returns']
                       pdf_counts['93_registros_individuales']+=sum(len(v) for v in events['sanction_minutes'].values())
+                      if a in audit_pdfs:
+                          stored=get('alineaciones',{'partido_id':'eq.'+str(a['partido']),'select':'id,equipo_id,jugador_id,dorsal,titular'})
+                          expected={}
+                          for side in ('local','visitante'):
+                              for d,lic in core['identities'][side].items():
+                                  expected[(a['equipo_'+side+'_id'],d)]=(str(lic),d in core['starting'][side],events['participation'][side][0][d],events['sanction_minutes'][side][d])
+                          if len(stored)!=len(expected):raise ValueError('Cantidad alineaciones 94')
+                          ids=','.join(str(v['id']) for v in stored)
+                          parts=get('participaciones',{'alineacion_id':'in.('+ids+')','select':'alineacion_id,minutos_jugados,minutos_sancionado'})
+                          by_id={v['alineacion_id']:v for v in parts}
+                          if len(parts)!=len(stored) or len(by_id)!=len(stored):raise ValueError('Cantidad participaciones 94')
+                          actual={}
+                          for v in stored:
+                              p=by_id[v['id']]
+                              actual[(v['equipo_id'],v['dorsal'])]=(identities94.get(v['jugador_id']),v['titular'],p['minutos_jugados'],p['minutos_sancionado'])
+                          if actual!=expected or len(actual)!=len(stored):raise ValueError('Conciliación individual 94')
+                          pdf_counts['94_alineaciones_conciliadas']+=len(actual)
+                          pdf_counts['94_participaciones_conciliadas']+=len(parts)
+                          pdf_counts['94_actas_conciliadas']+=1
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
