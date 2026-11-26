@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_estadisticas_jugadores:
+        description: Importar estadísticas individuales M14 validadas
+        type: boolean
+        default: false
       importar_participaciones:
         description: Importar realmente las participaciones M14 validadas
         type: boolean
@@ -45,6 +49,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_ESTADISTICAS_JUGADORES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_estadisticas_jugadores || false }}
           IMPORTAR_PARTICIPACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_participaciones || false }}
           IMPORTAR_SANCIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_sanciones || false }}
           IMPORTAR_SUSTITUCIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_sustituciones || false }}
@@ -67,7 +72,7 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
-          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
+          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_SANCIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
           # Verify the installed diagnostic RPC using only synthetic temporary rows.
           req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with opener.open(req,timeout=30) as response: probe=json.load(response)
@@ -792,6 +797,19 @@ jobs:
               print('ESTADISTICAS 51 discrepancias',json.dumps(mismatches,sort_keys=True))
               if any(mismatches.values()): raise SystemExit('Estadísticas almacenadas discrepantes')
               print('ESTADISTICAS 51',json.dumps(dict(registros=len(actual),identidades=len({k[1] for k in actual}),equipos=len({k[0] for k in actual}),totales={f:sum(c[f] for c in actual.values()) for f in fields},simulacion=True),sort_keys=True))
+          def stats_rpc(simulate):
+              request=urllib.request.Request(base+'/rest/v1/rpc/importar_estadisticas_jugadores_m14',data=json.dumps(dict(p_filas=simulated_players,p_simular=simulate)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with opener.open(request,timeout=90) as response: result=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit('Importación estadísticas individuales HTTP '+str(exc.code)) from None
+              expected=dict(registros=436,identidades=432,equipos=18,convocatorias=2124,titularidades=1584,partidos_jugados=1840,minutos_jugados=56894,minutos_posibles=76464,ensayos=295,transformaciones=177,puntos=1829,amarillas=23,rojas=4,simulacion=simulate)
+              if any(result.get(k)!=v for k,v in expected.items()): raise SystemExit('Resultado estadísticas individuales discrepante')
+              return result
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              probe=stats_rpc(True)
+              if probe.get('insertadas')!=0: raise SystemExit('Simulación estadísticas incorrecta')
+              print('ESTADISTICAS 52 simulación',json.dumps(probe,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
@@ -813,6 +831,11 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          if os.environ.get('IMPORTAR_ESTADISTICAS_JUGADORES')=='true':
+              first=stats_rpc(False)
+              second=stats_rpc(False)
+              if first.get('insertadas') not in (0,436) or second.get('insertadas')!=0: raise SystemExit('Idempotencia estadísticas incorrecta')
+              print('ESTADISTICAS 52',json.dumps(first,sort_keys=True),'repetición',second['insertadas'])
           if os.environ.get('IMPORTAR_PARTICIPACIONES')=='true':
               def participation_rpc(simulate):
                   request=urllib.request.Request(base+'/rest/v1/rpc/validar_participaciones_m14',data=json.dumps(dict(p_filas=participation_payload,p_simular=simulate)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
