@@ -5,6 +5,10 @@ on:
       - '.github/workflows/audit-acts-m14.yml'
   workflow_dispatch:
     inputs:
+      importar_anotaciones:
+        description: Importar realmente las anotaciones M14 validadas
+        type: boolean
+        default: false
       importar_alineaciones:
         description: Importar realmente las alineaciones M14 validadas
         type: boolean
@@ -29,6 +33,7 @@ jobs:
       - run: python -m pip install pypdf pdfplumber
       - name: Comprobar PDF sin publicar datos personales
         env:
+          IMPORTAR_ANOTACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_anotaciones || false }}
           IMPORTAR_ALINEACIONES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_alineaciones || false }}
           IMPORTAR_JUGADORES: ${{ github.event_name == 'workflow_dispatch' && inputs.importar_jugadores || false }}
           GUARDAR_ACTAS: ${{ github.event_name == 'workflow_dispatch' && inputs.guardar_actas || false }}
@@ -47,6 +52,7 @@ jobs:
           def get(table,params):
               req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(params),headers={'apikey':key})
               with opener.open(req,timeout=30) as r: return json.load(r)
+          if sum(os.environ.get(k)=='true' for k in ('IMPORTAR_ANOTACIONES','IMPORTAR_ALINEACIONES','IMPORTAR_JUGADORES','GUARDAR_ACTAS'))>1: raise SystemExit('Autorizar una sola escritura por ejecución')
           # Verify the installed diagnostic RPC using only synthetic temporary rows.
           req=urllib.request.Request(base+'/rest/v1/rpc/probar_transaccion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
           with opener.open(req,timeout=30) as response: probe=json.load(response)
@@ -688,6 +694,24 @@ jobs:
               changes['estado_'+candidate['estado_validacion']]+=1
           if sum(changes[k] for k in ('nueva','sin_cambios','modificada'))!=accepted: raise SystemExit('Plan incompleto')
           print('Plan versiones actas',accepted,'nuevas',changes['nueva'],'sin cambios',changes['sin_cambios'],'modificadas',changes['modificada'],'parciales',changes['estado_parcial'],'correctas',changes['estado_correcto'])
+          if os.environ.get('IMPORTAR_ANOTACIONES')=='true':
+              if expected_scoring!=dict(anotaciones=475,partidos_con_anotaciones=53,ensayos=295,transformaciones=177,ensayos_castigo=3,puntos=1850,simulacion=True): raise SystemExit('Alcance de anotaciones distinto del validado')
+              if changes['estado_correcto']!=53 or changes['modificada'] or changes['nueva'] or changes['sin_cambios']!=53: raise SystemExit('Actas cambiadas; revisar antes de importar')
+              def write_scoring():
+                  request=urllib.request.Request(base+'/rest/v1/rpc/importar_anotaciones_m14',data=json.dumps(dict(p_filas=scoring_payload,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  try:
+                      with opener.open(request,timeout=90) as response: return json.load(response)
+                  except urllib.error.HTTPError as exc:
+                      raise SystemExit('Importación anotaciones HTTP '+str(exc.code)) from None
+              expected_real=dict(expected_scoring,simulacion=False)
+              first=write_scoring()
+              inserted=first.pop('insertadas',None)
+              if first!=expected_real or not isinstance(inserted,int) or not 0<=inserted<=475: raise SystemExit('Resultado de importación inesperado')
+              print('ANOTACIONES 42 insertadas',inserted)
+              if write_scoring()!=dict(expected_real,insertadas=0): raise SystemExit('Repetición de anotaciones incorrecta')
+              print('ANOTACIONES 42 repetición sin duplicados correcta')
+          else:
+              print('ANOTACIONES 42 escritura no autorizada; solo simulación')
           if os.environ.get('IMPORTAR_ALINEACIONES')=='true':
               if os.environ.get('IMPORTAR_JUGADORES')=='true' or os.environ.get('GUARDAR_ACTAS')=='true': raise SystemExit('Ejecutar alineaciones por separado')
               if expected_lineup!=dict(alineaciones=2124,titulares=1584,suplentes=540,partidos=53,simulacion=True): raise SystemExit('Alcance de alineaciones distinto del validado')
