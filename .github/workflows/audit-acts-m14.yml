@@ -810,6 +810,42 @@ jobs:
               probe=stats_rpc(True)
               if probe.get('insertadas')!=0: raise SystemExit('Simulación estadísticas incorrecta')
               print('ESTADISTICAS 52 simulación',json.dumps(probe,sort_keys=True))
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              actual_teams=defaultdict(Counter)
+              match_ids={x['partido_id'] for x in lineup_payload}
+              match_map={m['id']:m for m in matches if m['id'] in match_ids}
+              events_by_team=defaultdict(Counter)
+              for e in all_rows('anotaciones','id,partido_id,equipo_id,tipo,puntos'):
+                  if e['partido_id'] not in match_ids: continue
+                  c=events_by_team[(e['partido_id'],e['equipo_id'])]
+                  c[e['tipo']]+=1
+                  c['puntos']+=e['puntos']
+              for m in match_map.values():
+                  for side,other in [('local','visitante'),('visitante','local')]:
+                      team=m['equipo_'+side+'_id']; opponent=m['equipo_'+other+'_id']
+                      e=events_by_team[(m['id'],team)]; o=events_by_team[(m['id'],opponent)]
+                      pf=m['puntos_'+side]; pa=m['puntos_'+other]
+                      if e['puntos']!=pf or o['puntos']!=pa: raise SystemExit('Marcador almacenado discrepante')
+                      c=actual_teams[team]
+                      c['partidos_jugados']+=1; c['actas_comprobadas']+=1
+                      c['victorias']+=int(pf>pa); c['empates']+=int(pf==pa); c['derrotas']+=int(pf<pa)
+                      c['puntos_favor']+=pf; c['puntos_contra']+=pa
+                      c['ensayos_favor']+=e['ensayo']; c['ensayos_contra']+=o['ensayo']
+                      c['transformaciones']+=e['transformacion']; c['ensayos_castigo_favor']+=e['ensayo_castigo']
+                      c['pf_'+side]+=pf; c['partidos_'+side]+=1
+              for e in all_rows('sanciones','id,partido_id,equipo_id,tipo'):
+                  if e['partido_id'] in match_ids: actual_teams[e['equipo_id']]['amarillas' if e['tipo']=='temporal' else 'rojas']+=1
+              expected_teams={x['equipo_id']:x for x in simulated_teams}
+              fields_team=('partidos_jugados','victorias','empates','derrotas','puntos_favor','puntos_contra','ensayos_favor','ensayos_contra','transformaciones','ensayos_castigo_favor','amarillas','rojas','actas_comprobadas')
+              if set(actual_teams)!=set(expected_teams) or len(actual_teams)!=18 or len(match_map)!=53: raise SystemExit('Alcance equipos discrepante')
+              discrepancies={f:sum(actual_teams[k][f]!=v[f] for k,v in expected_teams.items()) for f in fields_team}
+              for side in ('local','visitante'):
+                  f='puntos_'+side+'_por_partido'
+                  discrepancies[f]=sum(ratio(actual_teams[k]['pf_'+side],actual_teams[k]['partidos_'+side])!=v['datos_adicionales'][f] for k,v in expected_teams.items())
+              print('EQUIPOS 53 discrepancias',json.dumps(discrepancies,sort_keys=True))
+              if any(discrepancies.values()): raise SystemExit('Estadísticas equipos discrepantes')
+              print('EQUIPOS 53',json.dumps(dict(equipos=len(actual_teams),partidos=len(match_map),totales={f:sum(c[f] for c in actual_teams.values()) for f in fields_team},simulacion=True),sort_keys=True))
+              print('EQUIPOS 53 balance reglamentario actas',json.dumps({f:sum(c[f] for c in team_totals.values()) for f in ('igualdad','superioridad','inferioridad','minutos_balance')},sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
