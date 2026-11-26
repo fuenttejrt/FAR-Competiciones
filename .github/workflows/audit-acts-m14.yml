@@ -117,6 +117,7 @@ jobs:
           version_plan=[]
           roster_audit=Counter()
           lineup_payload=[]
+          participation_payload=[]
           scoring_payload=[]
           changes_payload=[]
           sanctions_payload=[]
@@ -529,6 +530,7 @@ jobs:
                               pc=players[(team_id,ident)]
                               pc['convocatorias']+=1
                               pc['titularidades']+=int(d in starting[side])
+                              participation_payload.append(dict(partido_id=m['id'],equipo_id=team_id,dorsal=d,titular=d in starting[side],minutos=mins[d] if reliable else None,verificada=reliable))
                               if reliable:
                                   pc['minutos']+=mins[d]
                                   pc['minutos_posibles']+=36
@@ -725,6 +727,12 @@ jobs:
               if sanctions_probe!=dict(total=27,partidos=16,amarillas=23,rojas=4,simulacion=True) or not isinstance(constraints,list) or not constraints: raise SystemExit('Validación SQL sanciones no coincide')
               print('SANCIONES 46',json.dumps(sanctions_probe,sort_keys=True))
               print('SANCIONES 46 restricciones',json.dumps(constraints,sort_keys=True))
+          participation_keys=Counter((x['partido_id'],x['equipo_id'],x['dorsal']) for x in participation_payload)
+          if participation_keys!=roster_keys or any(v!=1 for v in participation_keys.values()): raise SystemExit('Participaciones no corresponden a alineaciones')
+          if any(not x['verificada'] or x['minutos'] is None or not 0<=x['minutos']<=36 for x in participation_payload): raise SystemExit('Participación no verificada')
+          total_minutes=sum(x['minutos'] for x in participation_payload)
+          if len(participation_payload)!=2124 or total_minutes!=56894 or total_minutes!=sum(x['minutos_jugados'] for x in simulated_players): raise SystemExit('Totales de participación discrepantes')
+          print('PARTICIPACIONES 48',json.dumps(dict(total=len(participation_payload),partidos=len(set(x['partido_id'] for x in participation_payload)),minutos=total_minutes,titulares=sum(x['titular'] for x in participation_payload),suplentes_con_minutos=sum(not x['titular'] and x['minutos']>0 for x in participation_payload),suplentes_sin_minutos=sum(not x['titular'] and x['minutos']==0 for x in participation_payload),jugadores_con_minutos=sum(x['minutos']>0 for x in participation_payload),simulacion=True),sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
