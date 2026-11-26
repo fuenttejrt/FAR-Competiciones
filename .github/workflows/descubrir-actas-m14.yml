@@ -42,6 +42,8 @@ jobs:
               db=[]
               for j in get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'}):
                   db.extend(get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'id,url_acta'}))
+              sample=get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'*'})
+              print('ESQUEMA 68',sorted(sample[0]) if sample else [])
               known={actid(m['url_acta']) for m in db if m['url_acta']}
               if None in known:raise SystemExit('Enlace almacenado no reconocido')
               url=host+'/es/public/calendar/35/'+cid+'/combined/'
@@ -50,6 +52,7 @@ jobs:
                   if urllib.parse.urlparse(r.geturl()).netloc!='farugby.matchready.es':raise SystemExit('Redirección inesperada')
                   soup=BeautifulSoup(r.read(),'html.parser')
               found=set()
+              fixtures=[]
               rows=0
               skipped=0
               score_counts=Counter()
@@ -75,6 +78,12 @@ jobs:
                           print('FILA 67 descartada',cid,'celdas',len(cells),'cabecera',bool(tr.find('th')),'equipos_presentes',bool(home and away))
                           continue
                       rows+=1
+                      home=re.split(r'Árbitro:',home,flags=re.I)[0].strip()
+                      away=re.split(r'Campo:',away,flags=re.I)[0].strip()
+                      live=[urllib.parse.urlparse(urllib.parse.urljoin(host,a['href'])).path for a in tr.select('a[href]') if '/live_act/' in a['href']]
+                      fixtures.append((home,away,date,score))
+                      if live:print('DIRECTO 68',cid,home,away,date,score,live)
+                      if not re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score):print('PENDIENTE 68',cid,home,away,date,score,'atributos',sorted(tr.attrs.keys()))
                       score_counts['con_marcador' if re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score) else 'sin_marcador']+=1
                       for a in tr.select('a[href]'):
                           u=urllib.parse.urlparse(urllib.parse.urljoin(host,a['href']))
@@ -82,6 +91,7 @@ jobs:
                       ids={actid(a.get('href')) for a in tr.select('a[href]')}-{None}
                       if len(ids)>1:ambiguous+=1
                       elif ids:found.update(ids)
+              print('REPETIDOS 68',cid,[(list(k),v) for k,v in Counter(fixtures).items() if v>1])
               print('DIAGNOSTICO 67',cid,'descartadas',skipped,'marcadores',dict(score_counts),'rutas',dict(link_patterns))
               c=dict(partidos_db=len(db),filas_web=rows,actas_db=len(known),actas_web=len(found),coincidentes=len(known&found),nuevas_candidatas=len(found-known),no_localizadas=len(known-found),ambiguas=ambiguous)
               print('DESCUBRIMIENTO 66',cid,json.dumps(c,sort_keys=True))
