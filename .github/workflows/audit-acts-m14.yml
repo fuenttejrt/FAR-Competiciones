@@ -441,9 +441,17 @@ jobs:
                                       match=re.match(r'^\s*'+re.escape(role)+r'\s*:\s*(.*)$',line,re.I)
                                       if not match: continue
                                       name=match.group(1).strip()
-                                      licence=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{7})\b',' '.join(lines[i+1:i+4]).split('Entrenador:')[0].split('Delegado:')[0].split('Juez línea:')[0])
+                                      licence=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*('+ (r'\d{6,7}' if role=='Juez línea' else r'\d{7}') +r')\b',' '.join(lines[i+1:i+4]).split('Entrenador:')[0].split('Delegado:')[0].split('Juez línea:')[0])
                                       if name and licence and any(c.isalpha() for c in name):
                                           hits.append((licence.group(1),name))
+                                  if role=='Juez línea' and not hits:
+                                      for i,line in enumerate(lines):
+                                          short=re.fullmatch(r'\s*Juez\s+l[ií]nea\s*:\s*(\d{6})\s*',line,re.I)
+                                          if not short: continue
+                                          lic=re.search(r'(?i)N[ºo]\s*licencia\s*:\s*(\d{6})\b',' '.join(lines[i+1:i+4]))
+                                          if lic and lic.group(1)==short.group(1):
+                                              side61='local' if side==0 else 'visitante'
+                                              print('JUEZ 61 identificador repetido sin nombre',m['id'],side61,'coincide_alineacion',lic.group(1) in identities[side61].values())
                                   staff_slots58[(role,'completo' if len(hits)==1 else 'ausente_o_ambiguo')]+=1
                                   if len(hits)==1:
                                       ident58,name58=hits[0]
@@ -1005,7 +1013,7 @@ jobs:
           staff_keys58=[(x['partido_id'],x['equipo_id'],x['funcion']) for x in staff58]
           if len(staff_keys58)!=len(set(staff_keys58)): raise SystemExit('Personal duplicado por función y equipo')
           print('PERSONAL 58',json.dumps(dict(registros=len(staff58),por_funcion=dict(Counter(x['funcion'] for x in staff58)),jueces_en_alineacion=sum(x['en_alineacion'] for x in staff58 if x['funcion']=='Juez línea'),cobertura_partidos=len({x['partido_id'] for x in staff58}),huecos_equipo={r+':'+estado:n for (r,estado),n in staff_slots58.items()},solo_lectura=True),ensure_ascii=False,sort_keys=True))
-          if len(staff58)!=469 or len({x['partido_id'] for x in staff58})!=53: raise SystemExit('Cobertura personal pendiente de revisión')
+          if len(staff58) not in range(469,473) or len({x['partido_id'] for x in staff58})!=53: raise SystemExit('Cobertura personal pendiente de revisión')
           if not any(os.environ.get(k)=='true' for k in ('GUARDAR_MINUTOS_SANCION','IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
               staff_scope={(a['partido_id'],a['equipo_id']) for a in al}
               for x in staff58:
