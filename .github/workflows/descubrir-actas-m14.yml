@@ -331,6 +331,9 @@ jobs:
                       pdf_counts['92_completos']+=sum(bool(v['nombre_completo']) for v in staff)
                       pdf_counts['92_parciales']+=sum(not v['nombre_completo'] for v in staff)
                       for v in staff:pdf_counts['92_'+v['funcion']]+=1
+                      pdf_counts['93_minutos_sancion']+=sum(sum(v.values()) for v in events['sanction_minutes'].values())
+                      pdf_counts['93_reincorporaciones']+=events['returns']
+                      pdf_counts['93_registros_individuales']+=sum(len(v) for v in events['sanction_minutes'].values())
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
