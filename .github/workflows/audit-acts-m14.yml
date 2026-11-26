@@ -454,6 +454,19 @@ jobs:
                                       labels=[i for i,line in enumerate(lines) if re.search(r'(?i)juez\s+l[ií]nea',line)]
                                       for idx in labels:
                                           segment=' '.join(lines[idx:idx+3])
+                                          # Inspect geometry only; never print names or identifiers.
+                                          halfwords=region.extract_words(x_tolerance=2,y_tolerance=2)
+                                          labels60=[w for w in halfwords if w['text'].casefold().strip(':')=='juez']
+                                          for label60 in labels60:
+                                              y60=label60['top']
+                                              band60=[w for w in halfwords if y60-2<=w['top']<=y60+24]
+                                              shape60=[]
+                                              for w in sorted(band60,key=lambda w:(round(w['top']/2),w['x0'])):
+                                                  t=w['text'].casefold().strip(':')
+                                                  kind=t if t in ('juez','línea','linea','nº','no','licencia','delegado','entrenador') else 'NUM'+str(len(t)) if t.isdigit() else 'VACIO' if not any(c.isalnum() for c in t) else 'TEXTO'
+                                                  shape60.append([round(w['top']-y60,1),round((w['x0']-side*page.width/2)/page.width,3),kind])
+                                              print('JUEZ 60 geometría',m['id'],'lado',side,json.dumps(shape60,ensure_ascii=False))
+
                                           print('REVISION JUEZ 59',m['id'],'lado',side,'campo_vacio',not bool(re.sub(r'(?i)juez\\s+l[ií]nea\\s*:?|n[ºo]\\s*licencia\\s*:?|[\\s:–—-]','',segment)),'lineas',len(lines[idx:idx+3]))
                                           print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',True,'licencia presente',bool(re.search(r'\b\d{7}\b',segment)),'nombre presente',bool(re.search(r'(?i)juez\s+l[ií]nea\s*:\s*[A-Za-zÁÉÍÓÚÑáéíóúñ]',lines[idx])))
                                       if not labels: print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',False)
