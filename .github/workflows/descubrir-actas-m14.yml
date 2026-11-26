@@ -1,6 +1,11 @@
 name: Descubrir actas MatchReady M14
 on:
   workflow_dispatch:
+    inputs:
+      actualizar_calendario:
+        description: 'Guardar los cambios de calendario validados'
+        type: boolean
+        default: false
   push:
     paths:
       - '.github/workflows/descubrir-actas-m14.yml'
@@ -11,8 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: pip install beautifulsoup4
-      - name: Comparar calendarios oficiales sin escrituras
+      - name: Comparar calendarios y actualizar solo con autorización manual
         env:
+          ACTUALIZAR: ${{ github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
@@ -215,4 +221,26 @@ jobs:
           with urllib.request.urlopen(req,timeout=60) as resp: result=json.load(resp)
           print('SIMULACION 73',json.dumps(result,sort_keys=True))
           if result!={'partidos':len(proposed),'jornadas':len(proposed_rounds),'simulacion':True}:raise SystemExit('Resultado RPC discrepante')
+          if os.environ.get('ACTUALIZAR')=='true':
+              if reconciliation['marcador_distinto'] or reconciliation['marcador_pendiente_db']:raise SystemExit('Marcadores discrepantes')
+              before=get('historial_calendario_m14',{'select':'id'})
+              def rpc():
+                  payload['p_simular']=False
+                  req=urllib.request.Request(base+'/rest/v1/rpc/actualizar_calendario_m14',data=json.dumps(payload).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                  with urllib.request.urlopen(req,timeout=60) as resp:return json.load(resp)
+              first=rpc()
+              print('ESCRITURA 74',json.dumps(first,sort_keys=True))
+              if first!={'partidos':len(proposed),'jornadas':len(proposed_rounds),'simulacion':False}:raise SystemExit('Escritura discrepante')
+              second=rpc()
+              print('REPETICION 74',json.dumps(second,sort_keys=True))
+              if second!={'partidos':0,'jornadas':0,'simulacion':False}:raise SystemExit('Repetición discrepante')
+              for p in proposed:
+                  rows=get('partidos',{'id':'eq.'+str(p['id']),'select':'id,fecha_hora'})
+                  if len(rows)!=1 or datetime.fromisoformat(rows[0]['fecha_hora'].replace('Z','+00:00'))!=datetime.fromisoformat(p['nueva']):raise SystemExit('Persistencia partido discrepante')
+              for j in proposed_rounds:
+                  rows=get('jornadas',{'id':'eq.'+str(j['id']),'select':'id,fecha_inicio'})
+                  if len(rows)!=1 or rows[0]['fecha_inicio']!=j['nueva']:raise SystemExit('Persistencia jornada discrepante')
+              after=get('historial_calendario_m14',{'select':'id'})
+              if len(after)-len(before)!=len(proposed)+len(proposed_rounds):raise SystemExit('Historial discrepante')
+              print('PERSISTENCIA 74',len(proposed),len(proposed_rounds),'historial nuevo',len(after)-len(before))
           PY
