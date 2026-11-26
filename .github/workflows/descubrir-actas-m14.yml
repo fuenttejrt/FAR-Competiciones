@@ -369,6 +369,26 @@ jobs:
                           pdf_counts['95_puntos_conciliados']+=sum(v['puntos'] for v in rows95)
                           pdf_counts['95_castigo_conciliados']+=sum(v['tipo']=='ensayo_castigo' for v in rows95)
                           pdf_counts['95_actas_conciliadas']+=1
+                          changes96=Counter()
+                          sanctions96=Counter()
+                          for side,items in events['timeline'].items():
+                              team=a['equipo_'+side+'_id']
+                              ids=core['identities'][side]
+                              for minute,kind,ds,code in items:
+                                  if kind=='Cambios':
+                                      changes96[(team,minute,ds[0],ds[1],str(ids[ds[0]]),str(ids[ds[1]]))]+=1
+                                  else:
+                                      typ={'Expulsiones temporales':'temporal','Expulsiones definitivas':'definitiva'}[kind]
+                                      sanctions96[(team,minute,ds[0],typ,str(ids[ds[0]]))]+=1
+                          changes_db96=get('sustituciones',{'partido_id':'eq.'+str(a['partido']),'select':'equipo_id,minuto,dorsal_entra,dorsal_sale,jugador_entra_id,jugador_sale_id'})
+                          sanctions_db96=get('sanciones',{'partido_id':'eq.'+str(a['partido']),'select':'equipo_id,minuto,dorsal,tipo,jugador_id'})
+                          actual_changes96=Counter((v['equipo_id'],v['minuto'],v['dorsal_entra'],v['dorsal_sale'],identities94[v['jugador_entra_id']],identities94[v['jugador_sale_id']]) for v in changes_db96)
+                          actual_sanctions96=Counter((v['equipo_id'],v['minuto'],v['dorsal'],v['tipo'],identities94[v['jugador_id']]) for v in sanctions_db96)
+                          if actual_changes96!=changes96:raise ValueError('Conciliación sustituciones 96')
+                          if actual_sanctions96!=sanctions96:raise ValueError('Conciliación sanciones 96')
+                          pdf_counts['96_sustituciones_conciliadas']+=len(changes_db96)
+                          pdf_counts['96_sanciones_conciliadas']+=len(sanctions_db96)
+                          pdf_counts['96_actas_conciliadas']+=1
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
