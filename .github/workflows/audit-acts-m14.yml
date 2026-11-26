@@ -454,6 +454,7 @@ jobs:
                                       labels=[i for i,line in enumerate(lines) if re.search(r'(?i)juez\s+l[ií]nea',line)]
                                       for idx in labels:
                                           segment=' '.join(lines[idx:idx+3])
+                                          print('REVISION JUEZ 59',m['id'],'lado',side,'campo_vacio',not bool(re.sub(r'(?i)juez\\s+l[ií]nea\\s*:?|n[ºo]\\s*licencia\\s*:?|[\\s:–—-]','',segment)),'lineas',len(lines[idx:idx+3]))
                                           print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',True,'licencia presente',bool(re.search(r'\b\d{7}\b',segment)),'nombre presente',bool(re.search(r'(?i)juez\s+l[ií]nea\s*:\s*[A-Za-zÁÉÍÓÚÑáéíóúñ]',lines[idx])))
                                       if not labels: print('Diagnóstico juez',m['id'],'lado',side,'etiqueta presente',False)
                                   print('Personal',role,'local' if side==0 else 'visitante','registros completos',len(hits))
@@ -991,6 +992,14 @@ jobs:
           staff_keys58=[(x['partido_id'],x['equipo_id'],x['funcion']) for x in staff58]
           if len(staff_keys58)!=len(set(staff_keys58)): raise SystemExit('Personal duplicado por función y equipo')
           print('PERSONAL 58',json.dumps(dict(registros=len(staff58),por_funcion=dict(Counter(x['funcion'] for x in staff58)),jueces_en_alineacion=sum(x['en_alineacion'] for x in staff58 if x['funcion']=='Juez línea'),cobertura_partidos=len({x['partido_id'] for x in staff58}),huecos_equipo={r+':'+estado:n for (r,estado),n in staff_slots58.items()},solo_lectura=True),ensure_ascii=False,sort_keys=True))
+          if len(staff58)!=469 or len({x['partido_id'] for x in staff58})!=53: raise SystemExit('Cobertura personal pendiente de revisión')
+          if not any(os.environ.get(k)=='true' for k in ('GUARDAR_MINUTOS_SANCION','IMPORTAR_ESTADISTICAS_EQUIPOS','IMPORTAR_ESTADISTICAS_JUGADORES','IMPORTAR_PARTICIPACIONES','IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              staff_scope={(a['partido_id'],a['equipo_id']) for a in al}
+              for x in staff58:
+                  if x['partido_id'] not in match_ids or (x['equipo_id'] is not None and (x['partido_id'],x['equipo_id']) not in staff_scope): raise SystemExit('Personal fuera de alcance')
+                  if not x['nombre_completo'].strip() or not x['licencia'].strip(): raise SystemExit('Personal incompleto')
+              existing_staff=[x for x in all_rows('personal_partidos','id,partido_id,equipo_id,funcion') if x['partido_id'] in match_ids]
+              print('PERSONAL 59',json.dumps(dict(candidatos=len(staff58),existentes=len(existing_staff),funciones=dict(Counter(x['funcion'] for x in staff58)),relaciones_invalidas=0,solo_lectura=True),ensure_ascii=False,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
