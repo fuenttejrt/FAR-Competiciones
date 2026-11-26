@@ -354,6 +354,21 @@ jobs:
                           pdf_counts['94_alineaciones_conciliadas']+=len(actual)
                           pdf_counts['94_participaciones_conciliadas']+=len(parts)
                           pdf_counts['94_actas_conciliadas']+=1
+                          types95={'E':('ensayo',5),'T':('transformacion',2),'D':('drop',3),'PC':('golpe_castigo',3),'EC':('ensayo_castigo',7)}
+                          expected95=Counter()
+                          for side in ('local','visitante'):
+                              for kind,minute,dorsal in core['scores'][side]:
+                                  typ,points=types95[kind]
+                                  lic=core['identities'][side].get(dorsal) if dorsal is not None else None
+                                  expected95[(a['equipo_'+side+'_id'],typ,minute,dorsal,points,lic)]+=1
+                          rows95=get('anotaciones',{'partido_id':'eq.'+str(a['partido']),'select':'equipo_id,jugador_id,tipo,minuto,dorsal,puntos'})
+                          actual95=Counter((v['equipo_id'],v['tipo'],v['minuto'],v['dorsal'],v['puntos'],identities94.get(v['jugador_id']) if v['jugador_id'] is not None else None) for v in rows95)
+                          if any(v['jugador_id'] is not None and v['jugador_id'] not in identities94 for v in rows95):raise ValueError('Identidad anotación 95')
+                          if actual95!=expected95:raise ValueError('Conciliación anotaciones 95')
+                          pdf_counts['95_anotaciones_conciliadas']+=len(rows95)
+                          pdf_counts['95_puntos_conciliados']+=sum(v['puntos'] for v in rows95)
+                          pdf_counts['95_castigo_conciliados']+=sum(v['tipo']=='ensayo_castigo' for v in rows95)
+                          pdf_counts['95_actas_conciliadas']+=1
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
