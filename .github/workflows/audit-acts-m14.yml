@@ -733,6 +733,16 @@ jobs:
           total_minutes=sum(x['minutos'] for x in participation_payload)
           if len(participation_payload)!=2124 or total_minutes!=56894 or total_minutes!=sum(x['minutos_jugados'] for x in simulated_players): raise SystemExit('Totales de participación discrepantes')
           print('PARTICIPACIONES 48',json.dumps(dict(total=len(participation_payload),partidos=len(set(x['partido_id'] for x in participation_payload)),minutos=total_minutes,titulares=sum(x['titular'] for x in participation_payload),suplentes_con_minutos=sum(not x['titular'] and x['minutos']>0 for x in participation_payload),suplentes_sin_minutos=sum(not x['titular'] and x['minutos']==0 for x in participation_payload),jugadores_con_minutos=sum(x['minutos']>0 for x in participation_payload),simulacion=True),sort_keys=True))
+          if not any(os.environ.get(k)=='true' for k in ('IMPORTAR_JUGADORES','IMPORTAR_ALINEACIONES','IMPORTAR_ANOTACIONES','IMPORTAR_SUSTITUCIONES','IMPORTAR_SANCIONES','GUARDAR_ACTAS')):
+              request=urllib.request.Request(base+'/rest/v1/rpc/validar_participaciones_m14',data=json.dumps(dict(p_filas=participation_payload)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with opener.open(request,timeout=90) as response: participation_probe=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  raise SystemExit('Validación participaciones HTTP '+str(exc.code)) from None
+              constraints=participation_probe.pop('restricciones',None)
+              if participation_probe!=dict(total=2124,partidos=53,minutos=56894,titulares=1584,suplentes_con_minutos=256,suplentes_sin_minutos=284,jugadores_con_minutos=1840,simulacion=True) or not isinstance(constraints,list) or not constraints: raise SystemExit('Validación SQL participaciones no coincide')
+              print('PARTICIPACIONES 49',json.dumps(participation_probe,sort_keys=True))
+              print('PARTICIPACIONES 49 restricciones',json.dumps(constraints,sort_keys=True))
           # Preflight before any optional writes.
           existing={}
           for start in range(0,len(version_plan),50):
