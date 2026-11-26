@@ -17,7 +17,9 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           python - <<'PY'
-          import os,json,re,urllib.request,urllib.parse
+          import os,json,re,urllib.request,urllib.parse,unicodedata
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
           from bs4 import BeautifulSoup
           from collections import Counter
           base=os.environ['SUPABASE_URL'].rstrip('/')
@@ -35,13 +37,25 @@ jobs:
               u=urllib.parse.urlparse(urllib.parse.urljoin(host,url or ''))
               m=re.fullmatch(r'/es/public/competition/match_pdf/(\d+)/act/?',u.path)
               return m.group(1) if u.scheme=='https' and u.netloc=='farugby.matchready.es' and m else None
+          def norm(v):
+              return ''.join(c for c in unicodedata.normalize('NFKD',str(v).casefold()) if c.isalnum())
+          def dbdate(v):
+              if not v:return None
+              d=datetime.fromisoformat(v.replace('Z','+00:00'))
+              return (d.astimezone(ZoneInfo('Europe/Madrid')) if d.tzinfo else d).date().isoformat()
+          teams=get('equipos',{'select':'*'})
+          print('EQUIPOS 69 esquema',sorted(teams[0]) if teams else [])
+          namefield=next((f for f in ('nombre','nombre_completo','nombre_oficial') if teams and f in teams[0]),None)
+          if not namefield:raise SystemExit('Campo nombre de equipo no reconocido')
+          names={t['id']:t[namefield] for t in teams}
           totals=Counter()
+          reconciliation=Counter()
           for cid in ('11','12','15'):
               comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
               if len(comps)!=1:raise SystemExit('Competición ambigua')
               db=[]
               for j in get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'}):
-                  db.extend(get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'id,url_acta'}))
+                  db.extend(get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'id,url_acta,id_oficial,equipo_local_id,equipo_visitante_id,fecha_hora,puntos_local,puntos_visitante'}))
               sample=get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'*'})
               print('ESQUEMA 68',sorted(sample[0]) if sample else [])
               known={actid(m['url_acta']) for m in db if m['url_acta']}
@@ -81,6 +95,10 @@ jobs:
                       home=re.split(r'Árbitro:',home,flags=re.I)[0].strip()
                       away=re.split(r'Campo:',away,flags=re.I)[0].strip()
                       live=[urllib.parse.urlparse(urllib.parse.urljoin(host,a['href'])).path for a in tr.select('a[href]') if '/live_act/' in a['href']]
+                      if norm(home)==norm(away)=='descanso':
+                          rows-=1
+                          reconciliation['descansos']+=1
+                          continue
                       fixtures.append((home,away,date,score))
                       if live:print('DIRECTO 68',cid,home,away,date,score,live)
                       if not re.fullmatch(r'\s*\d+\s*[-:]\s*\d+\s*',score):print('PENDIENTE 68',cid,home,away,date,score,'atributos',sorted(tr.attrs.keys()))
@@ -91,11 +109,36 @@ jobs:
                       ids={actid(a.get('href')) for a in tr.select('a[href]')}-{None}
                       if len(ids)>1:ambiguous+=1
                       elif ids:found.update(ids)
+              matched=set()
+              counts=Counter()
+              for home,away,date,score in fixtures:
+                  try: day=datetime.strptime(date.split()[0],'%d/%m/%Y').date().isoformat()
+                  except (ValueError,IndexError):
+                      counts['fecha_web_invalida']+=1
+                      continue
+                  candidates=[m for m in db if norm(names.get(m['equipo_local_id'],''))==norm(home) and norm(names.get(m['equipo_visitante_id'],''))==norm(away) and dbdate(m['fecha_hora'])==day]
+                  if len(candidates)!=1:
+                      counts['sin_asociar' if not candidates else 'ambiguos']+=1
+                      print('DIFERENCIA 69',cid,home,away,day,'candidatos',len(candidates))
+                      continue
+                  m=candidates[0]
+                  if m['id'] in matched:
+                      counts['duplicados']+=1
+                      continue
+                  matched.add(m['id'])
+                  counts['asociados']+=1
+                  sc=re.fullmatch(r'\s*(\d+)\s*[-:]\s*(\d+)\s*',score)
+                  if sc and (m['puntos_local'],m['puntos_visitante'])!=tuple(map(int,sc.groups())):counts['marcador_distinto']+=1
+                  if not sc and (m['puntos_local'] is not None or m['puntos_visitante'] is not None):counts['marcador_pendiente_db']+=1
+              counts['db_sin_asociar']=len(db)-len(matched)
+              reconciliation.update(counts)
+              print('ASOCIACION 69',cid,json.dumps(dict(counts),sort_keys=True))
               print('REPETIDOS 68',cid,[(list(k),v) for k,v in Counter(fixtures).items() if v>1])
               print('DIAGNOSTICO 67',cid,'descartadas',skipped,'marcadores',dict(score_counts),'rutas',dict(link_patterns))
               c=dict(partidos_db=len(db),filas_web=rows,actas_db=len(known),actas_web=len(found),coincidentes=len(known&found),nuevas_candidatas=len(found-known),no_localizadas=len(known-found),ambiguas=ambiguous)
               print('DESCUBRIMIENTO 66',cid,json.dumps(c,sort_keys=True))
               totals.update(c)
+          print('TOTAL 69',json.dumps(dict(reconciliation),sort_keys=True))
           print('TOTAL 66',json.dumps(dict(totals),sort_keys=True))
           if totals['no_localizadas'] or totals['ambiguas'] or not totals['filas_web']:raise SystemExit('Calendario no reconciliado')
           PY
