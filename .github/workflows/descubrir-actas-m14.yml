@@ -409,6 +409,8 @@ jobs:
                               pf=sum(types95[k][1] for k,_,_ in core['scores'][side])
                               pa=sum(types95[k][1] for k,_,_ in core['scores'][other])
                               c99.update(dict(partidos_jugados=1,actas_comprobadas=1,victorias=int(pf>pa),empates=int(pf==pa),derrotas=int(pf<pa),puntos_favor=pf,puntos_contra=pa,ensayos_favor=sum(k=='E' for k,_,_ in core['scores'][side]),ensayos_contra=sum(k=='E' for k,_,_ in core['scores'][other]),transformaciones=sum(k=='T' for k,_,_ in core['scores'][side]),ensayos_castigo_favor=sum(k=='EC' for k,_,_ in core['scores'][side]),amarillas=sum(k=='Expulsiones temporales' for _,k,_,_ in events['timeline'][side]),rojas=sum(k=='Expulsiones definitivas' for _,k,_,_ in events['timeline'][side]),minutos_superioridad=events['superior' if side=='local' else 'inferior'],minutos_inferioridad=events['inferior' if side=='local' else 'superior']))
+                              c99['pf_'+side]+=pf
+                              c99['partidos_'+side]+=1
                               if pf!=a['marcador_db'][0 if side=='local' else 1]:raise ValueError('Marcador colectivo 99')
                           for side in ('local','visitante'):
                               team=a['equipo_'+side+'_id']
@@ -440,7 +442,7 @@ jobs:
           if audit_pdfs:
               fields98=('convocatorias','titularidades','partidos_jugados','minutos_jugados','minutos_posibles','ensayos','transformaciones','puntos','amarillas','rojas','actas_participacion_verificada')
               teams98={k[0] for k in players98}
-              rows98=get('estadisticas_jugadores',{'select':'jugador_id,equipo_id,'+','.join(fields98)})
+              rows98=get('estadisticas_jugadores',{'select':'jugador_id,equipo_id,datos_adicionales,'+','.join(fields98)})
               stored98={}
               for v in rows98:
                   if v['equipo_id'] not in teams98:continue
@@ -453,7 +455,7 @@ jobs:
               if any(diff98.values()):raise SystemExit('Estadísticas jugadores discrepantes 98')
           if audit_pdfs:
               fields99=('partidos_jugados','victorias','empates','derrotas','puntos_favor','puntos_contra','ensayos_favor','ensayos_contra','transformaciones','ensayos_castigo_favor','amarillas','rojas','actas_comprobadas','minutos_superioridad','minutos_inferioridad')
-              rows99=get('estadisticas_equipos',{'select':'equipo_id,'+','.join(fields99)})
+              rows99=get('estadisticas_equipos',{'select':'equipo_id,datos_adicionales,'+','.join(fields99)})
               stored99={}
               for v in rows99:
                   k=v['equipo_id']
@@ -464,6 +466,14 @@ jobs:
               diff99={f:sum(stored99[k][f]!=c[f] for k,c in teams99.items()) for f in fields99}
               print('CONCILIACION 99',json.dumps(dict(registros=len(teams99),campos=len(fields99),discrepancias=diff99,totales={f:sum(c[f] for c in teams99.values()) for f in fields99}),sort_keys=True),'solo lectura')
               if any(diff99.values()):raise SystemExit('Estadísticas equipos discrepantes 99')
+          if audit_pdfs:
+              def ratio100(n,d):return round(n/d,4) if d else None
+              pm100={k:dict(participacion=ratio100(c['minutos_jugados'],c['minutos_posibles']),puntos_por_convocatoria=ratio100(c['puntos'],c['convocatorias']),titularidad=ratio100(c['titularidades'],c['convocatorias'])) for k,c in players98.items()}
+              tm100={k:dict(puntos_por_partido=ratio100(c['puntos_favor'],c['partidos_jugados']),puntos_contra_por_partido=ratio100(c['puntos_contra'],c['partidos_jugados']),proporcion_ensayos_transformados=ratio100(c['transformaciones'],c['ensayos_favor']),victorias=ratio100(c['victorias'],c['partidos_jugados']),superioridad=ratio100(c['minutos_superioridad'],36*c['actas_comprobadas']),inferioridad=ratio100(c['minutos_inferioridad'],36*c['actas_comprobadas']),puntos_local_por_partido=ratio100(c['pf_local'],c['partidos_local']),puntos_visitante_por_partido=ratio100(c['pf_visitante'],c['partidos_visitante'])) for k,c in teams99.items()}
+              dp100=sum(stored98[k]['datos_adicionales']!=v for k,v in pm100.items())
+              dt100=sum(stored99[k]['datos_adicionales']!=v for k,v in tm100.items())
+              print('CONCILIACION 100',json.dumps(dict(jugadores=len(pm100),equipos=len(tm100),metricas_jugadores=sum(map(len,pm100.values())),metricas_equipos=sum(map(len,tm100.values())),discrepancias_jugadores=dp100,discrepancias_equipos=dt100),sort_keys=True),'solo lectura')
+              if dp100 or dt100:raise SystemExit('Métricas adicionales discrepantes 100')
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
