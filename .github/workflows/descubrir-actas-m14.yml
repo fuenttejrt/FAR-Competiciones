@@ -443,6 +443,11 @@ jobs:
                               if result108!={'acta_escrita':True,'version_escrita':True,'vinculo_verificado':True,'reversion':True,'partido_intacto':True}:raise ValueError('Escritura reversible 108')
                               print('ESCRITURA SQL 108',json.dumps(result108,sort_keys=True))
                               pdf_counts['108_prueba']+=1
+                              req109=urllib.request.Request(base+'/rest/v1/rpc/probar_escritura_jugadores_m14',data=json.dumps(dict(p_acta=manifest101)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                              with urllib.request.urlopen(req109,timeout=60) as resp:result109=json.load(resp)
+                              if result109!={'existentes':2,'nuevos':1,'alineaciones':3,'relaciones_verificadas':True,'duplicados_rechazados':True,'reversion':True}:raise ValueError('Escritura reversible 109')
+                              print('ESCRITURA SQL 109',json.dumps(result109,sort_keys=True))
+                              pdf_counts['109_prueba']+=1
 
 
 
