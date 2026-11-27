@@ -424,6 +424,13 @@ jobs:
                               else:raise ValueError('Paquete incorrecto aceptado 105 '+label105)
                           if prevalidate104(manifest101)!=result104:raise ValueError('Repetición discrepante 105')
                           pdf_counts['105_repeticion']+=1
+                          if os.environ.get('GUARDAR_RESULTADOS')!='true':
+                              req106=urllib.request.Request(base+'/rest/v1/rpc/probar_proteccion_acta_m14',data=json.dumps(dict(p_acta=manifest101)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                              with urllib.request.urlopen(req106,timeout=60) as resp:result106=json.load(resp)
+                              if result106!={'rechazo':True,'reversion':True,'partido_intacto':True,'acta_intacta':True}:raise ValueError('Protección transaccional 106')
+                              print('PROTECCION SQL 106',json.dumps(result106,sort_keys=True))
+                              pdf_counts['106_prueba']+=1
+
 
                       pdf_counts['101_planes']+=1
                       if a in new_actas:
