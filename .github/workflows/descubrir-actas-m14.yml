@@ -663,6 +663,20 @@ jobs:
               dt100=sum(stored99[k]['datos_adicionales']!=v for k,v in tm100.items())
               print('CONCILIACION 100',json.dumps(dict(jugadores=len(pm100),equipos=len(tm100),metricas_jugadores=sum(map(len,pm100.values())),metricas_equipos=sum(map(len,tm100.values())),discrepancias_jugadores=dp100,discrepancias_equipos=dt100),sort_keys=True),'solo lectura')
               if dp100 or dt100:raise SystemExit('Métricas adicionales discrepantes 100')
+          if audit_pdfs:
+              req118=urllib.request.Request(base+'/rest/v1/rpc/recalcular_jugadores_m14',data=json.dumps(dict(p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with pdf_opener.open(req118,timeout=30) as resp:result118=json.load(resp)
+              except urllib.error.HTTPError as exc:
+                  try:error118=json.loads(exc.read())
+                  except Exception:error118={}
+                  print('DIAGNOSTICO RECALCULO 118',exc.code,error118.get('code',''),flush=True)
+                  raise SystemExit('Recalculo de jugadores 118 fallido')
+              expected118=dict(registros=len(players98),discrepancias=0,actas=len(audit_pdfs),totales={f:sum(c[f] for c in players98.values()) for f in fields98},simulacion=True,actualizados=0,insertados=0)
+              if result118!=expected118:raise SystemExit('Recalculo de jugadores 118 discrepante: '+json.dumps(result118,sort_keys=True))
+              after118=get('estadisticas_jugadores',{'select':'jugador_id,equipo_id,datos_adicionales,'+','.join(fields98)})
+              if after118!=rows98:raise SystemExit('Simulacion 118 ha alterado estadisticas')
+              print('RECALCULO JUGADORES 118',json.dumps(result118,sort_keys=True),flush=True)
           if len(plans101)!=len(new_actas) or pdf_counts['101_planes']!=len(audit_pdfs)+len(new_actas):raise SystemExit('Planes incompletos 101')
           print('PLAN IMPORTACION 101',json.dumps(dict(historicos=len(audit_pdfs),nuevos=len(plans101),registros={k:v for k,v in pdf_counts.items() if k.startswith('101_')},escritura=False),sort_keys=True))
           if audit_pdfs or new_actas:
