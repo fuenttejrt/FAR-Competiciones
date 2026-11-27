@@ -369,6 +369,30 @@ jobs:
                           for m,k,ds,code in events['timeline'][side]:
                               if k=='Cambios':manifest101['sustituciones'].append(dict(equipo_id=team,minuto=m,dorsal_entra=ds[0],dorsal_sale=ds[1]))
                               else:manifest101['sanciones'].append(dict(equipo_id=team,minuto=m,dorsal=ds[0],tipo=k))
+                      # Validate relational references before any future transactional write.
+                      refs103={(v['equipo_id'],v['dorsal']):v for v in manifest101['alineaciones']}
+                      if len(refs103)!=len(manifest101['alineaciones']):raise ValueError('Clave alineación duplicada 103')
+                      weights103={'E':5,'T':2,'D':3,'PC':3,'EC':7}
+                      types103={'E':'ensayo','T':'transformacion','D':'drop','PC':'golpe_castigo','EC':'ensayo_castigo'}
+                      for n,v in enumerate(manifest101['anotaciones'],1):
+                          k=v['tipo']
+                          v['orden_evento']=n
+                          v['puntos']=weights103[k]
+                          v['tipo']=types103[k]
+                          if k!='EC' and (v['equipo_id'],v['dorsal']) not in refs103:raise ValueError('Anotación sin jugador 103')
+                      for n,v in enumerate(manifest101['sustituciones'],1):
+                          v['orden_evento']=n
+                          if v['dorsal_entra']==v['dorsal_sale'] or any((v['equipo_id'],v[k]) not in refs103 for k in ('dorsal_entra','dorsal_sale')):raise ValueError('Cambio sin referencia 103')
+                      for n,v in enumerate(manifest101['sanciones'],1):
+                          v['orden_evento']=n
+                          v['tipo']={'Expulsiones temporales':'temporal','Expulsiones definitivas':'definitiva'}[v['tipo']]
+                          if (v['equipo_id'],v['dorsal']) not in refs103:raise ValueError('Sanción sin referencia 103')
+                      for v in manifest101['participaciones']:
+                          if (v['equipo_id'],v['dorsal']) not in refs103 or not 0<=v['minutos_jugados']+v['minutos_sancionado']<=36:raise ValueError('Participación inválida 103')
+                      for side,points in [('local',x),('visitante',y)]:
+                          if sum(v['puntos'] for v in manifest101['anotaciones'] if v['equipo_id']==a['equipo_'+side+'_id'])!=points:raise ValueError('Balance marcador 103')
+                      pdf_counts['103_planes']+=1
+                      pdf_counts['103_referencias']+=len(manifest101['participaciones'])+sum(v['tipo']!='ensayo_castigo' for v in manifest101['anotaciones'])+2*len(manifest101['sustituciones'])+len(manifest101['sanciones'])
                       if len(manifest101['alineaciones'])!=len(manifest101['participaciones']):raise ValueError('Cobertura 101')
                       if json.loads(json.dumps(manifest101,sort_keys=True))!=manifest101:raise ValueError('Serialización 101')
                       for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal'):pdf_counts['101_'+k]+=len(manifest101[k])
