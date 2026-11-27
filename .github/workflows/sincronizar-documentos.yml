@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '29 5,17 * * *'
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: catalogo-documentos-oficiales
   cancel-in-progress: false
@@ -24,6 +24,22 @@ jobs:
         run: python -m unittest discover -s scripts -p test_sincronizar_documentos.py -v
       - name: Archivar documentos sin activar reglas
         env:
+          DOCUMENTOS_CATALOGO_SALIDA: catalogo/documentos.json
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: python -u -m scripts.sincronizar_documentos
+      - name: Publicar catalogo de documentos para la aplicacion
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalogo/documentos.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Actualizar catalogo publico de circulares y reglamentos"
+            # Preserve concurrent code changes; only this workflow writes the catalogue.
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then exit 0; fi
+            done
+            exit 1
+          fi

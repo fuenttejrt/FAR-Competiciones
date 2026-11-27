@@ -1,7 +1,7 @@
 import json
 import unittest
 from unittest.mock import Mock, patch
-from sincronizar_documentos import Official, Catalogue, classify, official_url, season_name
+from sincronizar_documentos import Official, Catalogue, classify, official_url, season_name, export_catalogue
 
 class DocumentsTests(unittest.TestCase):
     def test_season_and_scope(self):
@@ -62,6 +62,32 @@ class DocumentsTests(unittest.TestCase):
         client.register(doc,1,b'%PDF','a'*64)
         self.assertEqual(client.request.call_count,3)
         self.assertEqual(client.request.call_args.args[1]['p_temporada_id'],1)
+
+
+    def test_export_uses_current_version_and_keeps_seasons(self):
+        import tempfile
+        from pathlib import Path
+        data={
+            'temporadas':[dict(id=1,nombre='2025/26'),dict(id=2,nombre='2026/27')],
+            'documentos_oficiales':[dict(id=10,fuente='FAR',url_oficial='https://farugby.com/doc.pdf',titulo='Circular M14',tipo='circular',categorias=['M14'],version_actual=2)],
+            'documentos_versiones':[dict(documento_id=10,version=1,archivo='old.pdf'),dict(documento_id=10,version=2,archivo='new.pdf')],
+            'documentos_temporadas':[dict(documento_id=10,temporada_id=2,procedencia='temporada_en_fuente',reglas_estado='pendiente_revision')],
+            'documentos_sincronizaciones':[dict(temporada_id=2,fuente='FAR',estado='actualizada')]
+        }
+        client=Mock()
+        client.base='https://public.supabase.co'
+        client.get.side_effect=lambda table,params:data[table]
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'catalogue.json'
+            export_catalogue(client,str(path))
+            payload=json.loads(path.read_text())
+        self.assertEqual([s['name'] for s in payload['seasons']],['2025/26','2026/27'])
+        self.assertEqual(payload['seasons'][0]['documents'],[])
+        doc=payload['seasons'][1]['documents'][0]
+        self.assertTrue(doc['url'].endswith('/new.pdf'))
+        self.assertEqual(doc['version'],2)
+        self.assertEqual(doc['review'],'pendiente_revision')
+        self.assertNotIn('key',doc)
 
 if __name__=='__main__':
     unittest.main()

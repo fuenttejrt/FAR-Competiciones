@@ -230,6 +230,35 @@ class Catalogue:
             raise ValueError('Registro no confirmado')
         return result
 
+def export_catalogue(catalogue, output):
+    seasons=catalogue.get('temporadas',{'select':'id,nombre','order':'id.asc'})
+    documents=catalogue.get('documentos_oficiales',{'select':'id,fuente,url_oficial,titulo,tipo,categorias,version_actual','order':'id.asc'})
+    versions=catalogue.get('documentos_versiones',{'select':'documento_id,version,archivo','order':'id.asc'})
+    links=catalogue.get('documentos_temporadas',{'select':'documento_id,temporada_id,procedencia,reglas_estado','order':'temporada_id.asc,documento_id.asc'})
+    sources=catalogue.get('documentos_sincronizaciones',{'select':'temporada_id,fuente,estado','order':'temporada_id.asc,fuente.asc'})
+    by_id={d['id']:d for d in documents}
+    by_version={(v['documento_id'],v['version']):v for v in versions}
+    exported=[]
+    for season in seasons:
+        items=[]
+        for link in links:
+            if link['temporada_id']!=season['id']:
+                continue
+            doc=by_id[link['documento_id']]
+            version=by_version[(doc['id'],doc['version_actual'])]
+            items.append(dict(id=doc['id'],name=doc['titulo'],source=doc['fuente'],type=doc['tipo'],categories=doc['categorias'],version=doc['version_actual'],
+                url=catalogue.base+'/storage/v1/object/public/documentos-oficiales/'+version['archivo'],
+                official_url=doc['url_oficial'],applicability=link['procedencia'],review=link['reglas_estado']))
+        exported.append(dict(name=season_name(season['nombre']),documents=sorted(items,key=lambda d:(d['source'],d['name'],d['id'])),
+            sources=[dict(source=s['fuente'],state=s['estado']) for s in sources if s['temporada_id']==season['id']]))
+    # Only public official document metadata: no account keys or sporting records.
+    result=dict(schema=1,seasons=sorted(exported,key=lambda s:s['name']))
+    from pathlib import Path
+    path=Path(output)
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+    print('CATALOGO PUBLICO 128',sum(len(s['documents']) for s in exported),'referencias',flush=True)
+
 def main():
     catalogue=Catalogue()
     official=Official()
@@ -274,6 +303,8 @@ def main():
         raise SystemExit('Catalogo sin solicitudes de temporada')
     if errors:
         raise SystemExit('Hay documentos pendientes de revision o descarga')
+    if os.environ.get('DOCUMENTOS_CATALOGO_SALIDA'):
+        export_catalogue(catalogue,os.environ['DOCUMENTOS_CATALOGO_SALIDA'])
     print('CATALOGO 127 sincronizado; reglas y categorias deportivas sin cambios',flush=True)
 
 if __name__=='__main__':
