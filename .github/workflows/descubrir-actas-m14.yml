@@ -561,6 +561,20 @@ jobs:
                               if snapshot122()!=before122:raise SystemExit('Correccion de prueba ha dejado cambios 122')
                               print('CORRECCION SQL 122',json.dumps(dict(simulaciones=2,conflicto_rechazado=True,fallo_final_revertido=True,tablas_verificadas=13,reversion=True,escritura=False),sort_keys=True),flush=True)
                               pdf_counts['122_prueba']+=1
+                              print('INICIO SQL 123',flush=True)
+                              req123=urllib.request.Request(base+'/rest/v1/rpc/probar_guardado_correccion_m14',data=json.dumps(dict(p_acta=manifest101)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                              try:
+                                  with pdf_opener.open(req123,timeout=45) as resp:result123=json.load(resp)
+                              except urllib.error.HTTPError as exc:
+                                  try:error123=json.loads(exc.read())
+                                  except Exception:error123={}
+                                  print('DIAGNOSTICO CORRECCION 123',exc.code,error123.get('code',''),flush=True)
+                                  raise SystemExit('Prueba de guardado de correccion 123 fallida')
+                              expected123=dict(guardado_completo=True,version_anterior_conservada=True,estadistica_actualizada=True,repeticion_sin_cambios=True,tablas_verificadas=13,reversion=True,escritura=False)
+                              if result123!=expected123:raise SystemExit('Guardado de correccion 123 discrepante')
+                              print('GUARDADO CORRECCION SQL 123',json.dumps(result123,sort_keys=True),flush=True)
+                              pdf_counts['123_prueba']+=1
+
 
 
 
