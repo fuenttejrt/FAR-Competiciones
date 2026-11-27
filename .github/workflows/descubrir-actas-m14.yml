@@ -438,6 +438,12 @@ jobs:
                               if result106!={'rechazo':True,'reversion':True,'partido_intacto':True,'acta_intacta':True}:raise ValueError('Protección transaccional 106')
                               print('PROTECCION SQL 106',json.dumps(result106,sort_keys=True))
                               pdf_counts['106_prueba']+=1
+                              req108=urllib.request.Request(base+'/rest/v1/rpc/probar_escritura_acta_m14',data=json.dumps(dict(p_acta=manifest101)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                              with urllib.request.urlopen(req108,timeout=60) as resp:result108=json.load(resp)
+                              if result108!={'acta_escrita':True,'version_escrita':True,'vinculo_verificado':True,'reversion':True,'partido_intacto':True}:raise ValueError('Escritura reversible 108')
+                              print('ESCRITURA SQL 108',json.dumps(result108,sort_keys=True))
+                              pdf_counts['108_prueba']+=1
+
 
 
                       pdf_counts['101_planes']+=1
