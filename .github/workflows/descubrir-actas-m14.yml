@@ -522,6 +522,46 @@ jobs:
                               if result120!=expected120:raise SystemExit('Paquete integral 120 discrepante')
                               print('PAQUETE INTEGRAL SQL 120',json.dumps(result120,sort_keys=True),flush=True)
                               pdf_counts['120_prueba']+=1
+                              # 122: synthetic correction of a real manifest; never save a valid test correction.
+                              current122=get('actas',{'partido_id':'eq.'+str(manifest101['partido']),'select':'id,version,hash_contenido'})
+                              if len(current122)!=1:raise SystemExit('Version de prueba ambigua 122')
+                              current122=current122[0]
+                              tables122=('partidos','actas','actas_versiones','jugadores','jugadores_equipos','alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal_partidos','estadisticas_jugadores','estadisticas_equipos')
+                              def snapshot122():
+                                  return {t:hashlib.sha256(json.dumps(get(t,{'select':'*'}),sort_keys=True).encode()).hexdigest() for t in tables122}
+                              before122=snapshot122()
+                              corrected122=json.loads(json.dumps(manifest101))
+                              corrected122['hash_contenido']=hashlib.sha256(('prueba122:'+manifest101['hash_contenido']).encode()).hexdigest()
+                              minute122=next((v for v in corrected122['participaciones'] if v['minutos_jugados']>1),None)
+                              if minute122 is None:raise SystemExit('Sin participacion adecuada 122')
+                              minute122['minutos_jugados']-=1
+                              def rpc122(pack,version,simulate=True):
+                                  req=urllib.request.Request(base+'/rest/v1/rpc/corregir_acta_estadisticas_m14',data=json.dumps(dict(p_acta=pack,p_version_esperada=version,p_hash_anterior=current122['hash_contenido'],p_simular=simulate)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                                  with pdf_opener.open(req,timeout=40) as resp:return json.load(resp)
+                              expected122=dict(estado='corregido',version=current122['version']+1,registros={k:len(corrected122[k]) for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal')},simulacion=True,escritura=False,version_anterior_conservada=True)
+                              try:
+                                  result122=rpc122(corrected122,current122['version'])
+                                  repeated122=rpc122(corrected122,current122['version'])
+                              except urllib.error.HTTPError as exc:
+                                  try:error122=json.loads(exc.read())
+                                  except Exception:error122={}
+                                  print('DIAGNOSTICO CORRECCION 122',exc.code,error122.get('code',''),flush=True)
+                                  raise SystemExit('Simulacion de correccion 122 fallida')
+                              if result122!=expected122 or repeated122!=expected122:raise SystemExit('Correccion simulada discrepante 122')
+                              cases122=[(corrected122,current122['version']+1,True,'Conflicto de version')]
+                              invalid122=json.loads(json.dumps(corrected122))
+                              invalid122['personal'][-1]['licencia']=None
+                              cases122.extend((invalid122,current122['version'],mode,'Personal invalido') for mode in (True,False))
+                              for pack122,version122,mode122,message122 in cases122:
+                                  try:rpc122(pack122,version122,mode122)
+                                  except urllib.error.HTTPError as exc:
+                                      error122=json.loads(exc.read())
+                                      if exc.code!=400 or error122.get('code')!='P0001' or error122.get('message')!=message122:raise SystemExit('Rechazo de correccion inesperado 122')
+                                  else:raise SystemExit('Correccion invalida aceptada 122')
+                              if snapshot122()!=before122:raise SystemExit('Correccion de prueba ha dejado cambios 122')
+                              print('CORRECCION SQL 122',json.dumps(dict(simulaciones=2,conflicto_rechazado=True,fallo_final_revertido=True,tablas_verificadas=13,reversion=True,escritura=False),sort_keys=True),flush=True)
+                              pdf_counts['122_prueba']+=1
+
 
 
 
