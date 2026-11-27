@@ -291,6 +291,9 @@ jobs:
               dbplayers102[lic]=v
           players98={}
           teams99={}
+          def prevalidate104(payload):
+              req=urllib.request.Request(base+'/rest/v1/rpc/prevalidar_importacion_acta_m14',data=json.dumps(dict(p_acta=payload)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(req,timeout=60) as resp:return json.load(resp)
           for a in audit_pdfs+new_actas:
               try:
                   if actid(a['url'])!=a['acta']:raise ValueError('URL')
@@ -396,6 +399,10 @@ jobs:
                       if len(manifest101['alineaciones'])!=len(manifest101['participaciones']):raise ValueError('Cobertura 101')
                       if json.loads(json.dumps(manifest101,sort_keys=True))!=manifest101:raise ValueError('Serialización 101')
                       for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal'):pdf_counts['101_'+k]+=len(manifest101[k])
+                      result104=prevalidate104(manifest101)
+                      expected104='existente' if a in audit_pdfs else 'candidato'
+                      if result104.get('estado')!=expected104 or result104.get('escritura') is not False or result104.get('registros')!={k:len(manifest101[k]) for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal')}:raise ValueError('Respuesta prevalidación 104')
+                      pdf_counts['104_'+expected104]+=1
                       pdf_counts['101_planes']+=1
                       if a in new_actas:
                           if old:raise ValueError('Acta nueva ya registrada 101')
@@ -543,6 +550,8 @@ jobs:
               if pdf_counts['102_existente']+pdf_counts['102_nuevo']!=pdf_counts['101_alineaciones']:raise SystemExit('Cobertura identidades 102')
               if any(len(names102[v['licencia']])>1 for p in plans101 for v in p['alineaciones']):raise SystemExit('Variantes nuevas pendientes 102')
               print('IDENTIDADES 102',json.dumps(dict(identidades=len(names102),variantes=sum(len(v)>1 for v in names102.values()),registros={k:v for k,v in pdf_counts.items() if k.startswith('102_')},escritura=False),sort_keys=True))
+          if pdf_counts['104_existente']!=len(audit_pdfs) or pdf_counts['104_candidato']!=len(new_actas):raise SystemExit('Prevalidación incompleta 104')
+          print('PREVALIDACION SQL 104',json.dumps(dict(existentes=pdf_counts['104_existente'],candidatos=pdf_counts['104_candidato'],escritura=False),sort_keys=True))
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
