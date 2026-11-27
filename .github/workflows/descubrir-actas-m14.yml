@@ -492,6 +492,19 @@ jobs:
                               if result111!={'participaciones':2,'minutos_jugados':31,'minutos_sancionado':5,'personal':2,'duplicado_rechazado':True,'reversion':True}:raise SystemExit('Escritura reversible 111 discrepante')
                               print('ESCRITURA SQL 111',json.dumps(result111,sort_keys=True))
                               pdf_counts['111_prueba']+=1
+                              print('INICIO SQL 112',flush=True)
+                              req112=urllib.request.Request(base+'/rest/v1/rpc/probar_importacion_integral_m14',data=json.dumps(dict(p_acta=manifest101)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                              try:
+                                  with urllib.request.urlopen(req112,timeout=25) as resp:result112=json.load(resp)
+                              except urllib.error.HTTPError as exc:
+                                  try:err112=json.loads(exc.read())
+                                  except Exception:err112={}
+                                  print('DIAGNOSTICO SQL 112',exc.code,err112.get('code',''),err112.get('message',''),flush=True)
+                                  raise SystemExit('Prueba SQL 112 fallida')
+                              if result112!={'participaciones':2,'minutos_jugados':31,'minutos_sancionado':5,'personal':2,'fallo_final_revertido':True,'ejecucion_completa_revertida':True,'tablas_verificadas':11,'reversion':True}:raise SystemExit('Importacion integral 112 discrepante')
+                              print('IMPORTACION INTEGRAL SQL 112',json.dumps(result112,sort_keys=True),flush=True)
+                              pdf_counts['112_prueba']+=1
+
 
 
 
