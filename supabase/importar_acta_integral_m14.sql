@@ -2,7 +2,7 @@ begin;
 -- 113: a validated manifest is the sole source of every inserted section.
 create or replace function public.importar_acta_integral_m14(p_acta jsonb,p_simular boolean default true)
 returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
-declare gate jsonb; p record; v jsonb; j record; jid bigint; aid bigint; al bigint; en bigint; sa bigint; team bigint; dorsal integer; mins integer; pen integer; k text; result jsonb;
+declare gate jsonb; p record; v jsonb; j record; jid bigint; aid bigint; al bigint; en bigint; sa bigint; team bigint; v_dorsal integer; mins integer; pen integer; k text; result jsonb;
 begin
  if p_simular is null then raise exception 'Modo obligatorio'; end if;
  lock table jornadas,partidos,actas,actas_versiones,jugadores,jugadores_equipos,alineaciones,anotaciones,sustituciones,sanciones,participaciones,personal_partidos in share row exclusive mode;
@@ -41,15 +41,15 @@ begin
   end loop;
   foreach k in array array['anotaciones','sustituciones','sanciones','participaciones'] loop
    for v in select value from jsonb_array_elements(p_acta->k) loop
-    team:=(v->>'equipo_id')::bigint; dorsal:=(v->>'dorsal')::int;
+    team:=(v->>'equipo_id')::bigint; v_dorsal:=(v->>'dorsal')::int;
     jid:=null; al:=null;
     if k<>'sustituciones' and not (k='anotaciones' and v->>'tipo'='ensayo_castigo') then
-     select id,jugador_id into strict al,jid from alineaciones where partido_id=p.id and equipo_id=team and alineaciones.dorsal=importar_acta_integral_m14.dorsal;
+     select id,jugador_id into strict al,jid from alineaciones where partido_id=p.id and equipo_id=team and alineaciones.dorsal=v_dorsal;
     end if;
     if k<>'participaciones' and (coalesce((v->>'minuto')::int,-1) not between 0 and 36 or coalesce((v->>'orden_evento')::int,0)<1) then raise exception 'Tiempo u orden invalido'; end if;
     if k='anotaciones' then
-     if coalesce(v->>'tipo','') not in ('ensayo','transformacion','golpe_castigo','drop','ensayo_castigo') or (v->>'puntos')::int is distinct from (case v->>'tipo' when 'ensayo' then 5 when 'transformacion' then 2 when 'golpe_castigo' then 3 when 'drop' then 3 when 'ensayo_castigo' then 7 end) or (v->>'tipo'='ensayo_castigo' and dorsal is not null) then raise exception 'Anotacion invalida'; end if;
-     insert into anotaciones(partido_id,equipo_id,jugador_id,dorsal,minuto,orden_evento,tipo,puntos,verificada) values(p.id,team,jid,dorsal,(v->>'minuto')::int,(v->>'orden_evento')::int,v->>'tipo',(v->>'puntos')::int,true);
+     if coalesce(v->>'tipo','') not in ('ensayo','transformacion','golpe_castigo','drop','ensayo_castigo') or (v->>'puntos')::int is distinct from (case v->>'tipo' when 'ensayo' then 5 when 'transformacion' then 2 when 'golpe_castigo' then 3 when 'drop' then 3 when 'ensayo_castigo' then 7 end) or (v->>'tipo'='ensayo_castigo' and v_dorsal is not null) then raise exception 'Anotacion invalida'; end if;
+     insert into anotaciones(partido_id,equipo_id,jugador_id,dorsal,minuto,orden_evento,tipo,puntos,verificada) values(p.id,team,jid,v_dorsal,(v->>'minuto')::int,(v->>'orden_evento')::int,v->>'tipo',(v->>'puntos')::int,true);
     elsif k='sustituciones' then
      select jugador_id into strict en from alineaciones where partido_id=p.id and equipo_id=team and alineaciones.dorsal=(v->>'dorsal_entra')::int;
      select jugador_id into strict sa from alineaciones where partido_id=p.id and equipo_id=team and alineaciones.dorsal=(v->>'dorsal_sale')::int;
@@ -57,7 +57,7 @@ begin
      insert into sustituciones(partido_id,equipo_id,jugador_entra_id,jugador_sale_id,dorsal_entra,dorsal_sale,minuto,orden_evento,verificada) values(p.id,team,en,sa,(v->>'dorsal_entra')::int,(v->>'dorsal_sale')::int,(v->>'minuto')::int,(v->>'orden_evento')::int,true);
     elsif k='sanciones' then
      if coalesce(v->>'tipo','') not in ('temporal','definitiva') then raise exception 'Sancion invalida'; end if;
-     insert into sanciones(partido_id,equipo_id,jugador_id,dorsal,minuto,orden_evento,tipo,duracion_reglamentaria,minuto_fin,verificada) values(p.id,team,jid,dorsal,(v->>'minuto')::int,(v->>'orden_evento')::int,v->>'tipo',case when v->>'tipo'='temporal' then 5 end,case when v->>'tipo'='temporal' then least(36,(v->>'minuto')::int+5) end,true);
+     insert into sanciones(partido_id,equipo_id,jugador_id,dorsal,minuto,orden_evento,tipo,duracion_reglamentaria,minuto_fin,verificada) values(p.id,team,jid,v_dorsal,(v->>'minuto')::int,(v->>'orden_evento')::int,v->>'tipo',case when v->>'tipo'='temporal' then 5 end,case when v->>'tipo'='temporal' then least(36,(v->>'minuto')::int+5) end,true);
     else
      mins:=(v->>'minutos_jugados')::int; pen:=(v->>'minutos_sancionado')::int;
      if mins is null or pen is null or mins<0 or pen<0 or mins+pen>36 then raise exception 'Minutos invalidos'; end if;
