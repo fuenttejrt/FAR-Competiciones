@@ -10,6 +10,10 @@ on:
         description: 'Guardar nuevos resultados oficiales validados'
         type: boolean
         default: false
+      guardar_actas:
+        description: 'Guardar nuevas actas validadas y recalcular estadisticas'
+        type: boolean
+        default: false
       actualizar_calendario:
         description: 'Guardar los cambios de calendario validados'
         type: boolean
@@ -36,6 +40,7 @@ jobs:
           ACTUALIZAR: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_calendario) }}
           GUARDAR_RESULTADOS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.actualizar_resultados) }}
           PROBAR_AUTORIZACION: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.probar_modo_autorizado) }}
+          GUARDAR_ACTAS: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.guardar_actas) }}
           EVENTO: ${{ github.event_name }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
@@ -701,27 +706,27 @@ jobs:
           if audit_pdfs and (pdf_counts['105_pruebas']!=8 or pdf_counts['105_repeticion']!=1):raise SystemExit('Pruebas de protección incompletas 105')
           print('PROTECCIONES SQL 105',json.dumps(dict(rechazos=pdf_counts['105_pruebas'],repeticion=pdf_counts['105_repeticion'],escritura=False),sort_keys=True))
           print('PREVALIDACION SQL 104',json.dumps(dict(existentes=pdf_counts['104_existente'],candidatos=pdf_counts['104_candidato'],escritura=False),sort_keys=True))
-          # 117: every validated new acta exercises the integral importer in simulation.
-          simulated117=Counter()
-          for plan117 in plans101:
-              expected117=dict(estado='importado',registros={k:len(plan117[k]) for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal')},simulacion=True,escritura=False)
-              req117=urllib.request.Request(base+'/rest/v1/rpc/importar_acta_integral_m14',data=json.dumps(dict(p_acta=plan117,p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+          # 121: every validated new acta exercises the integral importer in simulation.
+          simulated121=Counter()
+          for plan121 in plans101:
+              expected121=dict(estado='importado',registros={k:len(plan121[k]) for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal')},simulacion=True,escritura=False)
+              req121=urllib.request.Request(base+'/rest/v1/rpc/importar_acta_estadisticas_m14',data=json.dumps(dict(p_acta=plan121,p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
               try:
-                  with pdf_opener.open(req117,timeout=30) as resp:result117=json.load(resp)
+                  with pdf_opener.open(req121,timeout=30) as resp:result121=json.load(resp)
               except urllib.error.HTTPError as exc:
-                  try:error117=json.loads(exc.read())
-                  except Exception:error117={}
-                  print('DIAGNOSTICO IMPORTADOR 117',exc.code,error117.get('code',''),flush=True)
+                  try:error121=json.loads(exc.read())
+                  except Exception:error121={}
+                  print('DIAGNOSTICO IMPORTADOR 121',exc.code,error121.get('code',''),flush=True)
                   raise SystemExit('Simulacion integral de nueva acta fallida')
-              if result117!=expected117:raise SystemExit('Simulacion integral de nueva acta discrepante')
+              if any(result121.get(k)!=v for k,v in expected121.items()) or any(type(result121.get(k)) is not int or result121[k]<1 for k in ('estadisticas_jugadores','estadisticas_equipos')):raise SystemExit('Simulacion integral de acta y estadisticas discrepante')
               # The candidate must remain empty and eligible after simulation.
-              check117=prevalidate104(plan117)
-              if check117.get('estado')!='candidato' or check117.get('registros')!=expected117['registros'] or check117.get('escritura') is not False:
+              check121=prevalidate104(plan121)
+              if check121.get('estado')!='candidato' or check121.get('registros')!=expected121['registros'] or check121.get('escritura') is not False:
                   raise SystemExit('Reversion de nueva acta no confirmada')
-              simulated117['actas']+=1
-              simulated117.update(expected117['registros'])
-          if simulated117['actas']!=len(new_actas):raise SystemExit('Cobertura integral de nuevas actas incompleta')
-          print('SIMULACION NUEVAS ACTAS 117',json.dumps(dict(candidatas=len(new_actas),simuladas=simulated117['actas'],registros={k:v for k,v in simulated117.items() if k!='actas'},escritura=False),sort_keys=True),flush=True)
+              simulated121['actas']+=1
+              simulated121.update(expected121['registros'])
+          if simulated121['actas']!=len(new_actas):raise SystemExit('Cobertura integral de nuevas actas incompleta')
+          print('SIMULACION NUEVAS ACTAS 121',json.dumps(dict(candidatas=len(new_actas),simuladas=simulated121['actas'],registros={k:v for k,v in simulated121.items() if k!='actas'},escritura=False),sort_keys=True),flush=True)
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
@@ -839,4 +844,30 @@ jobs:
                   print('IMPORTACION 83',len(score_proposals),'verificados sin duplicados')
               else:print('IMPORTACION 83 sin resultados nuevos')
           else:print('MODO RESULTADOS 83 solo simulacion')
+          # 121: save only validated new actas after all audits and result updates.
+          print('MODO ACTAS 121', 'guardado autorizado' if os.environ.get('GUARDAR_ACTAS')=='true' else 'solo simulacion',flush=True)
+          imported121=0
+          if os.environ.get('GUARDAR_ACTAS')=='true':
+              if proposed or proposed_rounds:
+                  print('ACTAS 121 aplazadas: cambios de calendario detectados',flush=True)
+              else:
+                  for plan121 in plans101:
+                      req121=urllib.request.Request(base+'/rest/v1/rpc/importar_acta_estadisticas_m14',data=json.dumps(dict(p_acta=plan121,p_simular=False)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                      try:
+                          with pdf_opener.open(req121,timeout=45) as resp:saved121=json.load(resp)
+                      except urllib.error.HTTPError as exc:
+                          try:error121=json.loads(exc.read())
+                          except Exception:error121={}
+                          print('DIAGNOSTICO GUARDADO ACTAS 121',exc.code,error121.get('code',''),flush=True)
+                          raise SystemExit('Guardado conjunto de acta y estadisticas fallido')
+                      if saved121.get('estado') not in ('importado','existente') or saved121.get('simulacion') is not False:
+                          raise SystemExit('Guardado conjunto discrepante')
+                      if saved121['estado']=='importado' and (saved121.get('escritura') is not True or saved121.get('registros')!={k:len(plan121[k]) for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal')}):
+                          raise SystemExit('Cobertura de acta guardada discrepante')
+                      if prevalidate104(plan121).get('estado')!='existente':raise SystemExit('Persistencia de acta no confirmada')
+                      with pdf_opener.open(req121,timeout=45) as resp:repeated121=json.load(resp)
+                      if repeated121.get('estado')!='existente' or repeated121.get('escritura') is not False or repeated121.get('simulacion') is not False:
+                          raise SystemExit('Repeticion de acta modifica datos')
+                      imported121+=int(saved121['estado']=='importado')
+          print('GUARDADO ACTAS 121',json.dumps(dict(candidatas=len(plans101),importadas=imported121,autorizado=os.environ.get('GUARDAR_ACTAS')=='true'),sort_keys=True),flush=True)
           PY
