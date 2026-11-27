@@ -89,7 +89,7 @@ commit;
 begin;
 create or replace function public.probar_paquete_integral_m14(p_acta jsonb)
 returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
-declare src record; dst record; payload jsonb; k text; t text; rows jsonb; before_counts jsonb:='{}'; after_counts jsonb:='{}'; n bigint; snapshot jsonb; result jsonb; repeated jsonb; invalid_payload jsonb; mode boolean; caught boolean; error_message text;
+declare src record; dst record; payload jsonb; k text; t text; rows jsonb; before_counts jsonb:='{}'; after_counts jsonb:='{}'; n bigint; snapshot jsonb; result jsonb; repeated jsonb; invalid_payload jsonb; mode boolean; caught boolean; error_message text; saved jsonb; duplicate_result jsonb; first_snapshot jsonb:='{}'; second_snapshot jsonb:='{}'; digest text; stored_counts jsonb; rolled boolean:=false;
 begin
  lock table jornadas,partidos,actas,actas_versiones,jugadores,jugadores_equipos,alineaciones,anotaciones,sustituciones,sanciones,participaciones,personal_partidos in share row exclusive mode;
  if prevalidar_importacion_acta_m14(p_acta)->>'estado' is distinct from 'existente' then raise exception 'Origen no confirmado'; end if;
@@ -141,6 +141,42 @@ begin
  end loop;
  -- A valid retry must still work after both rejected imports.
  if importar_acta_integral_m14(payload,true) is distinct from result then raise exception 'Recuperacion tras fallo discrepante'; end if;
+
+ -- 116: exercise the saving path, then repeat against the stored acta.
+ begin
+  saved:=importar_acta_integral_m14(payload,false);
+  if saved->>'estado' is distinct from 'importado' or saved->'escritura' is distinct from 'true'::jsonb
+  or saved->'registros' is distinct from result->'registros' then raise exception 'Guardado incompleto'; end if;
+  select jsonb_build_object(
+   'alineaciones',(select count(*) from alineaciones where partido_id=dst.id),
+   'anotaciones',(select count(*) from anotaciones where partido_id=dst.id),
+   'sustituciones',(select count(*) from sustituciones where partido_id=dst.id),
+   'sanciones',(select count(*) from sanciones where partido_id=dst.id),
+   'participaciones',(select count(*) from participaciones t join alineaciones a on a.id=t.alineacion_id where a.partido_id=dst.id),
+   'personal',(select count(*) from personal_partidos where partido_id=dst.id)
+  ) into stored_counts;
+  if stored_counts is distinct from result->'registros'
+  or not exists(select 1 from actas a join actas_versiones v on v.acta_id=a.id join partidos p on p.id=a.partido_id
+    where p.id=dst.id and a.datos=payload and v.datos=payload
+    and a.version=1 and v.version=1 and a.hash_contenido=payload->>'hash_contenido' and v.hash_contenido=a.hash_contenido
+    and p.url_acta=payload->>'url' and p.estado='finalizado'
+    and p.puntos_local=(payload->'marcador'->>0)::int and p.puntos_visitante=(payload->'marcador'->>1)::int)
+  then raise exception 'Datos guardados no conciliados'; end if;
+  foreach t in array array['partidos','actas','actas_versiones','jugadores','jugadores_equipos','alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal_partidos'] loop
+   execute format('select md5(coalesce(string_agg(to_jsonb(q)::text, chr(10) order by to_jsonb(q)::text), '''')) from public.%I q',t) into digest;
+   first_snapshot:=first_snapshot||jsonb_build_object(t,digest);
+  end loop;
+  duplicate_result:=importar_acta_integral_m14(payload,false);
+  if duplicate_result is distinct from '{"estado":"existente","escritura":false,"simulacion":false}'::jsonb then raise exception 'Repeticion no reconocida'; end if;
+  foreach t in array array['partidos','actas','actas_versiones','jugadores','jugadores_equipos','alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal_partidos'] loop
+   execute format('select md5(coalesce(string_agg(to_jsonb(q)::text, chr(10) order by to_jsonb(q)::text), '''')) from public.%I q',t) into digest;
+   second_snapshot:=second_snapshot||jsonb_build_object(t,digest);
+  end loop;
+  if first_snapshot is distinct from second_snapshot then raise exception 'Repeticion modifica registros'; end if;
+  raise exception using errcode='ZX116',message='Reversion obligatoria del guardado de prueba';
+ exception when sqlstate 'ZX116' then rolled:=true;
+ end;
+ if not rolled then raise exception 'Guardado de prueba no revertido'; end if;
  foreach t in array array['partidos','actas','actas_versiones','jugadores','jugadores_equipos','alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal_partidos'] loop
   execute format('select count(*) from public.%I',t) into n;
   after_counts:=after_counts||jsonb_build_object(t,n);
@@ -153,7 +189,7 @@ begin
  or exists(select 1 from sanciones where partido_id=dst.id)
  or exists(select 1 from personal_partidos where partido_id=dst.id)
  then raise exception 'Reversion no confirmada'; end if;
- return jsonb_build_object('registros',result->'registros','repeticion',true,'fallo_final_revertido',true,'modos_probados',2,'recuperacion',true,'reversion',true,'tablas_verificadas',11,'escritura',false);
+ return jsonb_build_object('registros',result->'registros','repeticion',true,'fallo_final_revertido',true,'modos_probados',2,'recuperacion',true,'guardado_completo',true,'repeticion_sin_cambios',true,'reversion',true,'tablas_verificadas',11,'escritura',false);
 end; $$;
 revoke all on function public.probar_paquete_integral_m14(jsonb) from public,anon,authenticated;
 grant execute on function public.probar_paquete_integral_m14(jsonb) to service_role;
