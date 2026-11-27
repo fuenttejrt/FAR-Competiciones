@@ -282,6 +282,7 @@ jobs:
           pdf_counts=Counter()
           audit_pdfs=existing_actas if os.environ.get('EVENTO')!='schedule' else []
           identities94={v['id']:str(v['licencia']) for v in get('jugadores',{'select':'id,licencia'})} if audit_pdfs else {}
+          players98={}
           for a in audit_pdfs+new_actas:
               try:
                   if actid(a['url'])!=a['acta']:raise ValueError('URL')
@@ -402,6 +403,22 @@ jobs:
                           pdf_counts['97_parciales']+=sum(not v['nombre_completo'] for v in staff_db97)
                           pdf_counts['97_jueces_en_alineacion']+=sum(v['funcion']=='Juez línea' and v['en_alineacion'] for v in staff)
                           pdf_counts['97_actas_conciliadas']+=1
+                          for side in ('local','visitante'):
+                              team=a['equipo_'+side+'_id']
+                              for d,lic in core['identities'][side].items():
+                                  c=players98.setdefault((team,str(lic)),Counter())
+                                  mins=events['participation'][side][0][d]
+                                  c.update(dict(convocatorias=1,titularidades=int(d in core['starting'][side]),partidos_jugados=int(mins>0),minutos_jugados=mins,minutos_posibles=36,actas_participacion_verificada=1))
+                              for kind,minute,d in core['scores'][side]:
+                                  if kind=='EC':continue
+                                  c=players98[(team,str(core['identities'][side][d]))]
+                                  c['ensayos']+=int(kind=='E')
+                                  c['transformaciones']+=int(kind=='T')
+                                  c['puntos']+=types95[kind][1]
+                              for minute,kind,ds,code in events['timeline'][side]:
+                                  if kind=='Cambios':continue
+                                  c=players98[(team,str(core['identities'][side][ds[0]]))]
+                                  c['amarillas' if kind=='Expulsiones temporales' else 'rojas']+=1
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
@@ -413,6 +430,20 @@ jobs:
                   print('ERROR PDF 88',a['partido'],type(exc).__name__)
           print('VALIDACION PDF 88',json.dumps(dict(pdf_counts),sort_keys=True),'solo lectura')
           if pdf_counts['error'] or pdf_counts['legibles']!=len(audit_pdfs)+len(new_actas):raise SystemExit('Validación PDF incompleta')
+          if audit_pdfs:
+              fields98=('convocatorias','titularidades','partidos_jugados','minutos_jugados','minutos_posibles','ensayos','transformaciones','puntos','amarillas','rojas','actas_participacion_verificada')
+              teams98={k[0] for k in players98}
+              rows98=get('estadisticas_jugadores',{'select':'jugador_id,equipo_id,'+','.join(fields98)})
+              stored98={}
+              for v in rows98:
+                  if v['equipo_id'] not in teams98:continue
+                  k=(v['equipo_id'],identities94.get(v['jugador_id']))
+                  if k in stored98 or k[1] is None:raise SystemExit('Estadística duplicada o huérfana 98')
+                  stored98[k]=v
+              if set(stored98)!=set(players98):raise SystemExit('Cobertura jugadores 98')
+              diff98={f:sum(stored98[k][f]!=c[f] for k,c in players98.items()) for f in fields98}
+              print('CONCILIACION 98',json.dumps(dict(registros=len(players98),campos=len(fields98),discrepancias=diff98,totales={f:sum(c[f] for c in players98.values()) for f in fields98}),sort_keys=True),'solo lectura')
+              if any(diff98.values()):raise SystemExit('Estadísticas jugadores discrepantes 98')
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
