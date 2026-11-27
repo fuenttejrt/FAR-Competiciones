@@ -89,7 +89,7 @@ commit;
 begin;
 create or replace function public.probar_paquete_integral_m14(p_acta jsonb)
 returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
-declare src record; dst record; payload jsonb; k text; t text; rows jsonb; before_counts jsonb:='{}'; after_counts jsonb:='{}'; n bigint; snapshot jsonb; result jsonb; repeated jsonb;
+declare src record; dst record; payload jsonb; k text; t text; rows jsonb; before_counts jsonb:='{}'; after_counts jsonb:='{}'; n bigint; snapshot jsonb; result jsonb; repeated jsonb; invalid_payload jsonb; mode boolean; caught boolean; error_message text;
 begin
  lock table jornadas,partidos,actas,actas_versiones,jugadores,jugadores_equipos,alineaciones,anotaciones,sustituciones,sanciones,participaciones,personal_partidos in share row exclusive mode;
  if prevalidar_importacion_acta_m14(p_acta)->>'estado' is distinct from 'existente' then raise exception 'Origen no confirmado'; end if;
@@ -118,6 +118,29 @@ begin
  result:=importar_acta_integral_m14(payload,true);
  repeated:=importar_acta_integral_m14(payload,true);
  if result is distinct from repeated or result->>'estado' is distinct from 'importado' or result->'simulacion' is distinct from 'true'::jsonb or result->'escritura' is distinct from 'false'::jsonb or result->'registros' is distinct from prevalidar_importacion_acta_m14(payload)->'registros' then raise exception 'Simulacion incompleta'; end if;
+
+ -- 115: only the final staff record is changed; all earlier sections are real.
+ if jsonb_array_length(payload->'personal')=0 then raise exception 'Sin personal para fallo final'; end if;
+ invalid_payload:=jsonb_set(payload,array['personal',(jsonb_array_length(payload->'personal')-1)::text,'licencia'],'null'::jsonb);
+ foreach mode in array array[true,false] loop
+  caught:=false;
+  begin
+   perform importar_acta_integral_m14(invalid_payload,mode);
+   -- Unexpected success aborts the entire RPC, including all writes.
+   raise exception using errcode='ZX115',message='Paquete invalido aceptado';
+  exception when sqlstate 'P0001' then
+   get stacked diagnostics error_message=message_text;
+   if error_message is distinct from 'Personal invalido' then raise; end if;
+   caught:=true;
+  end;
+  if not caught then raise exception 'Fallo final no detectado'; end if;
+  if exists(select 1 from alineaciones where partido_id=dst.id)
+  or exists(select 1 from personal_partidos where partido_id=dst.id)
+  or exists(select 1 from actas where partido_id=dst.id)
+  then raise exception 'Escritura parcial tras fallo final'; end if;
+ end loop;
+ -- A valid retry must still work after both rejected imports.
+ if importar_acta_integral_m14(payload,true) is distinct from result then raise exception 'Recuperacion tras fallo discrepante'; end if;
  foreach t in array array['partidos','actas','actas_versiones','jugadores','jugadores_equipos','alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal_partidos'] loop
   execute format('select count(*) from public.%I',t) into n;
   after_counts:=after_counts||jsonb_build_object(t,n);
@@ -130,7 +153,7 @@ begin
  or exists(select 1 from sanciones where partido_id=dst.id)
  or exists(select 1 from personal_partidos where partido_id=dst.id)
  then raise exception 'Reversion no confirmada'; end if;
- return jsonb_build_object('registros',result->'registros','repeticion',true,'reversion',true,'tablas_verificadas',11,'escritura',false);
+ return jsonb_build_object('registros',result->'registros','repeticion',true,'fallo_final_revertido',true,'modos_probados',2,'recuperacion',true,'reversion',true,'tablas_verificadas',11,'escritura',false);
 end; $$;
 revoke all on function public.probar_paquete_integral_m14(jsonb) from public,anon,authenticated;
 grant execute on function public.probar_paquete_integral_m14(jsonb) to service_role;
