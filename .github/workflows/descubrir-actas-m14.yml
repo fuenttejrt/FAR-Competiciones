@@ -677,6 +677,20 @@ jobs:
               after118=get('estadisticas_jugadores',{'select':'jugador_id,equipo_id,datos_adicionales,'+','.join(fields98)})
               if after118!=rows98:raise SystemExit('Simulacion 118 ha alterado estadisticas')
               print('RECALCULO JUGADORES 118',json.dumps(result118,sort_keys=True),flush=True)
+              req119=urllib.request.Request(base+'/rest/v1/rpc/recalcular_equipos_m14',data=json.dumps(dict(p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with pdf_opener.open(req119,timeout=30) as resp:result119=json.load(resp)
+              except urllib.error.HTTPError as exc:
+                  try:error119=json.loads(exc.read())
+                  except Exception:error119={}
+                  print('DIAGNOSTICO RECALCULO 119',exc.code,error119.get('code',''),flush=True)
+                  raise SystemExit('Recalculo de equipos 119 fallido')
+              expected119=dict(registros=len(teams99),discrepancias=0,actas=len(audit_pdfs),totales={f:sum(c[f] for c in teams99.values()) for f in fields99},simulacion=True,actualizados=0,insertados=0)
+              if result119!=expected119:raise SystemExit('Recalculo de equipos 119 discrepante: '+json.dumps(result119,sort_keys=True))
+              after119=get('estadisticas_equipos',{'select':'equipo_id,datos_adicionales,'+','.join(fields99)})
+              if after119!=rows99:raise SystemExit('Simulacion 119 ha alterado estadisticas')
+              print('RECALCULO EQUIPOS 119',json.dumps(result119,sort_keys=True),flush=True)
+
           if len(plans101)!=len(new_actas) or pdf_counts['101_planes']!=len(audit_pdfs)+len(new_actas):raise SystemExit('Planes incompletos 101')
           print('PLAN IMPORTACION 101',json.dumps(dict(historicos=len(audit_pdfs),nuevos=len(plans101),registros={k:v for k,v in pdf_counts.items() if k.startswith('101_')},escritura=False),sort_keys=True))
           if audit_pdfs or new_actas:
