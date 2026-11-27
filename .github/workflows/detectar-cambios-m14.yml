@@ -1,71 +1,32 @@
 name: Detectar cambios de actas M14
 on:
   workflow_dispatch:
+    inputs:
+      aplicar_correcciones:
+        description: Aplicar correcciones validadas con historial y estadisticas
+        type: boolean
+        default: false
+  push:
+    paths:
+      - scripts/corregir_actas_m14.py
+      - .github/workflows/detectar-cambios-m14.yml
   schedule:
     - cron: '17 7,19 * * *'
 permissions:
   contents: read
 concurrency:
-  group: far-m14-actas
+  group: calendario-m14
   cancel-in-progress: false
 jobs:
   detectar:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - run: python -m pip install pypdf
-      - name: Detectar cambios sin modificar Supabase
+      - uses: actions/checkout@v4
+      - run: python -m pip install pypdf pdfplumber
+      - name: Validar y corregir actas modificadas
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-        run: |
-          python - <<'PY'
-          import os,json,urllib.request,urllib.parse,io,hashlib,re
-          from collections import Counter
-          from pypdf import PdfReader
-          base=os.environ['SUPABASE_URL'].rstrip('/')
-          key=os.environ['SUPABASE_SECRET_KEY']
-          class NoRedirect(urllib.request.HTTPRedirectHandler):
-              def redirect_request(self,*args,**kwargs): return None
-          opener=urllib.request.build_opener(NoRedirect())
-          def get(table,params):
-              rows=[]
-              while True:
-                  q=dict(params,limit=200,offset=len(rows),order='id.asc')
-                  req=urllib.request.Request(base+'/rest/v1/'+table+'?'+urllib.parse.urlencode(q),headers={'apikey':key})
-                  with opener.open(req,timeout=30) as r: page=json.load(r)
-                  rows.extend(page)
-                  if len(page)<200: return rows
-          counts=Counter()
-          seen=set()
-          for cid in ('11','12','15'):
-              comps=get('competiciones',{'id_oficial':'eq.35/'+cid,'select':'id'})
-              if len(comps)!=1: raise SystemExit('Competición ambigua')
-              rounds=get('jornadas',{'competicion_id':'eq.'+str(comps[0]['id']),'select':'id'})
-              for j in rounds:
-                  matches=get('partidos',{'jornada_id':'eq.'+str(j['id']),'select':'id,url_acta'})
-                  for m in matches:
-                      mid=m['id']
-                      if mid in seen: raise SystemExit('Partido duplicado')
-                      seen.add(mid)
-                      if not m['url_acta']:
-                          counts['sin_url']+=1
-                          continue
-                      try:
-                          u=urllib.parse.urlparse(m['url_acta'])
-                          if u.scheme!='https' or u.netloc!='farugby.matchready.es' or not re.fullmatch(r'/es/public/competition/match_pdf/\d+/act/?',u.path): raise ValueError('URL')
-                          with opener.open(m['url_acta'],timeout=45) as response: raw=response.read(15000001)
-                          if len(raw)>15000000: raise ValueError('Tamaño')
-                          content='\n'.join(p.extract_text() or '' for p in PdfReader(io.BytesIO(raw)).pages)
-                          if not content.strip(): raise ValueError('PDF vacío')
-                          digest=hashlib.sha256(' '.join(content.split()).encode()).hexdigest()
-                          old=get('actas',{'partido_id':'eq.'+str(mid),'select':'id,hash_contenido,version'})
-                          if len(old)>1: raise ValueError('Duplicado')
-                          status='nueva' if not old else 'sin_cambios' if old[0]['hash_contenido']==digest else 'modificada'
-                          counts[status]+=1
-                          if status!='sin_cambios': print('CAMBIO 65',mid,status)
-                      except Exception as exc:
-                          counts['error']+=1
-                          print('ERROR 65 partido',mid,type(exc).__name__)
-          print('DETECCION 65',json.dumps(dict(counts),sort_keys=True),'partidos',len(seen),'solo lectura')
-          if counts['error']: raise SystemExit('Detección incompleta')
-          PY
+          APLICAR_CORRECCIONES: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.aplicar_correcciones) }}
+        run: python -m scripts.corregir_actas_m14
