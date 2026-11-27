@@ -283,6 +283,7 @@ jobs:
           audit_pdfs=existing_actas if os.environ.get('EVENTO')!='schedule' else []
           identities94={v['id']:str(v['licencia']) for v in get('jugadores',{'select':'id,licencia'})} if audit_pdfs else {}
           players98={}
+          teams99={}
           for a in audit_pdfs+new_actas:
               try:
                   if actid(a['url'])!=a['acta']:raise ValueError('URL')
@@ -403,6 +404,12 @@ jobs:
                           pdf_counts['97_parciales']+=sum(not v['nombre_completo'] for v in staff_db97)
                           pdf_counts['97_jueces_en_alineacion']+=sum(v['funcion']=='Juez línea' and v['en_alineacion'] for v in staff)
                           pdf_counts['97_actas_conciliadas']+=1
+                          for side,other in [('local','visitante'),('visitante','local')]:
+                              c99=teams99.setdefault(a['equipo_'+side+'_id'],Counter())
+                              pf=sum(types95[k][1] for k,_,_ in core['scores'][side])
+                              pa=sum(types95[k][1] for k,_,_ in core['scores'][other])
+                              c99.update(dict(partidos_jugados=1,actas_comprobadas=1,victorias=int(pf>pa),empates=int(pf==pa),derrotas=int(pf<pa),puntos_favor=pf,puntos_contra=pa,ensayos_favor=sum(k=='E' for k,_,_ in core['scores'][side]),ensayos_contra=sum(k=='E' for k,_,_ in core['scores'][other]),transformaciones=sum(k=='T' for k,_,_ in core['scores'][side]),ensayos_castigo_favor=sum(k=='EC' for k,_,_ in core['scores'][side]),amarillas=sum(k=='Expulsiones temporales' for _,k,_,_ in events['timeline'][side]),rojas=sum(k=='Expulsiones definitivas' for _,k,_,_ in events['timeline'][side]),minutos_superioridad=events['superior' if side=='local' else 'inferior'],minutos_inferioridad=events['inferior' if side=='local' else 'superior']))
+                              if pf!=a['marcador_db'][0 if side=='local' else 1]:raise ValueError('Marcador colectivo 99')
                           for side in ('local','visitante'):
                               team=a['equipo_'+side+'_id']
                               for d,lic in core['identities'][side].items():
@@ -444,6 +451,19 @@ jobs:
               diff98={f:sum(stored98[k][f]!=c[f] for k,c in players98.items()) for f in fields98}
               print('CONCILIACION 98',json.dumps(dict(registros=len(players98),campos=len(fields98),discrepancias=diff98,totales={f:sum(c[f] for c in players98.values()) for f in fields98}),sort_keys=True),'solo lectura')
               if any(diff98.values()):raise SystemExit('Estadísticas jugadores discrepantes 98')
+          if audit_pdfs:
+              fields99=('partidos_jugados','victorias','empates','derrotas','puntos_favor','puntos_contra','ensayos_favor','ensayos_contra','transformaciones','ensayos_castigo_favor','amarillas','rojas','actas_comprobadas','minutos_superioridad','minutos_inferioridad')
+              rows99=get('estadisticas_equipos',{'select':'equipo_id,'+','.join(fields99)})
+              stored99={}
+              for v in rows99:
+                  k=v['equipo_id']
+                  if k not in teams99:continue
+                  if k in stored99:raise SystemExit('Estadística equipo duplicada 99')
+                  stored99[k]=v
+              if set(stored99)!=set(teams99):raise SystemExit('Cobertura equipos 99')
+              diff99={f:sum(stored99[k][f]!=c[f] for k,c in teams99.items()) for f in fields99}
+              print('CONCILIACION 99',json.dumps(dict(registros=len(teams99),campos=len(fields99),discrepancias=diff99,totales={f:sum(c[f] for c in teams99.values()) for f in fields99}),sort_keys=True),'solo lectura')
+              if any(diff99.values()):raise SystemExit('Estadísticas equipos discrepantes 99')
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
