@@ -5,6 +5,7 @@ import pdfplumber
 def extract_roster_scoring(raw,content,m):
     roster_audit=Counter()
     name_variants=defaultdict(set)
+    names_by_side={'local':{},'visitante':{}}
     with pdfplumber.open(io.BytesIO(raw)) as doc:
         page=doc.pages[0]
         words=page.extract_words(x_tolerance=3,y_tolerance=2)
@@ -78,6 +79,7 @@ def extract_roster_scoring(raw,content,m):
                     if not lines or abs(w['top']-lines[-1][0]['top'])>=2: lines.append([])
                     lines[-1].append(w)
                 name=' '.join(w['text'] for line in lines for w in sorted(line,key=lambda w:w['x0']))
+                names_by_side['local' if side==0 else 'visitante'][d]=name
                 roster_audit['nombre_palabras_'+str(min(len(name.split()),8))]+=1
                 roster_audit['nombre_contiene_digitos']+=int(any(c.isdigit() for c in name))
                 roster_audit['nombre_posible_cabecera']+=int(any(w.casefold().strip(':') in ('dorsal','licencia','jugador','titulares','suplentes','apellidos') for w in name.split()))
@@ -174,7 +176,7 @@ def extract_roster_scoring(raw,content,m):
         total=sum(weights.get(x,0) for x in types)
         print('Marcador',side,'eventos',len(types),'ensayos',types.count('E'),'transformaciones',types.count('T'),'castigo',types.count('EC'),'golpes',types.count('PC'),'drops',types.count('D'),'puntos extraídos',total,'oficial',expected,'coincide',valid and total==expected,'dorsales disponibles',len(dorsals))
     if seen!={'local','visitante'}: print('Marcador incompleto: faltan bloques de equipo')
-    return dict(roster=roster,identities=identities,starting=starting,scores=scores,score_ok=score_ok,content_hash=content_hash)
+    return dict(roster=roster,identities=identities,names_by_side=names_by_side,starting=starting,scores=scores,score_ok=score_ok,content_hash=content_hash)
 
 
 def extract_events(raw,m,core):
