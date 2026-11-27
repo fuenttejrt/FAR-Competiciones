@@ -20,7 +20,10 @@ begin
  begin
  for v in select value from jsonb_array_elements(p_acta->'alineaciones') limit 2 loop
   lic:=v->>'licencia'; nombre:=v->>'nombre_completo';
-  select id into jid from jugadores where licencia=lic and nombre_completo=nombre;
+  select j.id into jid from jugadores j
+  where j.licencia=lic and j.id=(v->>'jugador_id')::bigint
+    and regexp_replace(lower(normalize(j.nombre_completo,NFKD)),'[^[:alnum:]]','','g')
+        =regexp_replace(lower(normalize(nombre,NFKD)),'[^[:alnum:]]','','g');
   if not found then raise exception 'Identidad no confirmada'; end if;
   equipo:=p.equipo_local_id; dorsal:=n+1;
   insert into jugadores_equipos(jugador_id,equipo_id) values(jid,equipo) on conflict(jugador_id,equipo_id) do nothing;
