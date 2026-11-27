@@ -1,0 +1,815 @@
+{
+  "schema": 1,
+  "seasons": [
+    {
+      "documents": [
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 7,
+          "name": "CIRCULAR 6.1 · Multiactas Torneos Promoción Copa FAR Femenino 7s",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ac7b07c86ef2-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/da24b4362f47a287153c88fb2a241293187de75d45769782bc0cb59e42497e6c.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 1,
+          "name": "CIRCULAR Nº 1 · Normas generales y Tramitación de Licencias",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6a98485991b34-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/99052a02a80666b50fcc17d784f5a17b96119d2303544232472283faa50ef10c.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M14"
+          ],
+          "id": 13,
+          "name": "CIRCULAR Nº 10 · Campeonato Andaluz M14 XV",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ad641fd1a8b4-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/1a190bee070dbd65f589cfe0f041e482acc49c2ed4866658031f133ff52cf725.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M16",
+            "M18"
+          ],
+          "id": 14,
+          "name": "CIRCULAR Nº 11 · Copa FAR M18 Masculino XV y Copa FAR M16 XV",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ae1cc27867ab-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/5d4b407b00c033bbe7dadd21b30da94d81c19dae78983f0253bb7015f4cd4e7a.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 15,
+          "name": "CIRCULAR Nº 12 · Liga Andaluza de Rugby Inclusivo (LARI)",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6aedc151c7b30-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/b3d64a1d5db9fdfa2b20ffb7879c50577372d13e02603991f2919d738b773202.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 2,
+          "name": "CIRCULAR Nº 2 · Normas  Generales sobre el desarrollo de las Competiciones Organizadas por la FAR",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6a984dc56389a-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/07870483ac4576cb11901573061092d6ed1e8a60c5ef6099767f7ac21981e45c.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 3,
+          "name": "CIRCULAR Nº 3 · Derechos de Arbitraje",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ae230c3dca84-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/10f39206b65d1ae9fd03c851e48bca537e69ec5eedca1d2f02d623f645134171.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M16",
+            "M18"
+          ],
+          "id": 4,
+          "name": "CIRCULAR Nº 4 · Campeonato Andaluz M18 Masculino XV y M16 XV.",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6acf5724a92ee-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/b05b85927e02d0dee287d0559e119fefacea634a68517508c1d2dfe3218ce269.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Sénior"
+          ],
+          "id": 5,
+          "name": "CIRCULAR Nº 5 · Liga BMS. 1ª Territorial Masculino XV",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ac7c33c646af-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/b5c28529bb3db93b98a0b6d64f437d518600368a5fbd9388d0541e3531586f92.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 6,
+          "name": "CIRCULAR Nº 6 · Torneos Promoción Copa FAR Femenino 7s",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ac7b05020210-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/334539b31c024656e3cf7ddb970bd6e31d8e1013a9ac0ee4dbba8549af79667d.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M6",
+            "M8",
+            "M10",
+            "M12"
+          ],
+          "id": 9,
+          "name": "CIRCULAR Nº 7 · ANEXO I. Jornadas Andaluzas de Rugby Gradual M6, M8, M10 y M12",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6acf57448e7b9-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "anexo",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/e117505c98360c823acaad4c8e3eeedf3e370af9d3e7689489a9656e979f1ce8.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M6",
+            "M8",
+            "M10",
+            "M12"
+          ],
+          "id": 10,
+          "name": "CIRCULAR Nº 7 · Anexo 2. Jornadas Andaluzas de Rugby Gradual M6, M8, M10 y M12",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6acf575306d03-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "anexo",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/944f324fbe98ac762ebaab867af8102282213b3f0158720a4f365de02dbc0b35.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M6",
+            "M8",
+            "M10",
+            "M12"
+          ],
+          "id": 8,
+          "name": "CIRCULAR Nº 7 · Jornadas Andaluzas de Rugby Gradual (M6,M8,M10 y M12)",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6acf573608c2b-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/faf48941282c12fff59724931529f7063da7b400df93d4282ba43a70b4ab1471.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Sénior femenino"
+          ],
+          "id": 11,
+          "name": "CIRCULAR Nº 8 · Liga 1.ª Territorial Femenino XV",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ad20bb00c9cc-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/a9506bbba1aaeb045befd034eb0f8402f5f8dec8aa376ac1102f1d0c7df8688a.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Sénior"
+          ],
+          "id": 12,
+          "name": "CIRCULAR Nº 9 · Liga 2.ª Territorial Masculino XV",
+          "official_url": "https://farugby.matchready.es/uploads/documentation/files/upload-6ad20bf3e3f60-documentation_file.pdf",
+          "review": "pendiente_revision",
+          "source": "FAR",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/55151314ddda2b1fbefda065499d97a18885574a4d909a8549a1fd5a4e2d87f2.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 42,
+          "name": "01 estatutos rfer 2.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/91125/01-estatutos-rfer-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "otro",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/d027bedeefae1eb7954bc4cd2aeddbefe3e5c001168386a10816099fce08c7c8.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 39,
+          "name": "02 reglamento general rfer 3.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/90965/02-reglamento-general-rfer-3.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/da10272b9a8af82bdd3b45265af2ce19924604504ecd87d98bafa918398ba4c1.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 40,
+          "name": "03 reglamento disciplinario rfer 2.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/90966/03-reglamento-disciplinario-rfer-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/4ad6e93b0bbe878c97494fd7ae01279e52a9dc34d76772d8678ab0861514209a.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 41,
+          "name": "04 reglamento de competiciones rfer.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/90967/04-reglamento-de-competiciones-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/f13345e5254dba12e208245f4a1b111675c5d49bfed9c3d60ebbbc57310c4617.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 43,
+          "name": "05 reglamento de agentes rugby cd 26 10 2020.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/68973/05-reglamento-de-agentes-rugby-cd-26-10-2020.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/66574b9cf36f442b0e12b63fd4f93a9bb5c93435c5b720e88bc65ec1e6147070.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 44,
+          "name": "06 reglamento de juego.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/68975/06-reglamento-de-juego.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/4492bc549a5f736501a9d07a466f8281edf1d99a6b9109b8a26c1044db63df21.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "M14"
+          ],
+          "id": 45,
+          "name": "07 variaciones a las reglas m14.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/68980/07-variaciones-a-las-reglas-m14.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/29aa5a5c7628231eee613cba4959cb26e606574f548b3e9143915e052bc219d8.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 46,
+          "name": "08 reglamentacion juego escuelas rugby.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/68977/08-reglamentacion-juego-escuelas-rugby.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "otro",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/db2180c13f19e4f46c3b0bc80ee093153404fc704cc51980320bb002f878a000.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 47,
+          "name": "09 reglamento electoral 2020.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/68976/09-reglamento-electoral-2020.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/2ab12bb55fdecffe27779d2bbaa15b72ee8da8069f27a2393428263d3032ab90.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 49,
+          "name": "1. Reglamento de Juego World Rugby · 4.77 MB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89901/1-reglamento-de-juego-world-rugby.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/4492bc549a5f736501a9d07a466f8281edf1d99a6b9109b8a26c1044db63df21.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 48,
+          "name": "10 normativa homologacion campos 2024.pdf",
+          "official_url": "https://ferugby.es/Descargar/1173/legislacion-fer/82337/10-normativa-homologacion-campos-2024.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "otro",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/2f4e736e817280d5646f8b6cadb4b010bfba797b89b08cb4455581433143424a.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "M14"
+          ],
+          "id": 50,
+          "name": "2. Variaciones a las Reglas M14 RFER · 1.27 MB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89903/2-variaciones-a-las-reglas-m14-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/29aa5a5c7628231eee613cba4959cb26e606574f548b3e9143915e052bc219d8.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 51,
+          "name": "3. Reglamentación Juego Escuelas Rugby RFER · 714.72 KB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89904/3-reglamentacion-juego-escuelas-rugby-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "otro",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/db2180c13f19e4f46c3b0bc80ee093153404fc704cc51980320bb002f878a000.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 52,
+          "name": "4. Reglamento M17 Femenino RFER · 467.36 KB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89902/4-reglamento-m17-femenino-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/d68b8d0261ebd577ec47940e7c80f278fa99cfc4619f5b3bb9edd583796bc0ea.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 53,
+          "name": "5. Reglamento de Juego Rugby Inclusivo XV RFER · 521.44 KB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89900/5-reglamento-de-juego-rugby-inclusivo-xv-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/9e5c217051d64d23c63871debd5693b3d07cdf64c210271eb02fd8c15255ab74.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 54,
+          "name": "6. Reglamento de Juego Rugby Inclusivo 7s RFER · 384.13 KB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89898/6-reglamento-de-juego-rugby-inclusivo-7s-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/3e6d419dd71c618ceebd39d657c14d73891cde702c89920d2130bc4c517f2fdc.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 55,
+          "name": "7. Reglamento de Juego Rugby Mater RFER · 305.05 KB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89899/7-reglamento-de-juego-rugby-mater-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/977ff6a7c862b661be8ebeabe31e9e6ee3169d60959af41fd18da9b43457f544.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "vigencia_por_revisar",
+          "categories": [
+            "Generales"
+          ],
+          "id": 56,
+          "name": "8. Reglamento Juego Rugby Escolar - Rugby Cinta RFER · 70.41 KB",
+          "official_url": "https://ferugby.es/Descargar/1795/reglamentos-de-juego/89897/8-reglamento-juego-rugby-escolar-rugby-cinta-rfer.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "reglamento",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/1de67cc3e78af0b5a5c0d76c9cf8fd7bf2a39fc68b9311c82e3c4613425c8608.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 16,
+          "name": "Circular 1. Criterios y requisitos para las competiciones nacionales en la Temporada 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/89907/circular-1-criterios-y-requisitos-para-las-competiciones-nacionales-en-la-temporada-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/3f5b543fef089be80905b6f1618a7cf8f61ab2afc3e4bf630897d3f19d8c879b.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 31,
+          "name": "Circular 10. Normativa Competición Nacional Menores de 23_B Masculina 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91016/circular-10-normativa-competicion-nacional-menores-de-23_b-masculina-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/5fe540c52d5ff25878f6a7d825c7d42d41beddd15d90976219b8597aca198c05.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 30,
+          "name": "Circular 11. Normativa Copa del Rey 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91015/circular-11-normativa-copa-del-rey-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/8608b52a0bb32aeeaa9b05c069fc00334b5bb73098c013abd2ca5f93a8489487.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M18"
+          ],
+          "id": 21,
+          "name": "Circular 15. Normativa Campeonato Selecciones Autonómicas Masculino M18 Primera División Temporada 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91006/circular-15-normativa-campeonato-selecciones-autonomicas-masculino-m18-primera-division-temporada-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/23b93ef67e3a5a40c4bbd2bd06e5d4349303bf4b713fa44d7d84ba85e04ff7db.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 23,
+          "name": "Circular 16. Normativa Campeonato Selecciones Autonómicas XV Femenino M17 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91008/circular-16-normativa-campeonato-selecciones-autonomicas-xv-femenino-m17-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/4338688d8af95419e7d65a70c18f1a9063d34df534de2c02c088be153b00ce8f.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M16"
+          ],
+          "id": 22,
+          "name": "Circular 17. Normativa Campeonato Selecciones Autonómicas Masculino M16 Primera División Temporada 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91007/circular-17-normativa-campeonato-selecciones-autonomicas-masculino-m16-primera-division-temporada-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/2128e86e6a9f08a916dc3c72b74cd41d3139f776d6c94957ee82a03d76ca8107.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 32,
+          "name": "Circular 18. Normativa Campeonato Selecciones Autonómicas XV Femenino M15 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91143/circular-18-normativa-campeonato-selecciones-autonomicas-xv-femenino-m15-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/bba4a6a712cd838fb91e43383e88d5983352e52eba1251c59baaeae97dd7f1f4.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M14"
+          ],
+          "id": 36,
+          "name": "Circular 19. Normativa Campeonato Selecciones Autonómicas XV M14 1ª D 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91147/circular-19-normativa-campeonato-selecciones-autonomicas-xv-m14-1a-d-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/5698362df8ccbb2159b9c6dab8af6865a3ed04f990a30d1262b390dfa91bd12c.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 18,
+          "name": "Circular 2. Normativa de expedición de licencias 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/90075/circular-2-normativa-de-expedicion-de-licencias-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/d4cd3a8ddf52136caf4ebe6445a64c6ac92bbb8f4fefd66c2261adfdaf524f00.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 34,
+          "name": "Circular 20. Normativa Campeonato Selecciones Autonómicas XV Femenino M19 2ª D 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91145/circular-20-normativa-campeonato-selecciones-autonomicas-xv-femenino-m19-2a-d-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/35a3c7f71acb0bb5f92b174b3a297aa361782759041650c68c1f148007a0469e.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M18"
+          ],
+          "id": 33,
+          "name": "Circular 21. Normativa Campeonato Selecciones Autonómicas Masculina M18 Segunda División Temporada 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91144/circular-21-normativa-campeonato-selecciones-autonomicas-masculina-m18-segunda-division-temporada-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/a27de502e413107d39af54b2a945b422027c47bb0818af16026c2ee6f013d7c7.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M16"
+          ],
+          "id": 35,
+          "name": "Circular 22. Normativa Campeonato Selecciones Autonómicas Masculina M16 Segunda División Temporada 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91146/circular-22-normativa-campeonato-selecciones-autonomicas-masculina-m16-segunda-division-temporada-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/37825927b70708d2952e8a3517bc5aaeaba38a8883ada2752aabd4df13ecf214.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M16"
+          ],
+          "id": 37,
+          "name": "Circular 23. Normativa Campeonato Selecciones Autonómicas XV Femenino M16 2ª D 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91148/circular-23-normativa-campeonato-selecciones-autonomicas-xv-femenino-m16-2a-d-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/0ce1cb15ef2204acdfca56aa1706832a1ed33288c4a3b867ae09952aa5a17490.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "M14"
+          ],
+          "id": 38,
+          "name": "Circular 24. Normativa Campeonato Selecciones Autonómicas XV M14 2ª D 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91149/circular-24-normativa-campeonato-selecciones-autonomicas-xv-m14-2a-d-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/200d38af825f61ffab046be84f513344f3d88c9fba66aa34cab0a9abb8897f76.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Sénior"
+          ],
+          "id": 17,
+          "name": "Circular 3. Requisitos que han de cumplir los clubes de DHM y DH Élite 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/90070/circular-3-requisitos-que-han-de-cumplir-los-clubes-de-dhm-y-dh-elite-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/dbb5888b0c81a6f7356a8eb0d1e79146cc646e888533463b8a00ce5b7025390c.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 19,
+          "name": "Circular 4. Normativa común a todas las competiciones nacionales 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/90132/circular-4-normativa-comun-a-todas-las-competiciones-nacionales-2026-27.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/f750ec4c90a1b99ead22f834f3ed00d6c95668fd33ce924088f85c9898150f79.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 24,
+          "name": "Circular 45. Normativa Festival España Mater Series 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91009/circular-45-normativa-festival-espana-mater-series-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/ef6d2298b2353645e22cb3f41b31c79323888f2184828207cef7c9c349c9b424.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 29,
+          "name": "Circular 5. Normativa Division Honor Masculina 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91014/circular-5-normativa-division-honor-masculina-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/7133069abc5ba463f70eafb3a631c25b6e2cf3c04a4c45be277fd7f56c5f48db.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 26,
+          "name": "Circular 6. Normativa División Élite Masculina 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91011/circular-6-normativa-division-elite-masculina-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/f92c27f979fc67a0e4d4a62283dbb37c527422365b052267eaa11a23f8b98db1.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 27,
+          "name": "Circular 7. Normativa División Honor B Masculina 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91012/circular-7-normativa-division-honor-b-masculina-2026-27-2.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/cd65b3514c5b8dd3c203d4b09199be3c1d20e64b57955e3fd159b60803c4ce90.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 28,
+          "name": "Circular 8. Normativa División Honor Femenina 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91013/circular-8-normativa-division-honor-femenina-2026-27-3.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/439bea413fb00ec911c28718b338b8262a1b09d134fdb535226557d9cd9234f1.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 25,
+          "name": "Circular 9. Normativa División Honor B Femenina 2026-27",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/91010/circular-9-normativa-division-honor-b-femenina-2026-27-3.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "circular",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/a57486741257b399c42a0a8aabf3d94caaa2c0aca152e0b995a6c319da7d1b6f.pdf",
+          "version": 1
+        },
+        {
+          "applicability": "temporada_en_fuente",
+          "categories": [
+            "Generales"
+          ],
+          "id": 20,
+          "name": "Reglamentación Audiovisual 2026-2027",
+          "official_url": "https://ferugby.es/Descargar/1793/circulares-26-27/90852/reglamentacion-audiovisual-2026-2027.pdf",
+          "review": "pendiente_revision",
+          "source": "FER",
+          "type": "otro",
+          "url": "https://sqrvvcklmudhonrqauey.supabase.co/storage/v1/object/public/documentos-oficiales/db74f95eeb5f1dba65dd039c5e85f55f6838b5b8e3644b87b4c473b268656a66.pdf",
+          "version": 1
+        }
+      ],
+      "name": "2026/27",
+      "sources": [
+        {
+          "source": "FAR",
+          "state": "actualizada"
+        },
+        {
+          "source": "FER",
+          "state": "actualizada"
+        }
+      ]
+    }
+  ]
+}
