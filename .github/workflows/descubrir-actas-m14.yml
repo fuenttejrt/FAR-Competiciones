@@ -282,6 +282,7 @@ jobs:
           pdf_counts=Counter()
           audit_pdfs=existing_actas if os.environ.get('EVENTO')!='schedule' else []
           identities94={v['id']:str(v['licencia']) for v in get('jugadores',{'select':'id,licencia'})} if audit_pdfs else {}
+          plans101=[]
           players98={}
           teams99={}
           for a in audit_pdfs+new_actas:
@@ -305,6 +306,7 @@ jobs:
                   for label,ok in [('equipos_local',local_ok),('equipos_visitante',away_ok),('marcador_textual',score_ok),('marcador_db',db_ok)]:
                       pdf_counts['89_'+label+('_ok' if ok else '_revisar')]+=1
                   if not all((local_ok,away_ok,score_ok,db_ok)):print('REVISION CONTENIDO 89',a['partido'],dict(local=local_ok,visitante=away_ok,marcador=score_ok,db=db_ok))
+                  if a in new_actas and not all((local_ok,away_ok,score_ok,db_ok)):raise ValueError('Prevalidación nueva acta 101')
                   digest=hashlib.sha256(' '.join(content.split()).encode()).hexdigest()
                   old=get('actas',{'partido_id':'eq.'+str(a['partido']),'select':'id,hash_contenido'})
                   if len(old)>1:raise ValueError('Acta duplicada')
@@ -337,6 +339,27 @@ jobs:
                       pdf_counts['93_minutos_sancion']+=sum(sum(v.values()) for v in events['sanction_minutes'].values())
                       pdf_counts['93_reincorporaciones']+=events['returns']
                       pdf_counts['93_registros_individuales']+=sum(len(v) for v in events['sanction_minutes'].values())
+                      # Build a private in-memory import manifest; never log participant identities.
+                      manifest101=dict(partido=a['partido'],acta=a['acta'],url=a['url'],hash_contenido=digest,marcador=[x,y],alineaciones=[],anotaciones=[],sustituciones=[],sanciones=[],participaciones=[],personal=staff)
+                      for side in ('local','visitante'):
+                          team=a['equipo_'+side+'_id']
+                          ids=core['identities'][side]
+                          if set(ids)!=set(core['roster'][side]) or len(set(ids.values()))!=len(ids):raise ValueError('Identidades 101')
+                          for d,lic in ids.items():
+                              manifest101['alineaciones'].append(dict(equipo_id=team,dorsal=d,licencia=str(lic),titular=d in core['starting'][side]))
+                              manifest101['participaciones'].append(dict(equipo_id=team,dorsal=d,minutos_jugados=events['participation'][side][0][d],minutos_sancionado=events['sanction_minutes'][side][d]))
+                          for k,m,d in core['scores'][side]:
+                              manifest101['anotaciones'].append(dict(equipo_id=team,tipo=k,minuto=m,dorsal=d))
+                          for m,k,ds,code in events['timeline'][side]:
+                              if k=='Cambios':manifest101['sustituciones'].append(dict(equipo_id=team,minuto=m,dorsal_entra=ds[0],dorsal_sale=ds[1]))
+                              else:manifest101['sanciones'].append(dict(equipo_id=team,minuto=m,dorsal=ds[0],tipo=k))
+                      if len(manifest101['alineaciones'])!=len(manifest101['participaciones']):raise ValueError('Cobertura 101')
+                      if json.loads(json.dumps(manifest101,sort_keys=True))!=manifest101:raise ValueError('Serialización 101')
+                      for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal'):pdf_counts['101_'+k]+=len(manifest101[k])
+                      pdf_counts['101_planes']+=1
+                      if a in new_actas:
+                          if old:raise ValueError('Acta nueva ya registrada 101')
+                          plans101.append(manifest101)
                       if a in audit_pdfs:
                           stored=get('alineaciones',{'partido_id':'eq.'+str(a['partido']),'select':'id,equipo_id,jugador_id,dorsal,titular'})
                           expected={}
@@ -474,6 +497,8 @@ jobs:
               dt100=sum(stored99[k]['datos_adicionales']!=v for k,v in tm100.items())
               print('CONCILIACION 100',json.dumps(dict(jugadores=len(pm100),equipos=len(tm100),metricas_jugadores=sum(map(len,pm100.values())),metricas_equipos=sum(map(len,tm100.values())),discrepancias_jugadores=dp100,discrepancias_equipos=dt100),sort_keys=True),'solo lectura')
               if dp100 or dt100:raise SystemExit('Métricas adicionales discrepantes 100')
+          if len(plans101)!=len(new_actas) or pdf_counts['101_planes']!=len(audit_pdfs)+len(new_actas):raise SystemExit('Planes incompletos 101')
+          print('PLAN IMPORTACION 101',json.dumps(dict(historicos=len(audit_pdfs),nuevos=len(plans101),registros={k:v for k,v in pdf_counts.items() if k.startswith('101_')},escritura=False),sort_keys=True))
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
