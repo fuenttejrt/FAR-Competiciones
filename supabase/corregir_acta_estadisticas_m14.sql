@@ -1,7 +1,7 @@
 begin;
 create or replace function public.corregir_acta_estadisticas_m14(p_acta jsonb,p_version_esperada integer,p_hash_anterior text,p_simular boolean default true)
 returns jsonb language plpgsql security invoker set search_path=public,pg_temp as $$
-declare pid bigint; p record; a record; v jsonb; j record; jid bigint; al bigint; en bigint; sa bigint; team bigint; v_dorsal integer; mins integer; pen integer; k text; result jsonb;
+declare pid bigint; p record; v_acta_actual record; v jsonb; j record; jid bigint; al bigint; en bigint; sa bigint; team bigint; v_dorsal integer; mins integer; pen integer; k text; result jsonb;
  marcador jsonb; n integer; counts jsonb:='{}'; previous jsonb; players jsonb; teams jsonb;
 begin
  if p_simular is null or p_version_esperada is null or p_version_esperada<1 or coalesce(p_hash_anterior,'') !~ '^[0-9a-f]{64}$' then raise exception 'Modo o version invalida'; end if;
@@ -23,13 +23,13 @@ begin
 
  lock table competiciones,equipos,jornadas,partidos,actas,actas_versiones,jugadores,jugadores_equipos,alineaciones,anotaciones,sustituciones,sanciones,participaciones,personal_partidos,estadisticas_jugadores,estadisticas_equipos in share row exclusive mode;
  select p0.* into strict p from partidos p0 join jornadas jo on jo.id=p0.jornada_id join competiciones c on c.id=jo.competicion_id where p0.id=pid and c.id_oficial in ('35/11','35/12','35/15');
- select * into strict a from actas where partido_id=pid;
- if a.url_pdf is distinct from p_acta->>'url' or p.url_acta is distinct from a.url_pdf then raise exception 'Origen de correccion discrepante'; end if;
- if a.hash_contenido=p_acta->>'hash_contenido' then
-  if a.datos is distinct from p_acta then raise exception 'Misma huella con datos diferentes'; end if;
-  return jsonb_build_object('estado','existente','version',a.version,'simulacion',p_simular,'escritura',false);
+ select * into strict v_acta_actual from actas where partido_id=pid;
+ if v_acta_actual.url_pdf is distinct from p_acta->>'url' or p.url_acta is distinct from v_acta_actual.url_pdf then raise exception 'Origen de correccion discrepante'; end if;
+ if v_acta_actual.hash_contenido=p_acta->>'hash_contenido' then
+  if v_acta_actual.datos is distinct from p_acta then raise exception 'Misma huella con datos diferentes'; end if;
+  return jsonb_build_object('estado','existente','version',v_acta_actual.version,'simulacion',p_simular,'escritura',false);
  end if;
- if a.version is distinct from p_version_esperada or a.hash_contenido is distinct from p_hash_anterior then raise exception 'Conflicto de version'; end if;
+ if v_acta_actual.version is distinct from p_version_esperada or v_acta_actual.hash_contenido is distinct from p_hash_anterior then raise exception 'Conflicto de version'; end if;
  -- Reject every untrusted reference before writing.
  foreach k in array array['alineaciones','anotaciones','sustituciones','sanciones','participaciones'] loop
   for v in select value from jsonb_array_elements(p_acta->k) loop
@@ -52,16 +52,16 @@ begin
  end loop;
 
  begin
-  previous:=jsonb_build_object('acta',to_jsonb(a),'partido',to_jsonb(p),
+  previous:=jsonb_build_object('acta',to_jsonb(v_acta_actual),'partido',to_jsonb(p),
    'alineaciones',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from alineaciones t where t.partido_id=pid),
    'participaciones',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from participaciones t join alineaciones b on b.id=t.alineacion_id where b.partido_id=pid),
    'anotaciones',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from anotaciones t where t.partido_id=pid),
    'sustituciones',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from sustituciones t where t.partido_id=pid),
    'sanciones',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from sanciones t where t.partido_id=pid),
    'personal',(select coalesce(jsonb_agg(to_jsonb(t)),'[]'::jsonb) from personal_partidos t where t.partido_id=pid));
-  if exists(select 1 from actas_versiones where acta_id=a.id and version=a.version and hash_contenido is distinct from a.hash_contenido) then raise exception 'Historial de version discrepante'; end if;
+  if exists(select 1 from actas_versiones where acta_id=v_acta_actual.id and version=v_acta_actual.version and hash_contenido is distinct from v_acta_actual.hash_contenido) then raise exception 'Historial de version discrepante'; end if;
   insert into actas_versiones(acta_id,version,hash_contenido,datos,motivo)
-  values(a.id,a.version,a.hash_contenido,jsonb_build_object('snapshot_previo',previous),'Conservacion anterior a correccion')
+  values(v_acta_actual.id,v_acta_actual.version,v_acta_actual.hash_contenido,jsonb_build_object('snapshot_previo',previous),'Conservacion anterior a correccion')
   on conflict(acta_id,version) do update set datos=actas_versiones.datos||excluded.datos
   where not (actas_versiones.datos ? 'snapshot_previo');
   delete from participaciones where alineacion_id in(select id from alineaciones where partido_id=pid);
@@ -109,17 +109,17 @@ begin
    if (team is not null and team not in (p.equipo_local_id,p.equipo_visitante_id)) or coalesce(v->>'funcion','') not in ('Entrenador','Delegado','Juez línea','Árbitro principal','Delegado de campo','Médico') or coalesce(btrim(v->>'licencia'),'')='' or (team is null) is distinct from (v->>'funcion' in ('Árbitro principal','Delegado de campo','Médico')) or (coalesce(btrim(v->>'nombre_completo'),'')='' and v->>'funcion'<>'Juez línea') then raise exception 'Personal invalido'; end if;
    insert into personal_partidos(partido_id,equipo_id,nombre_completo,licencia,funcion) values(p.id,team,v->>'nombre_completo',v->>'licencia',v->>'funcion');
   end loop;
-  if (select count(*) from participaciones t join alineaciones a on a.id=t.alineacion_id where a.partido_id=p.id)<>jsonb_array_length(p_acta->'alineaciones') then raise exception 'Participaciones incompletas'; end if;
+  if (select count(*) from participaciones t join alineaciones b on b.id=t.alineacion_id where b.partido_id=p.id)<>jsonb_array_length(p_acta->'alineaciones') then raise exception 'Participaciones incompletas'; end if;
 
-  update actas set hash_contenido=p_acta->>'hash_contenido',version=a.version+1,datos=p_acta,estado_validacion='pendiente',
-   version_procesador='122',descargada_en=now(),comprobada_en=now(),actualizada_en=now() where id=a.id;
+  update actas set hash_contenido=p_acta->>'hash_contenido',version=v_acta_actual.version+1,datos=p_acta,estado_validacion='pendiente',
+   version_procesador='122',descargada_en=now(),comprobada_en=now(),actualizada_en=now() where id=v_acta_actual.id;
   insert into actas_versiones(acta_id,version,hash_contenido,datos,motivo)
-  values(a.id,a.version+1,p_acta->>'hash_contenido',p_acta,'Correccion integral de contenido oficial');
+  values(v_acta_actual.id,v_acta_actual.version+1,p_acta->>'hash_contenido',p_acta,'Correccion integral de contenido oficial');
   update partidos set puntos_local=(marcador->>0)::int,puntos_visitante=(marcador->>1)::int,estado='finalizado' where id=pid;
   players:=recalcular_jugadores_m14(false);
   teams:=recalcular_equipos_m14(false);
   if recalcular_jugadores_m14(true)->'discrepancias' is distinct from '0'::jsonb or recalcular_equipos_m14(true)->'discrepancias' is distinct from '0'::jsonb then raise exception 'Estadisticas corregidas no conciliadas'; end if;
-  result:=jsonb_build_object('estado','corregido','version',a.version+1,'registros',counts,'simulacion',p_simular,'escritura',not p_simular,'version_anterior_conservada',true);
+  result:=jsonb_build_object('estado','corregido','version',v_acta_actual.version+1,'registros',counts,'simulacion',p_simular,'escritura',not p_simular,'version_anterior_conservada',true);
   if p_simular then raise exception using errcode='ZX122',message='Reversion de correccion y estadisticas'; end if;
  exception when sqlstate 'ZX122' then
   if not p_simular then raise; end if;
