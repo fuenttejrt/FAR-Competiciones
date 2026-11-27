@@ -389,6 +389,19 @@ jobs:
                           pdf_counts['96_sustituciones_conciliadas']+=len(changes_db96)
                           pdf_counts['96_sanciones_conciliadas']+=len(sanctions_db96)
                           pdf_counts['96_actas_conciliadas']+=1
+                          staff_db97=get('personal_partidos',{'partido_id':'eq.'+str(a['partido']),'select':'equipo_id,funcion,licencia,nombre_completo'})
+                          def staff_key97(v):
+                              return (v['equipo_id'],v['funcion'],v['licencia'],v['nombre_completo'])
+                          if Counter(map(staff_key97,staff_db97))!=Counter(map(staff_key97,staff)):raise ValueError('Conciliación personal 97')
+                          for v in staff:
+                              side=next((side for side in ('local','visitante') if a['equipo_'+side+'_id']==v['equipo_id']),None)
+                              in_roster=side is not None and str(v['licencia']) in {str(x) for x in core['identities'][side].values()}
+                              if in_roster!=v['en_alineacion']:raise ValueError('Vínculo alineación personal 97')
+                          pdf_counts['97_personal_conciliado']+=len(staff_db97)
+                          pdf_counts['97_completos']+=sum(bool(v['nombre_completo']) for v in staff_db97)
+                          pdf_counts['97_parciales']+=sum(not v['nombre_completo'] for v in staff_db97)
+                          pdf_counts['97_jueces_en_alineacion']+=sum(v['funcion']=='Juez línea' and v['en_alineacion'] for v in staff)
+                          pdf_counts['97_actas_conciliadas']+=1
                       pdf_counts['90_actas']+=1
                       pdf_counts['90_alineaciones']+=sum(len(v) for v in core['roster'].values())
                       pdf_counts['90_titulares']+=sum(len(v) for v in core['starting'].values())
