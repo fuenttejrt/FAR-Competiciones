@@ -59,6 +59,14 @@ jobs:
                   with urllib.request.urlopen(req,timeout=30) as r: page=json.load(r)
                   rows.extend(page)
                   if len(page)<200:return rows
+          if os.environ.get('EVENTO')!='schedule' and os.environ.get('GUARDAR_RESULTADOS')!='true':
+              req107=urllib.request.Request(base+'/rest/v1/rpc/contrato_importacion_m14',data=b'{}',headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              with urllib.request.urlopen(req107,timeout=60) as resp:contract107=json.load(resp)
+              expected107={'actas','actas_versiones','jugadores','jugadores_equipos','alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal_partidos','partidos'}
+              if {v['tabla'] for v in contract107['columnas']}!=expected107:raise SystemExit('Contrato incompleto 107')
+              for k in ('columnas','restricciones','indices'):
+                  for v in contract107[k]:print('CONTRATO 107',k,json.dumps(v,ensure_ascii=True,sort_keys=True))
+              print('RESUMEN CONTRATO 107',json.dumps(dict(tablas=len(expected107),columnas=len(contract107['columnas']),restricciones=len(contract107['restricciones']),indices=len(contract107['indices']),escritura=False),sort_keys=True))
           def actid(url):
               u=urllib.parse.urlparse(urllib.parse.urljoin(host,url or ''))
               m=re.fullmatch(r'/es/public/competition/match_pdf/(\d+)/act/?',u.path)
