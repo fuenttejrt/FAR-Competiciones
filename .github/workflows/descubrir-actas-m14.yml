@@ -477,6 +477,21 @@ jobs:
                               if result110!={'anotaciones':3,'puntos':14,'sustituciones':1,'sanciones':2,'duplicado_rechazado':True,'reversion':True}:raise SystemExit('Escritura reversible 110 discrepante')
                               print('ESCRITURA SQL 110',json.dumps(result110,sort_keys=True))
                               pdf_counts['110_prueba']+=1
+                              print('INICIO SQL 111',flush=True)
+                              req111=urllib.request.Request(base+'/rest/v1/rpc/probar_escritura_participaciones_m14',data=json.dumps(dict(p_acta=manifest101)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                              try:
+                                  with urllib.request.urlopen(req111,timeout=25) as resp:result111=json.load(resp)
+                              except urllib.error.HTTPError as exc:
+                                  try:err111=json.loads(exc.read())
+                                  except Exception:err111={}
+                                  print('DIAGNOSTICO SQL 111',exc.code,err111.get('code',''),flush=True)
+                                  raise SystemExit('Prueba SQL 111 fallida')
+                              except Exception as exc:
+                                  print('DIAGNOSTICO SQL 111',type(exc).__name__,flush=True)
+                                  raise SystemExit('Prueba SQL 111 interrumpida')
+                              if result111!={'participaciones':2,'minutos_jugados':31,'minutos_sancionado':5,'personal':2,'duplicado_rechazado':True,'reversion':True}:raise SystemExit('Escritura reversible 111 discrepante')
+                              print('ESCRITURA SQL 111',json.dumps(result111,sort_keys=True))
+                              pdf_counts['111_prueba']+=1
 
 
 
