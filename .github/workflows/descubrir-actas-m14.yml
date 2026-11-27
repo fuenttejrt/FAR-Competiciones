@@ -673,6 +673,27 @@ jobs:
           if audit_pdfs and (pdf_counts['105_pruebas']!=8 or pdf_counts['105_repeticion']!=1):raise SystemExit('Pruebas de protección incompletas 105')
           print('PROTECCIONES SQL 105',json.dumps(dict(rechazos=pdf_counts['105_pruebas'],repeticion=pdf_counts['105_repeticion'],escritura=False),sort_keys=True))
           print('PREVALIDACION SQL 104',json.dumps(dict(existentes=pdf_counts['104_existente'],candidatos=pdf_counts['104_candidato'],escritura=False),sort_keys=True))
+          # 117: every validated new acta exercises the integral importer in simulation.
+          simulated117=Counter()
+          for plan117 in plans101:
+              expected117=dict(estado='importado',registros={k:len(plan117[k]) for k in ('alineaciones','anotaciones','sustituciones','sanciones','participaciones','personal')},simulacion=True,escritura=False)
+              req117=urllib.request.Request(base+'/rest/v1/rpc/importar_acta_integral_m14',data=json.dumps(dict(p_acta=plan117,p_simular=True)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+              try:
+                  with pdf_opener.open(req117,timeout=30) as resp:result117=json.load(resp)
+              except urllib.error.HTTPError as exc:
+                  try:error117=json.loads(exc.read())
+                  except Exception:error117={}
+                  print('DIAGNOSTICO IMPORTADOR 117',exc.code,error117.get('code',''),flush=True)
+                  raise SystemExit('Simulacion integral de nueva acta fallida')
+              if result117!=expected117:raise SystemExit('Simulacion integral de nueva acta discrepante')
+              # The candidate must remain empty and eligible after simulation.
+              check117=prevalidate104(plan117)
+              if check117.get('estado')!='candidato' or check117.get('registros')!=expected117['registros'] or check117.get('escritura') is not False:
+                  raise SystemExit('Reversion de nueva acta no confirmada')
+              simulated117['actas']+=1
+              simulated117.update(expected117['registros'])
+          if simulated117['actas']!=len(new_actas):raise SystemExit('Cobertura integral de nuevas actas incompleta')
+          print('SIMULACION NUEVAS ACTAS 117',json.dumps(dict(candidatas=len(new_actas),simuladas=simulated117['actas'],registros={k:v for k,v in simulated117.items() if k!='actas'},escritura=False),sort_keys=True),flush=True)
           history=get('historial_calendario_m14',{'select':'id,entidad,entidad_id,anterior,nuevo'})
           expected_ids={19,20,21,22,23,24,49,50,51,52,53,54,79,80,81,82,83,84}
           initial=[h for h in history if h['entidad']=='partido' and h['entidad_id'] in expected_ids and h['anterior'].get('fecha_hora') is None]
