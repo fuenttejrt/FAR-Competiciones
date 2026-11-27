@@ -1,0 +1,69 @@
+name: Validar automatizacion M14
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/validar-automatizacion-m14.yml'
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: validar-automatizacion-m14
+  cancel-in-progress: false
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Ejecutar correcciones y nuevas actas en modo autorizado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -u - <<'PY'
+          import json,os,time,urllib.request,urllib.error
+          repo=os.environ['GITHUB_REPOSITORY']
+          sha=os.environ['GITHUB_SHA']
+          def api(path, data=None):
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Content-Type':'application/json','Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}
+              req=urllib.request.Request('https://api.github.com/repos/'+repo+'/'+path,headers=headers,data=None if data is None else json.dumps(data).encode(),method='GET' if data is None else 'POST')
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      raw=r.read()
+                      return json.loads(raw) if raw else None
+              except urllib.error.HTTPError as e:
+                  raise SystemExit('GitHub API HTTP '+str(e.code))
+          def run(workflow, inputs, title):
+              if api('commits/main')['sha']!=sha:
+                  raise SystemExit('La rama main ha cambiado: repetir validacion con la version actual')
+              path='actions/workflows/'+workflow
+              before={r['id'] for r in api(path+'/runs?event=workflow_dispatch&per_page=20')['workflow_runs']}
+              api(path+'/dispatches',dict(ref='main',inputs=inputs))
+              deadline=time.monotonic()+1200
+              selected=None
+              while time.monotonic()<deadline:
+                  if selected is None:
+                      candidates=[r for r in api(path+'/runs?event=workflow_dispatch&per_page=20')['workflow_runs'] if r['id'] not in before and r['head_sha']==sha]
+                      if len(candidates)>1:
+                          raise SystemExit('Varias ejecuciones candidatas: revisar enlaces en GitHub')
+                      if candidates:
+                          selected=candidates[0]['id']
+                          link=candidates[0]['html_url']
+                          print(title,link,flush=True)
+                          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
+                              summary.write('- ['+title+']('+link+')\n')
+                  if selected is not None:
+                      result=api('actions/runs/'+str(selected))
+                      if result['status']=='completed':
+                          conclusion=result['conclusion']
+                          print(title,conclusion,flush=True)
+                          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
+                              summary.write('  Resultado: '+str(conclusion)+'\n')
+                          if conclusion!='success':
+                              raise SystemExit(title+': '+str(conclusion))
+                          return
+                  time.sleep(20)
+              raise SystemExit('Tiempo limite: consultar ejecucion hija antes de repetir')
+          run('detectar-cambios-m14.yml',{'aplicar_correcciones':True},'Correcciones autorizadas')
+          run('descubrir-actas-m14.yml',{'guardar_actas':True,'actualizar_resultados':True,'actualizar_calendario':True,'probar_modo_autorizado':False},'Nuevas actas y resultados autorizados')
+          print('VALIDACION 125: ambos flujos autorizados completados',flush=True)
+          PY
