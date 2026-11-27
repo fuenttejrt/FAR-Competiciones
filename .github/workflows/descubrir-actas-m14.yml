@@ -27,6 +27,7 @@ permissions:
 jobs:
   descubrir:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - run: pip install beautifulsoup4 pypdf pdfplumber
@@ -39,7 +40,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
-          python - <<'PY'
+          python -u - <<'PY'
           import os,json,re,urllib.request,urllib.parse,unicodedata,io,hashlib
           from pypdf import PdfReader
           from scripts.extract_m14_core import extract_roster_scoring, extract_events, extract_staff
@@ -444,8 +445,9 @@ jobs:
                               print('ESCRITURA SQL 108',json.dumps(result108,sort_keys=True))
                               pdf_counts['108_prueba']+=1
                               req109=urllib.request.Request(base+'/rest/v1/rpc/probar_escritura_jugadores_m14',data=json.dumps(dict(p_acta=manifest101)).encode(),headers={'apikey':key,'Content-Type':'application/json'},method='POST')
+                              print('INICIO SQL 109',flush=True)
                               try:
-                                  with urllib.request.urlopen(req109,timeout=60) as resp:result109=json.load(resp)
+                                  with urllib.request.urlopen(req109,timeout=25) as resp:result109=json.load(resp)
                               except urllib.error.HTTPError as exc:
                                   try:err109=json.loads(exc.read())
                                   except Exception:err109={}
@@ -453,7 +455,10 @@ jobs:
                                   safe109={'Origen no confirmado','Sin partido de prueba','Identidad no confirmada','Muestra insuficiente','Relaciones no conciliadas','Duplicado permitido','Alineación duplicada permitida','Reversión no confirmada'}
                                   msg109=err109.get('message','')
                                   print('DIAGNOSTICO SQL 109',exc.code,code109,msg109 if msg109 in safe109 else 'mensaje reservado')
-                                  raise
+                                  raise SystemExit('Prueba SQL 109 fallida')
+                              except Exception as exc:
+                                  print('DIAGNOSTICO SQL 109',type(exc).__name__,flush=True)
+                                  raise SystemExit('Prueba SQL 109 interrumpida')
                               if result109!={'existentes':2,'nuevos':1,'alineaciones':3,'relaciones_verificadas':True,'duplicados_rechazados':True,'reversion':True}:raise ValueError('Escritura reversible 109')
                               print('ESCRITURA SQL 109',json.dumps(result109,sort_keys=True))
                               pdf_counts['109_prueba']+=1
